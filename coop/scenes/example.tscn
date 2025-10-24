@@ -5,8 +5,10 @@
 [ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/player.tscn" id="3_cs02y"]
 
 [node name="Example" type="Node2D"]
+position = Vector2(110, 58)
 
 [node name="InitialUI" parent="." instance=ExtResource("1_qmlxk")]
+metadata/_edit_use_anchors_ = true
 
 [node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
 _spawnable_scenes = PackedStringArray("uid://ewcge3xong6o")

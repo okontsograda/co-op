@@ -9,7 +9,8 @@ func _ready() -> void:
 	print("Player ", name, " (peer ", peer_id, ") has authority: ", is_multiplayer_authority())
 	print("Current multiplayer peer: ", multiplayer.get_unique_id())
 	print("Is server: ", multiplayer.is_server())
-	
+	print("Player position: ", position)
+	print("Player visible: ", visible)
 	
 	# Try using the actual multiplayer peer ID instead
 	if peer_id == multiplayer.get_unique_id():

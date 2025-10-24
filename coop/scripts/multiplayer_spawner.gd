@@ -6,9 +6,11 @@ func _ready() -> void:
 	multiplayer.peer_connected.connect(spawn_player)
 	spawned.connect(_on_player_spawned)
 	
-	# If we're the server, spawn our own player
-	if multiplayer.is_server():
-		call_deferred("_spawn_server_player")
+	# Add to group so it can be found by the initial UI
+	add_to_group("multiplayer_spawner")
+	
+	# Only spawn server player when we actually start hosting
+	# This prevents spawning before the server is created
 
 func _on_peer_connected(peer_id: int) -> void:
 	print("Peer connected: ", peer_id)
@@ -16,13 +18,10 @@ func _on_peer_connected(peer_id: int) -> void:
 
 func _on_player_spawned(node: Node) -> void:
 	print("Player spawned via MultiplayerSpawner: ", node.name)
+	print("Player position: ", node.position)
+	print("Player visible: ", node.visible)
 
-func _spawn_server_player() -> void:
-	print("Spawning server player")
-	var player: Node = network_player.instantiate()
-	player.name = "1"  # Server is always peer 1
-	get_node(spawn_path).call_deferred("add_child", player)
-	print("Server player spawned with name: ", player.name)
+# Server player spawning is now handled by initial_ui.gd when hosting starts
 
 func spawn_player(peer_id: int) -> void:
 	if !multiplayer.is_server(): return
