@@ -9,22 +9,45 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 script = ExtResource("1_e1qs8")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
-layout_mode = 0
-offset_left = 53.0
-offset_top = 54.0
-offset_right = 95.0
-offset_bottom = 87.0
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -80.75
+offset_top = -46.5
+offset_right = 80.75
+offset_bottom = 46.5
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="Server" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-text = "Server"
+text = "Host Game"
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 15)
+layout_mode = 2
+
+[node name="HostOnlineID" type="LineEdit" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
 
 [node name="Client" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-text = "Client"
+text = "Join Game"
+
+[node name="OnlineID" type="Label" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Loading ... "
+horizontal_alignment = 1
 
 [connection signal="pressed" from="VBoxContainer/Server" to="." method="_on_server_pressed"]
 [connection signal="pressed" from="VBoxContainer/Client" to="." method="_on_client_pressed"]

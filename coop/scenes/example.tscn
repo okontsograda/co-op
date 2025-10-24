@@ -5,10 +5,26 @@
 [ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/player.tscn" id="3_cs02y"]
 
 [node name="Example" type="Node2D"]
-position = Vector2(110, 58)
 
 [node name="InitialUI" parent="." instance=ExtResource("1_qmlxk")]
-metadata/_edit_use_anchors_ = true
+offset_left = 607.0
+offset_top = 347.0
+offset_right = 607.0
+offset_bottom = 347.0
+
+[node name="SpawnPoints" type="Node2D" parent="."]
+
+[node name="SpawnPoint1" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(100, 100)
+
+[node name="SpawnPoint2" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(300, 100)
+
+[node name="SpawnPoint3" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(500, 100)
+
+[node name="SpawnPoint4" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(700, 100)
 
 [node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
 _spawnable_scenes = PackedStringArray("uid://ewcge3xong6o")
