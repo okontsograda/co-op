@@ -1,0 +1,15 @@
+[gd_scene load_steps=4 format=3 uid="uid://c66m8oem8ehsl"]
+
+[ext_resource type="PackedScene" uid="uid://clfiwyexivjfm" path="res://coop/scenes/initial_ui.tscn" id="1_qmlxk"]
+[ext_resource type="Script" uid="uid://dxhnfj6uhslxp" path="res://coop/scripts/multiplayer_spawner.gd" id="2_cs02y"]
+[ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/player.tscn" id="3_cs02y"]
+
+[node name="Example" type="Node2D"]
+
+[node name="InitialUI" parent="." instance=ExtResource("1_qmlxk")]
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("uid://ewcge3xong6o")
+spawn_path = NodePath("..")
+script = ExtResource("2_cs02y")
+network_player = ExtResource("3_cs02y")

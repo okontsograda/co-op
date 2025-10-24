@@ -1,0 +1,34 @@
+[gd_scene load_steps=7 format=3 uid="uid://ewcge3xong6o"]
+
+[ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_6w5ry"]
+[ext_resource type="Texture2D" uid="uid://bscv6mbrlxqfm" path="res://player.png" id="1_78wma"]
+[ext_resource type="PackedScene" uid="uid://b8x7k9m2n4p5q" path="res://coop/scenes/chat_ui.tscn" id="2_chat_ui"]
+[ext_resource type="PackedScene" uid="uid://c7x8k9m3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="3_chat_bubble"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_6w5ry"]
+radius = 26.0
+height = 52.0
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_3kx2g"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_6w5ry")
+
+[node name="Player" type="Sprite2D" parent="."]
+position = Vector2(-2, -44)
+scale = Vector2(0.30666667, 0.30666667)
+texture = ExtResource("1_78wma")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(-1, -27)
+shape = SubResource("CapsuleShape2D_6w5ry")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_3kx2g")
+
+[node name="ChatUI" parent="." instance=ExtResource("2_chat_ui")]
+
+[node name="ChatBubble" parent="." instance=ExtResource("3_chat_bubble")]

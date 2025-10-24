@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cax8k7m6n5p4q"]
+
+[ext_resource type="Script" path="res://coop/scripts/dedicated_server.gd" id="1_dedicated_server"]
+
+[node name="DedicatedServer" type="Node"]
+script = ExtResource("1_dedicated_server")
