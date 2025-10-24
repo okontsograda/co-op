@@ -81,25 +81,12 @@ func _physics_process(_delta: float) -> void:
 	move_and_slide()
 func _on_chat_message_received(player_name: String, message: String) -> void:
 	print("Player ", name, " received chat message from ", player_name, ": ", message)
-	print("Player ", name, " peer ID: ", name.to_int(), ", message from: ", player_name)
-	print("Player ", name, " multiplayer unique ID: ", multiplayer.get_unique_id())
 	
 	# Check if this message is from this specific player
 	var is_message_from_this_player = (player_name == name or player_name == str(name.to_int()))
 	
-	print("DEBUG: player_name = '", player_name, "'")
-	print("DEBUG: name = '", name, "'")
-	print("DEBUG: str(name.to_int()) = '", str(name.to_int()), "'")
-	print("DEBUG: is_message_from_this_player = ", is_message_from_this_player)
-	
 	if is_message_from_this_player:
-		print("This message is from this player, showing chat bubble")
-		var chat_bubble = get_node("ChatBubble")
-		if chat_bubble:
-			print("Chat bubble found, showing message")
-			chat_bubble.show_message(message)
-		else:
-			print("ERROR: Chat bubble not found!")
+		print("This is our own message, ignoring (already shown locally)")
 	else:
 		print("Message from another player, finding their player and showing chat bubble")
 		# Find the player who sent this message and show it above them
