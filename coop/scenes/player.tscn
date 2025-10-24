@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_6w5ry"]
 [ext_resource type="Texture2D" uid="uid://bscv6mbrlxqfm" path="res://player.png" id="1_78wma"]
-[ext_resource type="PackedScene" uid="uid://b8x7k9m2n4p5q" path="res://coop/scenes/chat_ui.tscn" id="2_chat_ui"]
-[ext_resource type="PackedScene" uid="uid://c7x8k9m3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="3_chat_bubble"]
+[ext_resource type="PackedScene" uid="uid://b8x7lam2n4p5q" path="res://coop/scenes/chat_ui.tscn" id="2_chat_ui"]
+[ext_resource type="PackedScene" uid="uid://c7x8lam3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="3_chat_bubble"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_6w5ry"]
 radius = 26.0
@@ -30,5 +30,9 @@ shape = SubResource("CapsuleShape2D_6w5ry")
 replication_config = SubResource("SceneReplicationConfig_3kx2g")
 
 [node name="ChatUI" parent="." instance=ExtResource("2_chat_ui")]
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="ChatBubble" parent="." instance=ExtResource("3_chat_bubble")]
+grow_horizontal = 2
+grow_vertical = 2

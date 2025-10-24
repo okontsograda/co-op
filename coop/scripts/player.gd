@@ -45,6 +45,14 @@ func _physics_process(_delta: float) -> void:
 	if !is_multiplayer_authority(): 
 		return
 	
+	# Check if chat is active - if so, don't process movement
+	var chat_ui = get_node("ChatUI")
+	if chat_ui and chat_ui.is_chat_active:
+		# Chat is active, don't process movement
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+	
 	# Use direct key input instead of input actions
 	var direction = Vector2()
 	
@@ -68,7 +76,6 @@ func _physics_process(_delta: float) -> void:
 	
 	velocity = direction * speed
 	move_and_slide()
-
 func _on_chat_message_received(player_name: String, message: String) -> void:
 	print("Player ", name, " received chat message from ", player_name, ": ", message)
 	print("Player ", name, " peer ID: ", name.to_int(), ", message from: ", player_name)
@@ -93,12 +100,12 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 		is_our_message = true
 	
 	if is_our_message:
-		print("This is our message, showing chat bubble")
+		print("This is our message, ignoring (already shown by chat UI)")
+	else:
+		print("Message from another player, showing chat bubble")
 		var chat_bubble = get_node("ChatBubble")
 		if chat_bubble:
 			print("Chat bubble found, showing message")
 			chat_bubble.show_message(message)
 		else:
 			print("ERROR: Chat bubble not found!")
-	else:
-		print("Message not from this player, ignoring")
