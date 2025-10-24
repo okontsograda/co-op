@@ -12,6 +12,9 @@ func _ready() -> void:
 	print("Player position: ", position)
 	print("Player visible: ", visible)
 	
+	# Add to players group so it can be found by other players
+	add_to_group("players")
+	
 	# Try using the actual multiplayer peer ID instead
 	if peer_id == multiplayer.get_unique_id():
 		print("This player should have authority!")
@@ -81,31 +84,47 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 	print("Player ", name, " peer ID: ", name.to_int(), ", message from: ", player_name)
 	print("Player ", name, " multiplayer unique ID: ", multiplayer.get_unique_id())
 	
-	# Check if this message is from this player using multiple methods
-	var is_our_message = false
+	# Check if this message is from this specific player
+	var is_message_from_this_player = (player_name == name or player_name == str(name.to_int()))
 	
-	# Method 1: Check if player_name matches our name
-	if player_name == name:
-		print("Match by name: ", player_name, " == ", name)
-		is_our_message = true
+	print("DEBUG: player_name = '", player_name, "'")
+	print("DEBUG: name = '", name, "'")
+	print("DEBUG: str(name.to_int()) = '", str(name.to_int()), "'")
+	print("DEBUG: is_message_from_this_player = ", is_message_from_this_player)
 	
-	# Method 2: Check if player_name matches our multiplayer unique ID
-	elif player_name == str(multiplayer.get_unique_id()):
-		print("Match by unique ID: ", player_name, " == ", str(multiplayer.get_unique_id()))
-		is_our_message = true
-	
-	# Method 3: Check if our name matches the sender's unique ID
-	elif name == player_name:
-		print("Match by name to unique ID: ", name, " == ", player_name)
-		is_our_message = true
-	
-	if is_our_message:
-		print("This is our message, ignoring (already shown by chat UI)")
-	else:
-		print("Message from another player, showing chat bubble")
+	if is_message_from_this_player:
+		print("This message is from this player, showing chat bubble")
 		var chat_bubble = get_node("ChatBubble")
 		if chat_bubble:
 			print("Chat bubble found, showing message")
 			chat_bubble.show_message(message)
 		else:
 			print("ERROR: Chat bubble not found!")
+	else:
+		print("Message from another player, finding their player and showing chat bubble")
+		# Find the player who sent this message and show it above them
+		var sender_player = find_player_by_name(player_name)
+		if sender_player:
+			var chat_bubble = sender_player.get_node("ChatBubble")
+			if chat_bubble:
+				print("Chat bubble found on sender player, showing message")
+				chat_bubble.show_message(message)
+			else:
+				print("ERROR: Chat bubble not found on sender player!")
+		else:
+			print("ERROR: Sender player not found!")
+
+func find_player_by_name(player_name: String) -> Node2D:
+	# Find the player with the given name in the scene
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		if player.name == player_name or str(player.name.to_int()) == player_name:
+			return player
+	
+	# Fallback: search all nodes in the scene
+	var all_nodes = get_tree().get_nodes_in_group("")
+	for node in all_nodes:
+		if node.name == player_name and node.has_method("get_node"):
+			return node
+	
+	return null

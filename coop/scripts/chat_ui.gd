@@ -57,9 +57,6 @@ func _on_text_submitted(text: String) -> void:
 		close_chat()
 		return
 	
-	# Show our own message above our player immediately
-	show_own_message(text.strip_edges())
-	
 	# Send message through network handler
 	if NetworkHandler:
 		print("ChatUI: Sending message through NetworkHandler")
@@ -72,18 +69,6 @@ func _on_text_submitted(text: String) -> void:
 	print("ChatUI: Closing chat after sending message")
 	close_chat()
 
-func show_own_message(message: String) -> void:
-	# Show our own message above our player immediately
-	var player = get_player()
-	if player:
-		var chat_bubble = player.get_node("ChatBubble")
-		if chat_bubble:
-			print("ChatUI: Showing own message above player: ", message)
-			chat_bubble.show_message(message)
-		else:
-			print("ERROR: ChatBubble not found on player!")
-	else:
-		print("ERROR: Player not found!")
 
 func _on_focus_entered() -> void:
 	# Disable player movement when typing
