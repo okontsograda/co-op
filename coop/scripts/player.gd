@@ -1,6 +1,8 @@
 extends CharacterBody2D
 
-const speed: float = 500.0
+const speed: float = 200.0
+
+var is_firing: bool = false
 
 func _ready() -> void:
 	# Set authority based on the player's name (peer ID)
@@ -42,6 +44,15 @@ func _input(event: InputEvent) -> void:
 		else:
 			print("Player ", name, " (peer ", peer_id, ") ignoring chat input (not current player)")
 		return
+	
+	# Handle fire animation on left mouse click
+	if event is InputEventMouseButton:
+		var mouse_event = event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
+			# Only handle if this is the current player
+			var peer_id = name.to_int()
+			if peer_id == multiplayer.get_unique_id():
+				handle_fire_action(mouse_event.position)
 
 func _physics_process(_delta: float) -> void:
 	# Only process movement for players with authority
@@ -79,6 +90,9 @@ func _physics_process(_delta: float) -> void:
 	
 	velocity = direction * speed
 	move_and_slide()
+	
+	# Update animation based on movement
+	update_animation(direction)
 func _on_chat_message_received(player_name: String, message: String) -> void:
 	print("Player ", name, " received chat message from ", player_name, ": ", message)
 	
@@ -100,6 +114,84 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 				print("ERROR: Chat bubble not found on sender player!")
 		else:
 			print("ERROR: Sender player not found!")
+
+func handle_fire_action(mouse_position: Vector2) -> void:
+	# Trigger the fire animation
+	var animated_sprite = get_node("AnimatedSprite2D")
+	if animated_sprite:
+		print("Player ", name, " firing!")
+		is_firing = true
+		animated_sprite.play("fire")
+		
+		# Wait for animation to play before firing arrow (about halfway through fire animation)
+		await get_tree().create_timer(0.4).timeout
+		
+		# Spawn arrow projectile
+		spawn_arrow(mouse_position)
+		
+		# After remaining animation time, return to normal animation
+		await get_tree().create_timer(0.4).timeout
+		is_firing = false
+		print("Player ", name, " finished firing")
+	else:
+		print("ERROR: AnimatedSprite2D not found!")
+	
+func spawn_arrow(_mouse_position: Vector2) -> void:
+	# Load the arrow scene
+	var arrow_scene = preload("res://coop/scenes/arrow.tscn")
+	var arrow = arrow_scene.instantiate()
+	
+	# Get the camera to convert screen coordinates to world coordinates
+	var camera = get_viewport().get_camera_2d()
+	if not camera:
+		print("ERROR: No camera found!")
+		return
+	
+	# Convert mouse position to world coordinates
+	var world_target = camera.get_global_mouse_position()
+	
+	# Get the animated sprite to use its position as reference
+	var animated_sprite = get_node("AnimatedSprite2D")
+	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
+	
+	# Spawn arrow slightly ahead of the player sprite (to avoid clipping)
+	var direction_to_target = (world_target - sprite_position).normalized()
+	var spawn_offset = direction_to_target * 30.0  # 30 pixels ahead of sprite
+	var spawn_position = sprite_position + spawn_offset
+	
+	# Initialize the arrow
+	arrow.initialize(self, spawn_position, world_target)
+	
+	# Add arrow to the scene tree
+	get_tree().current_scene.add_child(arrow)
+	
+	print("Player ", name, " spawned arrow at ", spawn_position, " targeting ", world_target)
+
+func update_animation(direction: Vector2) -> void:
+	# Don't update animation if we're firing
+	if is_firing:
+		return
+	
+	# Get the AnimatedSprite2D node
+	var animated_sprite = get_node("AnimatedSprite2D")
+	if not animated_sprite:
+		return
+	
+	# Determine which animation to play based on movement
+	if direction != Vector2.ZERO:
+		# Player is moving - play walk animation
+		if animated_sprite.animation != "walk":
+			animated_sprite.play("walk")
+			
+		# Flip sprite based on horizontal direction
+		if direction.x < 0:
+			animated_sprite.flip_h = true
+		elif direction.x > 0:
+			animated_sprite.flip_h = false
+	else:
+		# Player is stationary - play idle animation
+		if animated_sprite.animation != "idle":
+			animated_sprite.play("idle")
 
 func find_player_by_name(player_name: String) -> Node2D:
 	# Find the player with the given name in the scene

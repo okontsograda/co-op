@@ -717,6 +717,13 @@ offset_top = 347.0
 offset_right = 607.0
 offset_bottom = 347.0
 
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+limit_left = -2000
+limit_top = -2000
+limit_right = 2000
+limit_bottom = 2000
+
 [node name="SpawnPoints" type="Node2D" parent="."]
 
 [node name="SpawnPoint1" type="Marker2D" parent="SpawnPoints"]
