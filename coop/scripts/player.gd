@@ -5,6 +5,10 @@ const max_health: int = 100
 var current_health: int = max_health
 
 var is_firing: bool = false
+var can_fire: bool = true
+var rapid_fire_count: int = 0  # Track number of arrows fired in rapid succession
+const max_rapid_fire: int = 2  # Maximum arrows that can be fired rapidly
+const fire_cooldown: float = .5  # Cooldown time after rapid fire
 
 func _ready() -> void:
 	# Set authority based on the player's name (peer ID)
@@ -21,6 +25,9 @@ func _ready() -> void:
 	
 	# Initialize health bar
 	update_health_display()
+	
+	# Set up camera to follow this player if this is the local player
+	setup_camera()
 	
 	# Try using the actual multiplayer peer ID instead
 	if peer_id == multiplayer.get_unique_id():
@@ -121,20 +128,46 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 			print("ERROR: Sender player not found!")
 
 func handle_fire_action(_mouse_position: Vector2) -> void:
+	# Check if player can fire (not on cooldown)
+	if not can_fire:
+		print("Player ", name, " cannot fire yet - on cooldown")
+		return
+	
+	# Check rapid fire limit
+	if rapid_fire_count >= max_rapid_fire:
+		print("Player ", name, " rapid fire limit reached, must wait")
+		return
+	
+	# Don't allow firing if already in fire animation and at rapid fire limit
+	if is_firing and rapid_fire_count >= max_rapid_fire:
+		return
+	
 	# Trigger the fire animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
 		print("Player ", name, " firing!")
-		is_firing = true
-		animated_sprite.play("fire")
 		
-		# Wait for animation to play before firing arrow (about halfway through fire animation)
-		await get_tree().create_timer(0.4).timeout
+		# Increment rapid fire count
+		rapid_fire_count += 1
 		
 		# Convert mouse position to world coordinates for network sync
 		var camera = get_viewport().get_camera_2d()
 		if camera:
 			var world_target = camera.get_global_mouse_position()
+			
+			# Turn player to face the shooting direction
+			var direction_to_target = (world_target - global_position).normalized()
+			if direction_to_target.x > 0:
+				animated_sprite.flip_h = false  # Face right
+			elif direction_to_target.x < 0:
+				animated_sprite.flip_h = true  # Face left
+			
+			# Play fire animation
+			is_firing = true
+			animated_sprite.play("fire")
+			
+			# Wait for animation to play before firing arrow (about halfway through fire animation)
+			await get_tree().create_timer(0.5).timeout
 			# Spawn arrow locally immediately
 			spawn_arrow_for_player(self, world_target)
 			# Send RPC to network to spawn arrow on other clients
@@ -144,6 +177,18 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 		await get_tree().create_timer(0.4).timeout
 		is_firing = false
 		print("Player ", name, " finished firing")
+		
+		# Allow immediate refire if under rapid fire limit, otherwise wait for cooldown
+		if rapid_fire_count < max_rapid_fire:
+			# Allow rapid fire - can fire again immediately
+			print("Player ", name, " rapid fire available: ", rapid_fire_count, "/", max_rapid_fire)
+		else:
+			# Rapid fire limit reached, wait for cooldown
+			can_fire = false
+			await get_tree().create_timer(fire_cooldown).timeout
+			can_fire = true
+			rapid_fire_count = 0  # Reset rapid fire counter
+			print("Player ", name, " can fire again")
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
 	
@@ -213,6 +258,29 @@ func update_animation(direction: Vector2) -> void:
 		# Player is stationary - play idle animation
 		if animated_sprite.animation != "idle":
 			animated_sprite.play("idle")
+
+func setup_camera() -> void:
+	# Check if this is the local player
+	var peer_id = name.to_int()
+	if peer_id == multiplayer.get_unique_id():
+		# Find and attach the camera from the scene
+		var scene_camera = get_tree().current_scene.get_node_or_null("Camera2D")
+		if scene_camera:
+			# Move camera to follow this player
+			scene_camera.reparent(self)
+			scene_camera.position = Vector2.ZERO
+			scene_camera.zoom = Vector2(1.15, 1.15)
+			print("Attached camera to player ", name)
+		else:
+			# Create a new camera if none exists
+			var camera = Camera2D.new()
+			camera.limit_left = -2000
+			camera.limit_top = -2000
+			camera.limit_right = 2000
+			camera.limit_bottom = 2000
+			camera.zoom = Vector2(0.5, 0.5)  # Zoom in to 50% (2x closer)
+			add_child(camera)
+			print("Created camera for player ", name)
 
 func update_health_display() -> void:
 	# Update the health bar display
