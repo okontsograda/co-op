@@ -25,6 +25,12 @@ func _on_body_entered(body: Node2D) -> void:
 	if body == get_meta("shooter", null):
 		return
 	
+	# Check if we hit a player
+	if body.has_method("take_damage"):
+		var damage = 10  # Amount of damage
+		body.take_damage(damage, get_meta("shooter", null))
+		print("Arrow hit player ", body.name, " for ", damage, " damage")
+	
 	# Stop the arrow
 	has_hit = true
 	queue_free()

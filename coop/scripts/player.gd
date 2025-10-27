@@ -1,6 +1,8 @@
 extends CharacterBody2D
 
 const speed: float = 200.0
+const max_health: int = 100
+var current_health: int = max_health
 
 var is_firing: bool = false
 
@@ -16,6 +18,9 @@ func _ready() -> void:
 	
 	# Add to players group so it can be found by other players
 	add_to_group("players")
+	
+	# Initialize health bar
+	update_health_display()
 	
 	# Try using the actual multiplayer peer ID instead
 	if peer_id == multiplayer.get_unique_id():
@@ -208,6 +213,43 @@ func update_animation(direction: Vector2) -> void:
 		# Player is stationary - play idle animation
 		if animated_sprite.animation != "idle":
 			animated_sprite.play("idle")
+
+func update_health_display() -> void:
+	# Update the health bar display
+	var health_bar = get_node_or_null("HealthBar")
+	if health_bar:
+		health_bar.update_health(current_health, max_health)
+
+func take_damage(amount: int, attacker: Node2D) -> void:
+	# Apply damage locally
+	
+	# Reduce health
+	current_health -= amount
+	print("Player ", name, " took ", amount, " damage. Health: ", current_health, "/", max_health)
+	
+	# Update health bar
+	update_health_display()
+	
+	# Check if player died
+	if current_health <= 0:
+		current_health = 0
+		handle_death()
+		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
+
+@rpc("any_peer", "reliable")
+func on_player_died(_killer: String) -> void:
+	# Handle death (e.g., respawn, show death message, etc.)
+	print("Player ", name, " died!")
+	# You can add death effects here
+
+func handle_death() -> void:
+	# Handle death on authority/server
+	print("Player ", name, " has died!")
+	# Reset health
+	current_health = max_health
+	# Update health bar
+	update_health_display()
+	# You can add respawn logic here
 
 func find_player_by_name(player_name: String) -> Node2D:
 	# Find the player with the given name in the scene
