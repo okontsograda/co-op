@@ -115,7 +115,7 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 		else:
 			print("ERROR: Sender player not found!")
 
-func handle_fire_action(mouse_position: Vector2) -> void:
+func handle_fire_action(_mouse_position: Vector2) -> void:
 	# Trigger the fire animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
@@ -126,8 +126,14 @@ func handle_fire_action(mouse_position: Vector2) -> void:
 		# Wait for animation to play before firing arrow (about halfway through fire animation)
 		await get_tree().create_timer(0.4).timeout
 		
-		# Spawn arrow projectile
-		spawn_arrow(mouse_position)
+		# Convert mouse position to world coordinates for network sync
+		var camera = get_viewport().get_camera_2d()
+		if camera:
+			var world_target = camera.get_global_mouse_position()
+			# Spawn arrow locally immediately
+			spawn_arrow_for_player(self, world_target)
+			# Send RPC to network to spawn arrow on other clients
+			rpc("spawn_arrow_network", world_target)
 		
 		# After remaining animation time, return to normal animation
 		await get_tree().create_timer(0.4).timeout
@@ -136,23 +142,33 @@ func handle_fire_action(mouse_position: Vector2) -> void:
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
 	
-func spawn_arrow(_mouse_position: Vector2) -> void:
+@rpc("any_peer", "reliable")
+func spawn_arrow_network(target_pos: Vector2) -> void:
+	# This function is called on all clients to spawn the arrow
+	# Get the player who sent this RPC
+	var shooter_peer_id = multiplayer.get_remote_sender_id()
+	
+	# Find the shooter player
+	var shooter = null
+	for player in get_tree().get_nodes_in_group("players"):
+		if player.name.to_int() == shooter_peer_id:
+			shooter = player
+			break
+	
+	if shooter:
+		spawn_arrow_for_player(shooter, target_pos)
+
+func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
 	# Load the arrow scene
 	var arrow_scene = preload("res://coop/scenes/arrow.tscn")
 	var arrow = arrow_scene.instantiate()
 	
-	# Get the camera to convert screen coordinates to world coordinates
-	var camera = get_viewport().get_camera_2d()
-	if not camera:
-		print("ERROR: No camera found!")
-		return
-	
-	# Convert mouse position to world coordinates
-	var world_target = camera.get_global_mouse_position()
+	# Target position should already be in world coordinates
+	var world_target = target_pos
 	
 	# Get the animated sprite to use its position as reference
-	var animated_sprite = get_node("AnimatedSprite2D")
-	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
+	var animated_sprite = shooter.get_node("AnimatedSprite2D")
+	var sprite_position = animated_sprite.global_position if animated_sprite else shooter.global_position
 	
 	# Spawn arrow slightly ahead of the player sprite (to avoid clipping)
 	var direction_to_target = (world_target - sprite_position).normalized()
