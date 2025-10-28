@@ -295,6 +295,9 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 	current_health -= amount
 	print("Player ", name, " took ", amount, " damage. Health: ", current_health, "/", max_health)
 	
+	# Broadcast health update to all clients
+	rpc("sync_player_health", current_health)
+	
 	# Update health bar
 	update_health_display()
 	
@@ -303,6 +306,13 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 		current_health = 0
 		handle_death()
 		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_player_health(health: int) -> void:
+	# Update health on all clients (including the local player)
+	current_health = health
+	update_health_display()
+	print("Synced health for player ", name, ": ", current_health, "/", max_health)
 
 @rpc("any_peer", "reliable")
 func on_player_died(_killer: String) -> void:
