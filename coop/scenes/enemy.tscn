@@ -1,7 +1,69 @@
-[gd_scene load_steps=11 format=3 uid="uid://b8k4nap2n1x5w"]
+[gd_scene load_steps=15 format=3 uid="uid://b8k4nap2n1x5w"]
 
-[ext_resource type="Script" path="res://coop/scripts/enemy.gd" id="1_enemy"]
-[ext_resource type="Texture2D" uid="uid://b5yyw187p3x41" path="res://tileset/Archer_Idle.png" id="2_idle"]
+[ext_resource type="Script" uid="uid://bye8ye18ljmnl" path="res://coop/scripts/enemy.gd" id="1_enemy"]
+[ext_resource type="Texture2D" uid="uid://dagoqd2vxj8u3" path="res://assets/Sprites/Mushroom-Idle.png" id="2_fn0b2"]
+[ext_resource type="PackedScene" path="res://coop/scenes/health_bar.tscn" id="4_health_bar"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_024w5"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(0, 0, 80, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_na36p"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(80, 0, 80, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w4cti"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(160, 0, 80, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_6bmr1"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(240, 0, 80, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ywjpu"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(320, 0, 80, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_uxtmd"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(400, 0, 80, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_268ks"]
+atlas = ExtResource("2_fn0b2")
+region = Rect2(480, 0, 80, 64)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_enemy"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_024w5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_na36p")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w4cti")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_6bmr1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ywjpu")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_uxtmd")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_268ks")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 8.0
+}]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_enemy"]
+radius = 6.0
+height = 40.0
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_enemy"]
 properties/0/path = NodePath(".:position")
@@ -13,57 +75,19 @@ properties/0/path = NodePath("AnimatedSprite2D:animation")
 properties/0/spawn = true
 properties/0/replication_mode = 1
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_enemy1"]
-atlas = ExtResource("2_idle")
-region = Rect2(0, 0, 192, 192)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_enemy2"]
-atlas = ExtResource("2_idle")
-region = Rect2(192, 0, 192, 192)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_enemy3"]
-atlas = ExtResource("2_idle")
-region = Rect2(384, 0, 192, 192)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_enemy4"]
-atlas = ExtResource("2_idle")
-region = Rect2(576, 0, 192, 192)
-
-[sub_resource type="SpriteFrames" id="SpriteFrames_enemy"]
-animations = [{
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_enemy1")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_enemy2")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_enemy3")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_enemy4")
-}],
-"loop": true,
-"name": &"idle",
-"speed": 3.0
-}]
-
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_enemy"]
-radius = 9.0
-height = 26.0
-
 [node name="Enemy" type="CharacterBody2D"]
 script = ExtResource("1_enemy")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
-position = Vector2(0, -35)
-scale = Vector2(0.5546875, 0.5546875)
+position = Vector2(0, -36)
+scale = Vector2(1.1123047, 1.1123047)
 sprite_frames = SubResource("SpriteFrames_enemy")
 animation = &"idle"
+frame = 5
+frame_progress = 0.65391004
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -29)
+position = Vector2(0, -17)
 shape = SubResource("CapsuleShape2D_enemy")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
@@ -75,6 +99,13 @@ replication_config = SubResource("SceneReplicationConfig_anim")
 [node name="Area2D" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-position = Vector2(0, -29)
+position = Vector2(0, -17)
 shape = SubResource("CapsuleShape2D_enemy")
 
+[node name="HealthBar" parent="." instance=ExtResource("4_health_bar")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = -2.0
+offset_top = -17.0
+offset_right = 58.0
+offset_bottom = -12.0

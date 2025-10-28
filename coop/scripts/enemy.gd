@@ -22,9 +22,8 @@ func _ready() -> void:
 		area.body_entered.connect(_on_body_entered)
 		area.body_exited.connect(_on_body_exited)
 	
-	# Set enemy color for all clients
-	var enemy_color = Color.RED
-	get_node("AnimatedSprite2D").modulate = enemy_color
+	# Initialize health bar
+	update_health_display()
 	
 	# Set authority to server only when we're on the server
 	if multiplayer.is_server():
@@ -106,14 +105,10 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 	# Send damage to server for authoritative processing
 	var attacker_name = str(attacker.name) if attacker else "unknown"
 	
-	# If we're the server (authority), process directly
-	if is_multiplayer_authority():
-		take_damage_rpc(amount, attacker_name)
-	else:
-		# Send to server - use ANY_PEER mode and check authority on server
-		rpc("take_damage_rpc", amount, attacker_name)
+	# Always send RPC to server - server will process it
+	rpc("take_damage_rpc", amount, attacker_name)
 
-@rpc("any_peer", "reliable", "call_local")
+@rpc("any_peer", "reliable")
 func take_damage_rpc(amount: int, attacker_name: String) -> void:
 	# Only process damage on server (authority)
 	if not is_multiplayer_authority():
@@ -121,6 +116,9 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 	
 	current_health -= amount
 	print("Enemy took ", amount, " damage from ", attacker_name, ", health: ", current_health)
+	
+	# Update health bar locally
+	update_health_display()
 	
 	if current_health <= 0:
 		# Broadcast death to all clients
@@ -132,6 +130,7 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 @rpc("any_peer", "reliable")
 func sync_health(health: int) -> void:
 	current_health = health
+	update_health_display()
 	print("Enemy health synced to ", health)
 
 @rpc("any_peer", "reliable", "call_local")
@@ -167,4 +166,10 @@ func _on_body_exited(body: Node2D) -> void:
 		print("Player left attack range")
 
 # sync_position removed - now using NetworkHandler.sync_enemy_position
+
+func update_health_display() -> void:
+	# Update the health bar display
+	var health_bar = get_node_or_null("HealthBar")
+	if health_bar:
+		health_bar.update_health(current_health, max_health)
 

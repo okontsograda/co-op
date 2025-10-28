@@ -15,9 +15,16 @@ var enemy_id_counter: int = 0  # Counter for unique enemy IDs
 
 func _ready() -> void:
 	multiplayer.multiplayer_peer = peer
+	print("Connecting to relay...")
+	# Start relay connection in background without blocking
+	connect_to_relay_async()
+
+func connect_to_relay_async() -> void:
 	peer.connect_to_relay("relay.nodetunnel.io", 9998)
 	
+	print("Waiting for relay connection...")
 	await peer.relay_connected
+	print("Relay connected in _ready(), online ID: ", peer.online_id)
 	
 	if %OnlineID:
 		%OnlineID.text = peer.online_id	
@@ -26,13 +33,30 @@ func _ready() -> void:
 signal chat_message_received(player_name: String, message: String)
 
 func start_server() -> void:
-	peer.host()
+	# Ensure relay connection is established before hosting
+	print("Starting server, checking relay connection...")
+	print("Current connection status: ", peer.connection_status)
+	print("Relay state: ", peer.connection_state)
 	
+	# Only wait for relay if not already connected (connection_state 2 = CONNECTED)
+	if peer.connection_state != 2:
+		print("Waiting for relay connection...")
+		# Wait for either relay connection or a 5 second timeout
+		await get_tree().create_timer(5.0).timeout or peer.relay_connected
+		print("Relay connection check complete, state: ", peer.connection_state)
+		# Check if still connecting after timeout
+		if peer.connection_state == 1:
+			print("WARNING: Relay still connecting after timeout")
+	else:
+		print("Relay already connected, proceeding to host...")
+	
+	print("Starting host() call...")
+	peer.host()
+	print("Waiting for hosting signal...")
 	await peer.hosting
+	print("Hosting successful, online ID: ", peer.online_id)
 	
 	DisplayServer.clipboard_set(peer.online_id)
-
-	multiplayer.multiplayer_peer = peer
 	
 	# Connect to peer_connected signal to sync existing enemies to new clients
 	multiplayer.peer_connected.connect(_on_peer_connected_sync)
@@ -178,19 +202,31 @@ func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String) -> void:
 	print("Enemy spawned at global_position: ", enemy.global_position, " with name ", enemy.name, " (total enemies: ", current_enemy_count, ") on ", "server" if multiplayer.is_server() else "client")
 
 # Client will join existing game
-# Client will join existing game
 func start_client(host_id: String = "") -> void:
-	if host_id:
-		peer.join(host_id)
-	else:
+	# Validate host ID
+	if not host_id or host_id.is_empty():
 		print("No host ID provided")
 		return
-
+	
+	# Ensure relay connection is established before joining
+	print("Starting client, checking relay connection...")
+	print("Current connection status: ", peer.connection_status)
+	print("Relay state: ", peer.connection_state)
+	
+	# Only wait for relay if not already connected (connection_state 2 = CONNECTED)
+	if peer.connection_state != 2:
+		print("Waiting for relay connection...")
+		await peer.relay_connected
+		print("Relay connected, attempting to join host: ", host_id)
+	else:
+		print("Relay already connected, proceeding to join...")
+	
+	print("Starting join() call with host ID: ", host_id)
+	peer.join(host_id)
+	print("Waiting for joined signal...")
 	await peer.joined
 	
-	multiplayer.multiplayer_peer = peer
-
-	print("Client connecting to ", host_id)
+	print("Client successfully connected to ", host_id)
 	
 # Chat system functions
 func send_chat_message(message: String) -> void:
