@@ -25,11 +25,13 @@ func _on_body_entered(body: Node2D) -> void:
 	if body == get_meta("shooter", null):
 		return
 	
-	# Check if we hit a player
+	# Check if we hit a player or enemy
 	if body.has_method("take_damage"):
 		var damage = 10  # Amount of damage
+		if body.name == "Enemy":
+			damage = 25  # More damage to enemies
 		body.take_damage(damage, get_meta("shooter", null))
-		print("Arrow hit player ", body.name, " for ", damage, " damage")
+		print("Arrow hit ", body.name, " for ", damage, " damage")
 	
 	# Stop the arrow
 	has_hit = true
@@ -38,6 +40,10 @@ func _on_body_entered(body: Node2D) -> void:
 func _on_screen_exited() -> void:
 	# Remove arrow when it leaves the screen
 	queue_free()
+
+func get_shooter() -> Node2D:
+	# Return the shooter for enemy collision detection
+	return get_meta("shooter", null)
 
 func initialize(shooter: Node2D, start_pos: Vector2, target_pos: Vector2) -> void:
 	# Set shooter metadata

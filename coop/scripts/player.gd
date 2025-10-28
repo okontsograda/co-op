@@ -97,8 +97,8 @@ func _physics_process(_delta: float) -> void:
 		direction = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	
 	# Debug input detection (removed spam)
-	if direction != Vector2.ZERO:
-		print("Player ", name, " input detected: ", direction)
+	#if direction != Vector2.ZERO:
+		#print("Player ", name, " input detected: ", direction)
 	
 	velocity = direction * speed
 	move_and_slide()
