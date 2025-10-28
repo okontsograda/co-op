@@ -1,4 +1,4 @@
-[gd_scene load_steps=30 format=3 uid="uid://ewcge3xong6o"]
+[gd_scene load_steps=31 format=3 uid="uid://ewcge3xong6o"]
 
 [ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_6w5ry"]
 [ext_resource type="Texture2D" uid="uid://bkmrhxpq8yuwi" path="res://tileset/Archer_Shoot.png" id="2_7meia"]
@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://bxrpwnwe5f6u5" path="res://tileset/Archer_Run.png" id="3_8m0gs"]
 [ext_resource type="PackedScene" uid="uid://c7x8lam3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="3_chat_bubble"]
 [ext_resource type="PackedScene" path="res://coop/scenes/health_bar.tscn" id="4_health_bar"]
+[ext_resource type="PackedScene" path="res://coop/scenes/xp_bar.tscn" id="5_xp_bar"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_af8pa"]
 atlas = ExtResource("2_7meia")
@@ -194,11 +195,19 @@ anchor_bottom = 0.0
 
 [node name="ChatBubble" parent="." instance=ExtResource("3_chat_bubble")]
 offset_left = -102.0
-offset_top = -106.0
+offset_top = -117.0
 offset_right = 102.0
-offset_bottom = -72.0
+offset_bottom = -83.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="XPBar" parent="." instance=ExtResource("5_xp_bar")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = -2.0
+offset_top = -19.0
+offset_right = 58.0
+offset_bottom = -14.0
 
 [node name="HealthBar" parent="." instance=ExtResource("4_health_bar")]
 layout_mode = 3
@@ -207,3 +216,12 @@ offset_left = -2.0
 offset_top = -17.0
 offset_right = 58.0
 offset_bottom = -12.0
+
+[node name="LevelLabel" type="Label" parent="."]
+offset_left = -101.0
+offset_top = -85.0
+offset_right = -1.0
+offset_bottom = -62.0
+text = "Lv.1"
+horizontal_alignment = 1
+vertical_alignment = 1

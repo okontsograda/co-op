@@ -1,8 +1,15 @@
 extends CharacterBody2D
 
 const speed: float = 200.0
-const max_health: int = 100
+var max_health: int = 100
 var current_health: int = max_health
+
+# XP System
+var current_xp: int = 0
+var current_level: int = 1
+var xp_to_next_level: int = 100
+const base_xp_per_level: int = 100
+const xp_per_enemy_kill: int = 25
 
 var is_firing: bool = false
 var can_fire: bool = true
@@ -23,8 +30,9 @@ func _ready() -> void:
 	# Add to players group so it can be found by other players
 	add_to_group("players")
 	
-	# Initialize health bar
+	# Initialize health bar and XP display
 	update_health_display()
+	update_xp_display()
 	
 	# Set up camera to follow this player if this is the local player
 	setup_camera()
@@ -288,6 +296,17 @@ func update_health_display() -> void:
 	if health_bar:
 		health_bar.update_health(current_health, max_health)
 
+func update_xp_display() -> void:
+	# Update the XP bar
+	var xp_bar = get_node_or_null("XPBar")
+	if xp_bar:
+		xp_bar.update_xp(current_xp, xp_to_next_level)
+	
+	# Update the level label
+	var level_label = get_node_or_null("LevelLabel")
+	if level_label:
+		level_label.text = "Lv." + str(current_level)
+
 func take_damage(amount: int, attacker: Node2D) -> void:
 	# Apply damage locally
 	
@@ -343,3 +362,70 @@ func find_player_by_name(player_name: String) -> Node2D:
 			return node
 	
 	return null
+
+# XP System Functions
+func gain_xp(amount: int) -> void:
+	# Always call via RPC so it processes on the correct player instance
+	rpc("gain_xp_rpc", amount)
+
+@rpc("any_peer", "reliable", "call_local")
+func gain_xp_rpc(amount: int) -> void:
+	print("gain_xp_rpc called for player ", name, ", is_multiplayer_authority: ", is_multiplayer_authority())
+	# Only process on the player who has authority
+	if not is_multiplayer_authority():
+		print("Player ", name, " not authority, returning")
+		return
+	
+	current_xp += amount
+	print("Player ", name, " gained ", amount, " XP. Total: ", current_xp)
+	
+	# Check for level up
+	while current_xp >= xp_to_next_level:
+		level_up()
+	
+	# Update XP display locally
+	update_xp_display()
+	
+	# Sync XP to all clients (including self via call_local)
+	rpc("sync_xp", current_xp, current_level, xp_to_next_level)
+	print("Sent sync_xp RPC: ", current_xp, "/", xp_to_next_level, " level ", current_level)
+
+func level_up() -> void:
+	current_xp -= xp_to_next_level
+	current_level += 1
+	
+	# Increase XP requirement for next level (scaling)
+	xp_to_next_level = base_xp_per_level * current_level
+	
+	# Level up bonuses
+	max_health += 10
+	current_health = max_health  # Full heal on level up
+	
+	print("Player ", name, " leveled up to level ", current_level, "!")
+	print("New max health: ", max_health)
+	
+	# Update health bar
+	update_health_display()
+	
+	# Sync level up to all clients
+	rpc("sync_level_up", current_level, max_health, current_xp, xp_to_next_level)
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_xp(xp: int, level: int, xp_needed: int) -> void:
+	print("sync_xp RPC received for player ", name, ": ", xp, "/", xp_needed, " level ", level)
+	current_xp = xp
+	current_level = level
+	xp_to_next_level = xp_needed
+	update_xp_display()
+	print("Synced XP for player ", name, ": ", current_xp, "/", xp_to_next_level, " (Level ", current_level, ")")
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int) -> void:
+	current_level = level
+	max_health = new_max_health
+	current_health = max_health
+	current_xp = xp
+	xp_to_next_level = xp_needed
+	update_health_display()
+	update_xp_display()
+	print("Synced level up for player ", name, ": Level ", current_level, ", Health: ", max_health)

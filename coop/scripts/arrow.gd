@@ -21,20 +21,26 @@ func _physics_process(delta: float) -> void:
 	global_position += direction * speed * delta
 
 func _on_body_entered(body: Node2D) -> void:
+	# Don't process if already hit
+	if has_hit:
+		return
+	
 	# Don't hit the player who fired it
 	if body == get_meta("shooter", null):
 		return
 	
+	# Mark as hit immediately to prevent multiple collisions
+	has_hit = true
+	
 	# Check if we hit a player or enemy
 	if body.has_method("take_damage"):
 		var damage = 10  # Amount of damage
-		if body.name == "Enemy":
+		if body.is_in_group("enemies"):
 			damage = 25  # More damage to enemies
 		body.take_damage(damage, get_meta("shooter", null))
 		print("Arrow hit ", body.name, " for ", damage, " damage")
 	
 	# Stop the arrow
-	has_hit = true
 	queue_free()
 
 func _on_screen_exited() -> void:

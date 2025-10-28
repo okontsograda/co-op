@@ -11,6 +11,7 @@ var target_player: Node2D = null
 var can_attack: bool = true
 var is_in_attack_range: bool = false
 var last_sync_position: Vector2 = Vector2.ZERO
+var last_attacker: String = ""  # Track who dealt the killing blow
 
 func _ready() -> void:
 	# Add to enemies group
@@ -102,32 +103,38 @@ func find_target_player() -> void:
 	target_player = closest_player
 
 func take_damage(amount: int, attacker: Node2D) -> void:
-	# Send damage to server for authoritative processing
+	print("take_damage called on enemy ", name, " for ", amount, " damage from ", attacker.name if attacker else "null")
+	# Always send RPC to server for authoritative processing
 	var attacker_name = str(attacker.name) if attacker else "unknown"
-	
-	# Always send RPC to server - server will process it
 	rpc("take_damage_rpc", amount, attacker_name)
 
 @rpc("any_peer", "reliable")
 func take_damage_rpc(amount: int, attacker_name: String) -> void:
+	print("take_damage_rpc received on enemy ", name, " for ", amount, " damage, is_authority: ", is_multiplayer_authority())
 	# Only process damage on server (authority)
 	if not is_multiplayer_authority():
+		print("Not authority, returning")
 		return
 	
 	current_health -= amount
 	print("Enemy took ", amount, " damage from ", attacker_name, ", health: ", current_health)
 	
+	# Track the attacker for XP purposes
+	last_attacker = attacker_name
+	
 	# Update health bar locally
 	update_health_display()
 	
 	if current_health <= 0:
+		# Award XP to the killer before death
+		award_xp_to_killer()
 		# Broadcast death to all clients
 		rpc("die_rpc")
 	else:
 		# Broadcast health update to all clients
 		rpc("sync_health", current_health)
 
-@rpc("any_peer", "reliable")
+@rpc("any_peer", "reliable", "call_local")
 func sync_health(health: int) -> void:
 	current_health = health
 	update_health_display()
@@ -172,4 +179,16 @@ func update_health_display() -> void:
 	var health_bar = get_node_or_null("HealthBar")
 	if health_bar:
 		health_bar.update_health(current_health, max_health)
+
+func award_xp_to_killer() -> void:
+	# Find the player who killed this enemy and award XP
+	if last_attacker.is_empty():
+		return
+	
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		if str(player.name) == last_attacker or str(player.name.to_int()) == last_attacker:
+			print("Awarding XP to player ", player.name, " for killing enemy")
+			player.gain_xp(25)  # Award 25 XP per kill
+			break
 
