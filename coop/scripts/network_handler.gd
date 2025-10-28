@@ -13,6 +13,14 @@ var spawn_interval_min: float = 3.0
 var spawn_interval_max: float = 6.0
 var enemy_id_counter: int = 0  # Counter for unique enemy IDs
 
+# Wave system variables
+var current_wave: int = 1
+var enemies_in_wave: int = 5
+var enemies_spawned_this_wave: int = 0
+var enemies_killed_this_wave: int = 0
+var wave_in_progress: bool = false
+var wave_start_timer: Timer = null
+
 func _ready() -> void:
 	multiplayer.multiplayer_peer = peer
 	print("Connecting to relay...")
@@ -65,9 +73,9 @@ func start_server() -> void:
 	await get_tree().create_timer(0.1).timeout
 	spawn_server_player()
 	
-	# Spawn enemies after server player spawns
+	# Start wave system after server player spawns
 	await get_tree().create_timer(0.5).timeout
-	spawn_enemies()
+	start_wave_system()
 
 func _on_peer_connected_sync(peer_id: int) -> void:
 	# When a new peer connects, send them all existing enemies
@@ -124,44 +132,57 @@ func get_spawn_position() -> Vector2:
 	print("No spawn points found, using origin")
 	return Vector2.ZERO
 
-func spawn_enemies() -> void:
-	# Only spawn enemies on server
+func start_wave_system() -> void:
+	# Only start waves on server
 	if not multiplayer.is_server():
 		return
 	
-	# Initial spawn of 3 enemies
-	for i in range(3):
+	print("Starting wave system - Wave ", current_wave, " with ", enemies_in_wave, " enemies")
+	wave_in_progress = true
+	enemies_spawned_this_wave = 0
+	enemies_killed_this_wave = 0
+	
+	# Start spawning enemies for this wave
+	spawn_wave_enemies()
+
+func spawn_wave_enemies() -> void:
+	# Spawn enemies for the current wave
+	for i in range(enemies_in_wave):
 		spawn_single_enemy()
-		await get_tree().create_timer(0.3).timeout
+		enemies_spawned_this_wave += 1
+		await get_tree().create_timer(0.5).timeout  # Small delay between spawns
 	
-	# Set up continuous spawning
-	setup_continuous_spawning()
+	print("Wave ", current_wave, " spawning complete. ", enemies_spawned_this_wave, " enemies spawned")
 
-func setup_continuous_spawning() -> void:
-	# Create a timer for continuous enemy spawning
-	enemy_spawn_timer = Timer.new()
-	enemy_spawn_timer.wait_time = randf_range(spawn_interval_min, spawn_interval_max)
-	enemy_spawn_timer.timeout.connect(func(): _on_enemy_spawn_timer_timeout())
-	enemy_spawn_timer.one_shot = false
-	enemy_spawn_timer.autostart = true
-	add_child(enemy_spawn_timer)
+func check_wave_completion() -> void:
+	# Check if all enemies in the current wave are dead
+	var current_enemies = get_tree().get_nodes_in_group("enemies").size()
 	
-	print("Continuous enemy spawning enabled. Interval: ", enemy_spawn_timer.wait_time, " seconds")
+	if current_enemies == 0 and enemies_spawned_this_wave > 0:
+		# Wave completed, start next wave after a delay
+		print("Wave ", current_wave, " completed!")
+		wave_in_progress = false
+		
+		# Start next wave after 5 seconds
+		await get_tree().create_timer(5.0).timeout
+		start_next_wave()
 
-func _on_enemy_spawn_timer_timeout() -> void:
+func start_next_wave() -> void:
+	current_wave += 1
+	enemies_in_wave += 3  # Increase enemy count by 3 each wave
+	print("Starting Wave ", current_wave, " with ", enemies_in_wave, " enemies")
+	start_wave_system()
+
+func on_enemy_died() -> void:
+	# Called when an enemy dies to check wave completion
 	if not multiplayer.is_server():
 		return
 	
-	# Get current enemy count
-	current_enemy_count = get_tree().get_nodes_in_group("enemies").size()
+	enemies_killed_this_wave += 1
+	print("Enemy killed. Wave progress: ", enemies_killed_this_wave, "/", enemies_spawned_this_wave)
 	
-	# Only spawn if under max enemies
-	if current_enemy_count < max_enemies:
-		spawn_single_enemy()
-	
-	# Update timer for next spawn (random interval)
-	enemy_spawn_timer.wait_time = randf_range(spawn_interval_min, spawn_interval_max)
-	print("Next enemy will spawn in ", enemy_spawn_timer.wait_time, " seconds")
+	# Check if wave is complete
+	check_wave_completion()
 
 func spawn_single_enemy() -> void:
 	# Get players to spawn away from them

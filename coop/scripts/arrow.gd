@@ -21,16 +21,25 @@ func _physics_process(delta: float) -> void:
 	global_position += direction * speed * delta
 
 func _on_body_entered(body: Node2D) -> void:
+	print("Arrow collision detected with ", body.name, ", has_hit: ", has_hit)
 	# Don't process if already hit
 	if has_hit:
+		print("Arrow already hit, ignoring collision")
 		return
 	
 	# Don't hit the player who fired it
 	if body == get_meta("shooter", null):
+		print("Arrow hit shooter, ignoring")
 		return
 	
 	# Mark as hit immediately to prevent multiple collisions
 	has_hit = true
+	print("Arrow marked as hit, processing damage")
+	
+	# Disable collision detection immediately
+	var collision = get_node("CollisionShape2D")
+	if collision:
+		collision.disabled = true
 	
 	# Check if we hit a player or enemy
 	if body.has_method("take_damage"):

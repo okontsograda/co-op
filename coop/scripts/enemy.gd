@@ -103,14 +103,22 @@ func find_target_player() -> void:
 	target_player = closest_player
 
 func take_damage(amount: int, attacker: Node2D) -> void:
-	print("take_damage called on enemy ", name, " for ", amount, " damage from ", attacker.name if attacker else "null")
-	# Always send RPC to server for authoritative processing
+	print("take_damage called on enemy ", name, " (instance ID: ", get_instance_id(), ") for ", amount, " damage from ", attacker.name if attacker else "null")
+	
+	# Only process damage on server instances
+	if not is_multiplayer_authority():
+		print("Client instance, ignoring damage")
+		return
+	
 	var attacker_name = str(attacker.name) if attacker else "unknown"
-	rpc("take_damage_rpc", amount, attacker_name)
+	
+	# Process damage directly on server
+	print("Server instance, processing damage directly")
+	take_damage_rpc(amount, attacker_name)
 
 @rpc("any_peer", "reliable")
 func take_damage_rpc(amount: int, attacker_name: String) -> void:
-	print("take_damage_rpc received on enemy ", name, " for ", amount, " damage, is_authority: ", is_multiplayer_authority())
+	print("take_damage_rpc received on enemy ", name, " (instance ID: ", get_instance_id(), ") for ", amount, " damage, is_authority: ", is_multiplayer_authority())
 	# Only process damage on server (authority)
 	if not is_multiplayer_authority():
 		print("Not authority, returning")
@@ -128,6 +136,8 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 	if current_health <= 0:
 		# Award XP to the killer before death
 		award_xp_to_killer()
+		# Notify NetworkHandler of enemy death for wave tracking
+		NetworkHandler.on_enemy_died()
 		# Broadcast death to all clients
 		rpc("die_rpc")
 	else:
@@ -191,4 +201,3 @@ func award_xp_to_killer() -> void:
 			print("Awarding XP to player ", player.name, " for killing enemy")
 			player.gain_xp(25)  # Award 25 XP per kill
 			break
-
