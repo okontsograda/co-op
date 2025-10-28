@@ -20,6 +20,8 @@ var enemies_spawned_this_wave: int = 0
 var enemies_killed_this_wave: int = 0
 var wave_in_progress: bool = false
 var wave_start_timer: Timer = null
+var max_waves: int = 3
+var boss_spawned: bool = false
 
 func _ready() -> void:
 	multiplayer.multiplayer_peer = peer
@@ -157,21 +159,113 @@ func spawn_wave_enemies() -> void:
 func check_wave_completion() -> void:
 	# Check if all enemies in the current wave are dead
 	var current_enemies = get_tree().get_nodes_in_group("enemies").size()
+	print("Current enemies: ", current_enemies, ", enemies_spawned_this_wave: ", enemies_spawned_this_wave)
 	
 	if current_enemies == 0 and enemies_spawned_this_wave > 0:
-		# Wave completed, start next wave after a delay
+		# Wave completed
 		print("Wave ", current_wave, " completed!")
 		wave_in_progress = false
 		
-		# Start next wave after 5 seconds
-		await get_tree().create_timer(5.0).timeout
-		start_next_wave()
+		# Show wave completion message
+		rpc("show_wave_completion", current_wave)
+		
+		# Check if this was the last wave
+		if current_wave >= max_waves:
+			# All waves complete, spawn boss
+			print("All waves complete! Spawning boss...")
+			rpc("show_boss_announcement")
+			await get_tree().create_timer(3.0).timeout
+			spawn_boss()
+		else:
+			# Start countdown to next wave
+			start_wave_countdown()
+	else:
+		print("Wave not complete yet")
 
 func start_next_wave() -> void:
 	current_wave += 1
 	enemies_in_wave += 3  # Increase enemy count by 3 each wave
 	print("Starting Wave ", current_wave, " with ", enemies_in_wave, " enemies")
 	start_wave_system()
+
+func start_wave_countdown() -> void:
+	# Show countdown from 5 to 1
+	for i in range(5, 0, -1):
+		rpc("show_countdown", i)
+		await get_tree().create_timer(1.0).timeout
+	
+	# Show wave start message
+	rpc("show_wave_start", current_wave + 1)
+	
+	# Start next wave
+	start_next_wave()
+
+@rpc("any_peer", "reliable", "call_local")
+func show_wave_completion(wave_number: int) -> void:
+	print("=== WAVE ", wave_number, " COMPLETED! ===")
+	# TODO: Add UI display for wave completion
+
+@rpc("any_peer", "reliable", "call_local")
+func show_countdown(seconds: int) -> void:
+	print("=== NEXT WAVE IN ", seconds, " SECONDS ===")
+	# TODO: Add UI display for countdown
+
+@rpc("any_peer", "reliable", "call_local")
+func show_wave_start(wave_number: int) -> void:
+	print("=== WAVE ", wave_number, " STARTING! ===")
+	# TODO: Add UI display for wave start
+
+@rpc("any_peer", "reliable", "call_local")
+func show_boss_announcement() -> void:
+	print("=== BOSS APPROACHING! ===")
+	# TODO: Add UI display for boss announcement
+
+func spawn_boss() -> void:
+	# Only spawn boss on server
+	if not multiplayer.is_server():
+		return
+	
+	if boss_spawned:
+		return
+	
+	boss_spawned = true
+	
+	# Get players to spawn boss away from them
+	var players = get_tree().get_nodes_in_group("players")
+	var spawn_position = Vector2.ZERO
+	
+	if not players.is_empty():
+		# Spawn boss at a distance from players
+		var base_player = players[0]
+		var angle = randf() * TAU
+		var distance = randf_range(200, 400)  # Further away than regular enemies
+		spawn_position = base_player.global_position + Vector2(cos(angle), sin(angle)) * distance
+		
+		# Clamp spawn position to visible area
+		spawn_position.x = clamp(spawn_position.x, -1800, 1800)
+		spawn_position.y = clamp(spawn_position.y, -1600, 1600)
+	else:
+		# No players, use random position
+		spawn_position = Vector2(randf_range(-1800, 1800), randf_range(-1600, 1600))
+	
+	# Spawn boss with unique ID
+	enemy_id_counter += 1
+	var boss_id = "Boss_" + str(enemy_id_counter)
+	rpc("spawn_boss_rpc", spawn_position, boss_id)
+	print("Boss spawned at position: ", spawn_position)
+
+@rpc("any_peer", "reliable", "call_local")
+func spawn_boss_rpc(spawn_position: Vector2, boss_id: String) -> void:
+	var boss_scene = preload("res://coop/scenes/boss.tscn")
+	var boss = boss_scene.instantiate()
+	
+	boss.global_position = spawn_position
+	boss.name = boss_id
+	
+	# Add boss to scene
+	get_tree().current_scene.add_child(boss)
+	
+	print("Boss spawned at global_position: ", spawn_position, " with name ", boss_id)
 
 func on_enemy_died() -> void:
 	# Called when an enemy dies to check wave completion
@@ -181,8 +275,25 @@ func on_enemy_died() -> void:
 	enemies_killed_this_wave += 1
 	print("Enemy killed. Wave progress: ", enemies_killed_this_wave, "/", enemies_spawned_this_wave)
 	
+	# Wait a frame for the enemy to be removed from the scene tree
+	await get_tree().process_frame
+	
 	# Check if wave is complete
+	print("Checking wave completion...")
 	check_wave_completion()
+
+func on_boss_died() -> void:
+	# Called when the boss dies
+	if not multiplayer.is_server():
+		return
+	
+	print("Boss defeated! Game complete!")
+	rpc("show_game_complete")
+
+@rpc("any_peer", "reliable", "call_local")
+func show_game_complete() -> void:
+	print("=== GAME COMPLETE! BOSS DEFEATED! ===")
+	# TODO: Add UI display for game completion
 
 func spawn_single_enemy() -> void:
 	# Get players to spawn away from them

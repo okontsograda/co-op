@@ -43,10 +43,17 @@ func _on_body_entered(body: Node2D) -> void:
 	
 	# Check if we hit a player or enemy
 	if body.has_method("take_damage"):
-		var damage = 10  # Amount of damage
+		var shooter = get_meta("shooter", null)
+		var damage = 10  # Default damage
+		
 		if body.is_in_group("enemies"):
-			damage = 25  # More damage to enemies
-		body.take_damage(damage, get_meta("shooter", null))
+			# Use shooter's attack damage for enemies
+			if shooter and shooter.has_method("get_attack_damage"):
+				damage = shooter.get_attack_damage()
+			else:
+				damage = 25  # Fallback damage
+		
+		body.take_damage(damage, shooter)
 		print("Arrow hit ", body.name, " for ", damage, " damage")
 	
 	# Stop the arrow

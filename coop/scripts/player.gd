@@ -3,6 +3,7 @@ extends CharacterBody2D
 const speed: float = 200.0
 var max_health: int = 100
 var current_health: int = max_health
+var attack_damage: int = 25  # Base arrow damage
 
 # XP System
 var current_xp: int = 0
@@ -400,15 +401,17 @@ func level_up() -> void:
 	# Level up bonuses
 	max_health += 10
 	current_health = max_health  # Full heal on level up
+	attack_damage += 5  # Increase attack damage by 5 per level
 	
 	print("Player ", name, " leveled up to level ", current_level, "!")
 	print("New max health: ", max_health)
+	print("New attack damage: ", attack_damage)
 	
 	# Update health bar
 	update_health_display()
 	
 	# Sync level up to all clients
-	rpc("sync_level_up", current_level, max_health, current_xp, xp_to_next_level)
+	rpc("sync_level_up", current_level, max_health, current_xp, xp_to_next_level, attack_damage)
 
 @rpc("any_peer", "reliable", "call_local")
 func sync_xp(xp: int, level: int, xp_needed: int) -> void:
@@ -420,12 +423,16 @@ func sync_xp(xp: int, level: int, xp_needed: int) -> void:
 	print("Synced XP for player ", name, ": ", current_xp, "/", xp_to_next_level, " (Level ", current_level, ")")
 
 @rpc("any_peer", "reliable", "call_local")
-func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int) -> void:
+func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int, new_attack_damage: int) -> void:
 	current_level = level
 	max_health = new_max_health
 	current_health = max_health
 	current_xp = xp
 	xp_to_next_level = xp_needed
+	attack_damage = new_attack_damage
 	update_health_display()
 	update_xp_display()
-	print("Synced level up for player ", name, ": Level ", current_level, ", Health: ", max_health)
+	print("Synced level up for player ", name, ": Level ", current_level, ", Health: ", max_health, ", Attack Damage: ", attack_damage)
+
+func get_attack_damage() -> int:
+	return attack_damage
