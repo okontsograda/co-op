@@ -19,6 +19,10 @@ config/icon="res://icon.svg"
 
 NetworkHandler="*res://coop/scripts/network_handler.gd"
 
+[display]
+
+window/stretch/mode="canvas_items"
+
 [input]
 
 move_up={
