@@ -7,6 +7,7 @@ var next_spawn_index: int = 0
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(spawn_player)
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	spawned.connect(_on_player_spawned)
 	
 	# Add to group so it can be found by the initial UI
@@ -21,6 +22,25 @@ func _ready() -> void:
 func _on_peer_connected(peer_id: int) -> void:
 	print("Peer connected: ", peer_id)
 	# The MultiplayerSpawner will handle spawning automatically
+
+func _on_peer_disconnected(peer_id: int) -> void:
+	print("Peer disconnected: ", peer_id)
+	# Find and remove the player node with this peer ID
+	var player_node_name = str(peer_id)
+	var spawn_path_node = get_node(spawn_path) if has_node(spawn_path) else null
+	if spawn_path_node:
+		var player = spawn_path_node.get_node_or_null(player_node_name)
+		if player:
+			print("MultiplayerSpawner: Removing player node: ", player_node_name)
+			player.queue_free()
+		else:
+			# Search in players group as backup
+			var players = get_tree().get_nodes_in_group("players")
+			for p in players:
+				if p.name == player_node_name or p.name.to_int() == peer_id:
+					print("MultiplayerSpawner: Removing player node from group: ", p.name)
+					p.queue_free()
+					break
 
 func _on_player_spawned(node: Node) -> void:
 	print("Player spawned via MultiplayerSpawner: ", node.name)

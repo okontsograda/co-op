@@ -70,6 +70,8 @@ func start_server() -> void:
 	
 	# Connect to peer_connected signal to sync existing enemies to new clients
 	multiplayer.peer_connected.connect(_on_peer_connected_sync)
+	# Connect to peer_disconnected signal to remove disconnected players
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	
 	# Spawn the server player after the server is fully established
 	await get_tree().create_timer(0.1).timeout
@@ -99,6 +101,26 @@ func _on_peer_connected_sync(peer_id: int) -> void:
 	
 	await get_tree().create_timer(0.1).timeout
 	print("Finished syncing ", enemies.size(), " enemies to peer ", peer_id)
+
+func _on_peer_disconnected(peer_id: int) -> void:
+	# When a peer disconnects, remove their player from the game
+	print("Peer ", peer_id, " disconnected, removing their player")
+	
+	# Find and remove the player node with this peer ID
+	var player_node_name = str(peer_id)
+	var player = get_tree().current_scene.get_node_or_null(player_node_name)
+	
+	if player:
+		print("Removing player node: ", player_node_name)
+		player.queue_free()
+	else:
+		# Also search in the players group as backup
+		var players = get_tree().get_nodes_in_group("players")
+		for p in players:
+			if p.name == player_node_name or p.name.to_int() == peer_id:
+				print("Removing player node from group: ", p.name)
+				p.queue_free()
+				break
 
 func spawn_server_player() -> void:
 	# Get the player scene directly (same as what the spawner would use)
