@@ -22,8 +22,8 @@ func update_health(current: int, maximum: int) -> void:
 	# Calculate health percentage
 	var health_percent = float(current_health) / float(max_health) if max_health > 0 else 0.0
 	
-	# Update the fill bar width
-	fill.offset_right = -30.0 + (health_percent * 60.0)
+	# Update the fill bar width (100 pixel total width: -50 to +50)
+	fill.offset_right = -50.0 + (health_percent * 100.0)
 	
 	# Change color based on health
 	var stylebox = fill.get_theme_stylebox("panel")

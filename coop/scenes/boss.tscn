@@ -262,12 +262,12 @@ animations = [{
 }]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_body"]
-radius = 28.0
-height = 98.0
+radius = 43.0
+height = 86.0
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_xeei2"]
-radius = 28.0
-height = 98.0
+radius = 44.0
+height = 104.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
 bg_color = Color(0.15, 0.15, 0.15, 1)
@@ -295,36 +295,36 @@ frame = 9
 frame_progress = 0.54527813
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -50)
+position = Vector2(6, -43)
 shape = SubResource("CapsuleShape2D_body")
 
 [node name="Area2D" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-position = Vector2(0, -49)
+position = Vector2(9, -44)
 shape = SubResource("CapsuleShape2D_xeei2")
 
 [node name="HealthBar" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 0
-offset_left = -33.0
-offset_top = -138.0
-offset_right = 27.0
-offset_bottom = -133.0
+offset_left = 6.0
+offset_top = -130.0
+offset_right = 106.0
+offset_bottom = -120.0
 script = ExtResource("2_health_bar")
 
 [node name="Background" type="Panel" parent="HealthBar"]
 layout_mode = 0
-offset_left = -26.0
-offset_top = -3.0
-offset_right = 92.0
-offset_bottom = 2.0
+offset_left = -50.0
+offset_top = -10.0
+offset_right = 50.0
+offset_bottom = -5.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
 
 [node name="Fill" type="Panel" parent="HealthBar"]
 layout_mode = 0
-offset_left = -11.0
-offset_top = -2.0
-offset_right = -11.0
-offset_bottom = 3.0
+offset_left = -50.0
+offset_top = -10.0
+offset_right = -50.0
+offset_bottom = -5.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_fill")

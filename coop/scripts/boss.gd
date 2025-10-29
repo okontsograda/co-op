@@ -71,10 +71,18 @@ func _physics_process(_delta: float) -> void:
 	find_closest_player()
 	
 	if target_player:
-		# Move towards target player
-		var direction = (target_player.global_position - global_position).normalized()
-		velocity = direction * speed
-		move_and_slide()
+		# Calculate distance to target
+		var distance_to_target = global_position.distance_to(target_player.global_position)
+		var attack_range = 50.0  # Attack range
+		
+		# Move towards target player if not in attack range
+		if distance_to_target > attack_range:
+			var direction = (target_player.global_position - global_position).normalized()
+			velocity = direction * speed
+			move_and_slide()
+		else:
+			# Stop moving if in attack range
+			velocity = Vector2.ZERO
 		
 		# Update animation based on state
 		update_animation()
@@ -83,6 +91,10 @@ func _physics_process(_delta: float) -> void:
 		if global_position.distance_to(last_sync_position) > 5.0:
 			NetworkHandler.sync_enemy_position(name, global_position)
 			last_sync_position = global_position
+		
+		# Sync sprite direction to clients
+		if velocity.length() > 0.1:
+			rpc("sync_sprite_direction", velocity.x > 0)
 		
 		# Attack if in range
 		if is_in_attack_range and can_attack:
@@ -108,6 +120,13 @@ func find_closest_player() -> void:
 func update_animation() -> void:
 	if not animated_sprite:
 		return
+	
+	# Handle sprite flipping based on movement direction
+	if velocity.length() > 0.1:
+		if velocity.x > 0:
+			animated_sprite.flip_h = false  # Face right
+		elif velocity.x < 0:
+			animated_sprite.flip_h = true   # Face left
 	
 	# Priority: hurt > attack > walk > idle
 	if is_hurt:
@@ -177,6 +196,12 @@ func sync_health(health: int) -> void:
 	current_health = health
 	update_health_display()
 	print("Boss health synced to ", health)
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_sprite_direction(facing_right: bool) -> void:
+	if animated_sprite:
+		animated_sprite.flip_h = not facing_right
+		print("Boss sprite direction synced: ", "right" if facing_right else "left")
 
 @rpc("any_peer", "reliable", "call_local")
 func sync_hurt_animation() -> void:
