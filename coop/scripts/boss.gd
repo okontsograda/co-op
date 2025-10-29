@@ -6,7 +6,7 @@ const attack_range: float = 50.0  # Boss has slightly larger attack range
 const attack_damage: int = 20  # Boss deals more damage
 const attack_cooldown: float = 2.0  # Boss attacks slower
 
-var max_health: int = 200  # Boss has much more health
+var max_health: int = 1500  # Boss has much more health
 var current_health: int = max_health
 var target_player: Node2D = null
 var can_attack: bool = true
