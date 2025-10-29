@@ -1,8 +1,55 @@
-[gd_scene load_steps=16 format=3 uid="uid://c0syjel1kfkgo"]
+[gd_scene load_steps=45 format=3 uid="uid://c0syjel1kfkgo"]
 
 [ext_resource type="Script" uid="uid://r3njj81rdev8" path="res://coop/scripts/boss.gd" id="1_boss"]
-[ext_resource type="Script" path="res://coop/scripts/health_bar.gd" id="2_health_bar"]
+[ext_resource type="Script" uid="uid://cjqxg83k364i6" path="res://coop/scripts/health_bar.gd" id="2_health_bar"]
+[ext_resource type="Texture2D" uid="uid://bk4wvkowyvqft" path="res://assets/Sprites/Golem_1_attack.png" id="2_mshwo"]
+[ext_resource type="Texture2D" uid="uid://c0ait5lktn2l1" path="res://assets/Sprites/Golem_1_hurt.png" id="3_1utp1"]
 [ext_resource type="Texture2D" uid="uid://wvj3xv7bmedr" path="res://assets/Sprites/Golem_1_idle.png" id="3_tfcwl"]
+[ext_resource type="Texture2D" uid="uid://ckefyrtnj50n0" path="res://assets/Sprites/Golem_1_walk.png" id="4_mshwo"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_6qr3q"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(0, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7tjx1"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(90, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ya6w7"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(180, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5qkax"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(270, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0i30g"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(360, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_mkwgo"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(450, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3tv7c"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(540, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_801i0"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(630, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_an1ad"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(720, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_iu5bb"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(810, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tkupx"]
+atlas = ExtResource("2_mshwo")
+region = Rect2(900, 0, 90, 64)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_to3dl"]
 atlas = ExtResource("3_tfcwl")
@@ -36,8 +83,102 @@ region = Rect2(540, 0, 90, 64)
 atlas = ExtResource("3_tfcwl")
 region = Rect2(630, 0, 90, 64)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_a1dev"]
+atlas = ExtResource("3_1utp1")
+region = Rect2(0, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xeei2"]
+atlas = ExtResource("3_1utp1")
+region = Rect2(90, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_41v81"]
+atlas = ExtResource("3_1utp1")
+region = Rect2(180, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_uw0wc"]
+atlas = ExtResource("3_1utp1")
+region = Rect2(270, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tj4n4"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(0, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_b5ebl"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(90, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dn6rw"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(180, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xc1wl"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(270, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_oflwl"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(360, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_vi4qs"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(450, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_k2saf"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(540, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_pfkuv"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(630, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_owaog"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(720, 0, 90, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_yj6po"]
+atlas = ExtResource("4_mshwo")
+region = Rect2(810, 0, 90, 64)
+
 [sub_resource type="SpriteFrames" id="SpriteFrames_a1dev"]
 animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_6qr3q")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7tjx1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ya6w7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_5qkax")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0i30g")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_mkwgo")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3tv7c")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_801i0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_an1ad")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_iu5bb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_tkupx")
+}],
+"loop": true,
+"name": &"attack",
+"speed": 7.0
+}, {
 "frames": [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_to3dl")
@@ -65,16 +206,68 @@ animations = [{
 }],
 "loop": true,
 "name": &"default",
-"speed": 5.0
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a1dev")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xeei2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_41v81")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_uw0wc")
+}],
+"loop": true,
+"name": &"hurt",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_tj4n4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_b5ebl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dn6rw")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xc1wl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_oflwl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_vi4qs")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_k2saf")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_pfkuv")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_owaog")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_yj6po")
+}],
+"loop": true,
+"name": &"walk",
+"speed": 6.0
 }]
-
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_xeei2"]
-radius = 24.0
-height = 60.0
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_body"]
 radius = 28.0
-height = 70.0
+height = 98.0
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_xeei2"]
+radius = 28.0
+height = 98.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
 bg_color = Color(0.15, 0.15, 0.15, 1)
@@ -94,38 +287,44 @@ corner_radius_bottom_left = 3
 script = ExtResource("1_boss")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
-position = Vector2(1.9073486e-06, -62)
-scale = Vector2(1.953125, 1.953125)
+position = Vector2(2.7105054e-20, -107)
+scale = Vector2(3.3203125, 3.3203125)
 sprite_frames = SubResource("SpriteFrames_a1dev")
+animation = &"attack"
+frame = 9
+frame_progress = 0.54527813
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -50)
 shape = SubResource("CapsuleShape2D_body")
 
 [node name="Area2D" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-position = Vector2(0, -29)
+position = Vector2(0, -49)
 shape = SubResource("CapsuleShape2D_xeei2")
 
 [node name="HealthBar" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 0
-offset_left = -2.0
-offset_top = -17.0
-offset_right = 58.0
-offset_bottom = -12.0
+offset_left = -33.0
+offset_top = -138.0
+offset_right = 27.0
+offset_bottom = -133.0
 script = ExtResource("2_health_bar")
 
 [node name="Background" type="Panel" parent="HealthBar"]
-offset_left = -30.0
-offset_top = -60.0
-offset_right = 30.0
-offset_bottom = -55.0
+layout_mode = 0
+offset_left = -26.0
+offset_top = -3.0
+offset_right = 92.0
+offset_bottom = 2.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
 
 [node name="Fill" type="Panel" parent="HealthBar"]
-offset_left = -30.0
-offset_top = -60.0
-offset_right = -30.0
-offset_bottom = -55.0
+layout_mode = 0
+offset_left = -11.0
+offset_top = -2.0
+offset_right = -11.0
+offset_bottom = 3.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_fill")

@@ -3,7 +3,7 @@ extends CharacterBody2D
 const speed: float = 200.0
 var max_health: int = 100
 var current_health: int = max_health
-var attack_damage: int = 25  # Base arrow damage
+var attack_damage: int = 50  # Base arrow damage
 
 # XP System
 var current_xp: int = 0
