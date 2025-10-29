@@ -18,6 +18,9 @@ var rapid_fire_count: int = 0  # Track number of arrows fired in rapid successio
 const max_rapid_fire: int = 2  # Maximum arrows that can be fired rapidly
 const fire_cooldown: float = .5  # Cooldown time after rapid fire
 
+# Sound effects
+var bow_sound_player: AudioStreamPlayer2D = null
+
 func _ready() -> void:
 	# Set authority based on the player's name (peer ID)
 	var peer_id = name.to_int()
@@ -47,6 +50,9 @@ func _ready() -> void:
 	# Connect to network handler for receiving chat messages
 	if NetworkHandler:
 		NetworkHandler.chat_message_received.connect(_on_chat_message_received)
+	
+	# Set up bow release sound
+	setup_bow_sound()
 
 func _input(event: InputEvent) -> void:
 	# Handle chat input for the player whose peer ID matches the current multiplayer peer
@@ -175,6 +181,9 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 			is_firing = true
 			animated_sprite.play("fire")
 			
+			# Play bow release sound immediately when firing starts
+			play_bow_sound(self)
+			
 			# Wait for animation to play before firing arrow (about halfway through fire animation)
 			await get_tree().create_timer(0.5).timeout
 			# Spawn arrow locally immediately
@@ -215,6 +224,8 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 			break
 	
 	if shooter:
+		# Play bow sound for remote clients when arrow spawns
+		play_bow_sound(shooter)
 		spawn_arrow_for_player(shooter, target_pos)
 
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
@@ -436,3 +447,39 @@ func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int, new
 
 func get_attack_damage() -> int:
 	return attack_damage
+
+func setup_bow_sound() -> void:
+	# Load the bow release sound
+	var bow_sound = load("res://assets/Sounds/SFX/bow_release.mp3")
+	if bow_sound:
+		# Create AudioStreamPlayer2D as a child of this player
+		bow_sound_player = AudioStreamPlayer2D.new()
+		bow_sound_player.name = "BowSoundPlayer"
+		bow_sound_player.stream = bow_sound
+		add_child(bow_sound_player)
+	else:
+		print("ERROR: Failed to load bow release sound from res://assets/Sounds/SFX/bow_release.mp3")
+
+func play_bow_sound(shooter: Node2D) -> void:
+	# Always create a new sound instance to allow overlapping sounds for rapid fire
+	var temp_sound = AudioStreamPlayer2D.new()
+	var bow_sound = null
+	
+	# Try to use the cached sound from bow_sound_player if available
+	var shooter_sound = shooter.get_node_or_null("BowSoundPlayer")
+	if shooter_sound and shooter_sound.stream:
+		bow_sound = shooter_sound.stream
+	else:
+		# Load sound if not cached
+		bow_sound = load("res://assets/Sounds/SFX/bow_release.mp3")
+	
+	if bow_sound:
+		temp_sound.stream = bow_sound
+		temp_sound.position = shooter.global_position
+		# Add to scene tree and play
+		get_tree().current_scene.add_child(temp_sound)
+		temp_sound.play()
+		# Clean up after sound finishes
+		temp_sound.finished.connect(func(): temp_sound.queue_free())
+	else:
+		print("ERROR: Failed to load bow release sound for player ", shooter.name)
