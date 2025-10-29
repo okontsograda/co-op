@@ -21,6 +21,9 @@ var is_hurt: bool = false
 var hurt_timer: float = 0.0
 const hurt_duration: float = 0.5  # Duration to show hurt animation
 
+# Sound effects
+var hit_sound_player: AudioStreamPlayer2D = null
+
 func _ready() -> void:
 	# Add to enemies group
 	add_to_group("enemies")
@@ -38,6 +41,9 @@ func _ready() -> void:
 	
 	# Initialize health bar
 	update_health_display()
+	
+	# Set up hit sound
+	setup_hit_sound()
 	
 	# Set authority to server only when we're on the server
 	if multiplayer.is_server():
@@ -73,7 +79,6 @@ func _physics_process(_delta: float) -> void:
 	if target_player:
 		# Calculate distance to target
 		var distance_to_target = global_position.distance_to(target_player.global_position)
-		var attack_range = 50.0  # Attack range
 		
 		# Move towards target player if not in attack range
 		if distance_to_target > attack_range:
@@ -143,7 +148,10 @@ func update_animation() -> void:
 			animated_sprite.play("default")
 
 func take_damage(amount: int, attacker: Node2D) -> void:
-	print("take_damage called on boss ", name, " (instance ID: ", get_instance_id(), ") for ", amount, " damage from ", attacker.name if attacker else "null")
+	var attacker_name_str = "null"
+	if attacker:
+		attacker_name_str = str(attacker.name)
+	print("take_damage called on boss ", name, " (instance ID: ", get_instance_id(), ") for ", amount, " damage from ", attacker_name_str)
 	
 	# Only process damage on server instances
 	if not is_multiplayer_authority():
@@ -169,6 +177,11 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 	
 	# Track the attacker for XP purposes
 	last_attacker = attacker_name
+	
+	# Play hit sound every time damage is taken (including killing blow)
+	# Play locally first for immediate feedback, then via RPC for all clients
+	play_hit_sound()
+	rpc("play_hit_sound")
 	
 	# Trigger hurt animation
 	is_hurt = true
@@ -269,3 +282,54 @@ func award_xp_to_killer() -> void:
 			print("Awarding XP to player ", player.name, " for killing boss")
 			player.gain_xp(100)  # Award 100 XP for killing boss
 			break
+
+func setup_hit_sound() -> void:
+	# Load the hit sound (try common names)
+	var hit_sound = null
+	var possible_names = ["res://assets/Sounds/SFX/hit.mp3", "res://assets/Sounds/SFX/enemy_hit.mp3", "res://assets/Sounds/SFX/hit.wav"]
+	
+	for sound_path in possible_names:
+		hit_sound = load(sound_path)
+		if hit_sound:
+			break
+	
+	if hit_sound:
+		# Create AudioStreamPlayer2D as a child of this boss
+		hit_sound_player = AudioStreamPlayer2D.new()
+		hit_sound_player.name = "HitSoundPlayer"
+		hit_sound_player.stream = hit_sound
+		add_child(hit_sound_player)
+	else:
+		print("WARNING: No hit sound found for boss. Tried: ", possible_names)
+
+@rpc("any_peer", "reliable", "call_local")
+func play_hit_sound() -> void:
+	# Play hit sound - always create a new sound instance to allow overlapping sounds
+	var temp_sound = AudioStreamPlayer2D.new()
+	var hit_sound = null
+	
+	# Try to use the cached sound from hit_sound_player if available
+	if hit_sound_player and hit_sound_player.stream:
+		hit_sound = hit_sound_player.stream
+	else:
+		# Load sound if not cached
+		var possible_names = ["res://assets/Sounds/SFX/hit.mp3", "res://assets/Sounds/SFX/enemy_hit.mp3", "res://assets/Sounds/SFX/hit.wav"]
+		for sound_path in possible_names:
+			hit_sound = load(sound_path)
+			if hit_sound:
+				print("Loaded hit sound from: ", sound_path)
+				break
+	
+	if hit_sound:
+		temp_sound.stream = hit_sound
+		temp_sound.position = global_position
+		# Randomly vary the pitch slightly for variation (0.9 to 1.1 = 10% variation)
+		temp_sound.pitch_scale = randf_range(0.9, 1.1)
+		# Add to scene tree and play
+		get_tree().current_scene.add_child(temp_sound)
+		temp_sound.play()
+		print("Playing hit sound for boss ", name, " at position ", global_position, " with pitch ", temp_sound.pitch_scale)
+		# Clean up after sound finishes
+		temp_sound.finished.connect(func(): temp_sound.queue_free())
+	else:
+		print("WARNING: Hit sound not found or not loaded for boss ", name)
