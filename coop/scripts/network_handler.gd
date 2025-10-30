@@ -21,7 +21,6 @@ var enemies_killed_this_wave: int = 0
 var wave_in_progress: bool = false
 var wave_start_timer: Timer = null
 var max_waves: int = 3
-var boss_spawned: bool = false
 
 # Enemy spawn points
 var enemy_spawn_points: Array[Vector2] = []
@@ -271,16 +270,8 @@ func check_wave_completion() -> void:
 		# Show wave completion message
 		rpc("show_wave_completion", current_wave)
 
-		# Check if this was the last wave
-		if current_wave >= max_waves:
-			# All waves complete, spawn boss
-			print("All waves complete! Spawning boss...")
-			rpc("show_boss_announcement")
-			await get_tree().create_timer(3.0).timeout
-			spawn_boss()
-		else:
-			# Start countdown to next wave
-			start_wave_countdown()
+		# Start countdown to next wave (waves are unlimited)
+		start_wave_countdown()
 	else:
 		print("Wave not complete yet")
 
@@ -323,44 +314,6 @@ func show_wave_start(wave_number: int) -> void:
 	# TODO: Add UI display for wave start
 
 
-@rpc("any_peer", "reliable", "call_local")
-func show_boss_announcement() -> void:
-	print("=== BOSS APPROACHING! ===")
-	# TODO: Add UI display for boss announcement
-
-
-func spawn_boss() -> void:
-	# Only spawn boss on server
-	if not multiplayer.is_server():
-		return
-
-	if boss_spawned:
-		return
-
-	boss_spawned = true
-
-	# Use predetermined spawn position from enemy spawn points
-	var spawn_position = get_next_enemy_spawn_position()
-
-	# Spawn boss with unique ID
-	enemy_id_counter += 1
-	var boss_id = "Boss_" + str(enemy_id_counter)
-	rpc("spawn_boss_rpc", spawn_position, boss_id)
-	print("Boss spawned at position: ", spawn_position)
-
-
-@rpc("any_peer", "reliable", "call_local")
-func spawn_boss_rpc(spawn_position: Vector2, boss_id: String) -> void:
-	var boss_scene = preload("res://coop/scenes/boss.tscn")
-	var boss = boss_scene.instantiate()
-
-	boss.global_position = spawn_position
-	boss.name = boss_id
-
-	# Add boss to scene
-	get_tree().current_scene.add_child(boss)
-
-	print("Boss spawned at global_position: ", spawn_position, " with name ", boss_id)
 
 
 func on_enemy_died() -> void:
@@ -379,45 +332,78 @@ func on_enemy_died() -> void:
 	check_wave_completion()
 
 
-func on_boss_died() -> void:
-	# Called when the boss dies
-	if not multiplayer.is_server():
-		return
-
-	print("Boss defeated! Game complete!")
-	rpc("show_game_complete")
 
 
-@rpc("any_peer", "reliable", "call_local")
-func show_game_complete() -> void:
-	print("=== GAME COMPLETE! BOSS DEFEATED! ===")
-	# TODO: Add UI display for game completion
+func get_random_enemy_size() -> int:
+	# Enemy size distribution based on wave number
+	# As waves progress, larger enemies become more common
+	
+	var rand_val = randf()  # 0.0 to 1.0
+	
+	# Base chances (early waves)
+	var small_chance = 0.30
+	var medium_chance = 0.50
+	var large_chance = 0.15
+	var huge_chance = 0.05
+	
+	# Adjust chances based on current wave
+	# Every 3 waves, reduce small/medium and increase large/huge
+	var wave_factor = floor(current_wave / 3.0)
+	small_chance = max(0.05, small_chance - (wave_factor * 0.05))
+	medium_chance = max(0.30, medium_chance - (wave_factor * 0.05))
+	large_chance = min(0.35, large_chance + (wave_factor * 0.05))
+	huge_chance = min(0.25, huge_chance + (wave_factor * 0.05))
+	
+	# Normalize to ensure they add up to 1.0
+	var total = small_chance + medium_chance + large_chance + huge_chance
+	small_chance /= total
+	medium_chance /= total
+	large_chance /= total
+	huge_chance /= total
+	
+	# Select size based on weighted random
+	if rand_val < small_chance:
+		return 0  # SMALL
+	elif rand_val < small_chance + medium_chance:
+		return 1  # MEDIUM
+	elif rand_val < small_chance + medium_chance + large_chance:
+		return 2  # LARGE
+	else:
+		return 3  # HUGE
 
 
 func spawn_single_enemy() -> void:
 	# Use predetermined spawn position from enemy spawn points
 	var spawn_position = get_next_enemy_spawn_position()
 
+	# Randomly choose enemy size based on wave number and chance
+	var enemy_size = get_random_enemy_size()
+
 	# Use RPC to spawn enemy on all clients with unique ID
 	enemy_id_counter += 1
 	var enemy_id = "Enemy_" + str(enemy_id_counter)
-	rpc("spawn_enemy_rpc", spawn_position, enemy_id)
+	rpc("spawn_enemy_rpc", spawn_position, enemy_id, enemy_size)
 
 
 @rpc("any_peer", "reliable", "call_local")
-func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String) -> void:
+func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int) -> void:
 	var enemy_scene = preload("res://coop/scenes/enemy.tscn")
 	var enemy = enemy_scene.instantiate()
 
 	enemy.global_position = spawn_position
 	enemy.name = enemy_id  # Give consistent name across all clients
+	
+	# Set enemy size before adding to scene
+	enemy.set_enemy_size(enemy_size)
 
 	# Add enemy to scene
 	get_tree().current_scene.add_child(enemy)
 
 	current_enemy_count += 1
 	print(
-		"Enemy spawned at global_position: ",
+		"Enemy (",
+		enemy.get_size_name(),
+		") spawned at global_position: ",
 		enemy.global_position,
 		" with name ",
 		enemy.name,

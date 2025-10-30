@@ -1,10 +1,20 @@
 extends CharacterBody2D
 
-var speed: float = 80.0  # Slower than players
-const attack_range: float = 40.0  # Distance at which enemy can attack
-const attack_damage: int = 15  # Damage per attack
-const attack_cooldown: float = 1.5  # Time between attacks
+# Enemy size variations
+enum EnemySize {
+	SMALL,
+	MEDIUM,
+	LARGE,
+	HUGE
+}
 
+var enemy_size: EnemySize = EnemySize.MEDIUM
+
+# Base stats (for MEDIUM size)
+var speed: float = 80.0
+var attack_range: float = 40.0
+var attack_damage: int = 15
+var attack_cooldown: float = 1.5
 var max_health: int = 50
 var current_health: int = max_health
 var target_player: Node2D = null
@@ -42,6 +52,9 @@ func _ready() -> void:
 		area.body_entered.connect(_on_body_entered)
 		area.body_exited.connect(_on_body_exited)
 
+	# Apply size-based stats
+	apply_size_stats()
+
 	# Initialize health bar
 	update_health_display()
 
@@ -49,11 +62,11 @@ func _ready() -> void:
 	if multiplayer.is_server():
 		# On server, set authority to 1 (server) and run AI
 		set_multiplayer_authority(1)
-		print("Enemy spawned on server at position: ", global_position)
+		print("Enemy (", get_size_name(), ") spawned on server at position: ", global_position)
 	else:
 		# On clients, set authority to 1 (server) so they sync from server
 		set_multiplayer_authority(1)
-		print("Enemy spawned on client at position: ", global_position)
+		print("Enemy (", get_size_name(), ") spawned on client at position: ", global_position)
 
 	# Initialize sync position
 	last_sync_position = global_position
@@ -69,6 +82,76 @@ func _ready() -> void:
 	# Only initialize AI on server
 	if not is_multiplayer_authority():
 		return
+
+
+func set_enemy_size(size: EnemySize) -> void:
+	enemy_size = size
+	apply_size_stats()
+
+
+func apply_size_stats() -> void:
+	# Base stats for MEDIUM
+	var base_speed = 80.0
+	var base_health = 50
+	var base_damage = 15
+	var base_range = 40.0
+	var base_cooldown = 1.5
+	var base_scale = 1.0
+	
+	match enemy_size:
+		EnemySize.SMALL:
+			# Small enemies: Fast, low health, low damage
+			speed = base_speed * 1.3  # 104
+			max_health = int(base_health * 0.5)  # 25
+			attack_damage = int(base_damage * 0.7)  # 10
+			attack_range = base_range * 0.8  # 32
+			attack_cooldown = base_cooldown * 0.8  # 1.2
+			scale = Vector2.ONE * 0.7  # Smaller sprite
+			
+		EnemySize.MEDIUM:
+			# Medium enemies: Balanced
+			speed = base_speed  # 80
+			max_health = base_health  # 50
+			attack_damage = base_damage  # 15
+			attack_range = base_range  # 40
+			attack_cooldown = base_cooldown  # 1.5
+			scale = Vector2.ONE * base_scale  # Normal sprite
+			
+		EnemySize.LARGE:
+			# Large enemies: Slow, high health, high damage
+			speed = base_speed * 0.7  # 56
+			max_health = int(base_health * 2.5)  # 125
+			attack_damage = int(base_damage * 1.8)  # 27
+			attack_range = base_range * 1.2  # 48
+			attack_cooldown = base_cooldown * 1.3  # 1.95
+			scale = Vector2.ONE * 1.5  # Larger sprite
+			
+		EnemySize.HUGE:
+			# Huge enemies: Very slow, very high health, very high damage (boss-like)
+			speed = base_speed * 0.5  # 40
+			max_health = int(base_health * 5.0)  # 250
+			attack_damage = int(base_damage * 2.5)  # 37
+			attack_range = base_range * 1.5  # 60
+			attack_cooldown = base_cooldown * 1.5  # 2.25
+			scale = Vector2.ONE * 2.0  # Much larger sprite
+	
+	# Set current health to max health
+	current_health = max_health
+	
+	print("Enemy size set to ", get_size_name(), " - Health: ", max_health, ", Speed: ", speed, ", Damage: ", attack_damage)
+
+
+func get_size_name() -> String:
+	match enemy_size:
+		EnemySize.SMALL:
+			return "SMALL"
+		EnemySize.MEDIUM:
+			return "MEDIUM"
+		EnemySize.LARGE:
+			return "LARGE"
+		EnemySize.HUGE:
+			return "HUGE"
+	return "UNKNOWN"
 
 
 func _physics_process(_delta: float) -> void:
