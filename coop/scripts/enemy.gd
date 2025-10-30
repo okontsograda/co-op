@@ -12,7 +12,6 @@ var can_attack: bool = true
 var is_in_attack_range: bool = false
 var last_sync_position: Vector2 = Vector2.ZERO
 var last_attacker: String = ""  # Track who dealt the killing blow
-var is_boss: bool = false  # Whether this is a boss enemy
 
 # Animation states
 var is_attacking: bool = false
@@ -26,13 +25,6 @@ var hit_sound_player: AudioStreamPlayer2D = null
 func _ready() -> void:
 	# Add to enemies group
 	add_to_group("enemies")
-	
-	# Set boss stats if this is a boss
-	if is_boss:
-		max_health = 200  # Boss has much more health
-		current_health = max_health
-		speed = 40.0  # Boss moves slower
-		print("Boss spawned with ", max_health, " health and speed ", speed)
 	
 	# Connect Area2D signals for attack detection
 	var area = get_node("Area2D")

@@ -1,6 +1,17 @@
 extends CharacterBody2D
 
-const speed: float = 200.0
+# Movement speeds
+const walk_speed: float = 100.0  # Default walking speed
+const run_speed: float = 135.0  # Running speed (when holding Shift)
+var current_speed: float = walk_speed
+
+# Stamina system
+var max_stamina: float = 100.0
+var current_stamina: float = 100.0
+const stamina_drain_rate: float = 40.0  # Stamina drained per second when running
+const stamina_regen_rate: float = 25.0  # Stamina regenerated per second when not running
+var is_running: bool = false
+
 var max_health: int = 100
 var current_health: int = max_health
 var attack_damage: int = 15  # Base arrow damage
@@ -34,9 +45,10 @@ func _ready() -> void:
 	# Add to players group so it can be found by other players
 	add_to_group("players")
 	
-	# Initialize health bar and XP display
+	# Initialize health bar, XP display, and stamina bar
 	update_health_display()
 	update_xp_display()
+	update_stamina_display()
 	
 	# Set up camera to follow this player if this is the local player
 	setup_camera()
@@ -111,11 +123,34 @@ func _physics_process(_delta: float) -> void:
 	if direction == Vector2.ZERO:
 		direction = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	
+	# Check for Shift key (running)
+	var wants_to_run = Input.is_key_pressed(KEY_SHIFT)
+	
+	# Determine if player can run (has stamina and is trying to run)
+	if wants_to_run and direction != Vector2.ZERO and current_stamina > 0:
+		is_running = true
+		current_speed = run_speed
+		# Drain stamina while running
+		current_stamina -= stamina_drain_rate * _delta
+		if current_stamina < 0:
+			current_stamina = 0
+	else:
+		is_running = false
+		current_speed = walk_speed
+		# Regenerate stamina when not running
+		if current_stamina < max_stamina:
+			current_stamina += stamina_regen_rate * _delta
+			if current_stamina > max_stamina:
+				current_stamina = max_stamina
+	
+	# Update stamina display
+	update_stamina_display()
+	
 	# Debug input detection (removed spam)
 	#if direction != Vector2.ZERO:
 		#print("Player ", name, " input detected: ", direction)
 	
-	velocity = direction * speed
+	velocity = direction * current_speed
 	move_and_slide()
 	
 	# Update animation based on movement
@@ -318,6 +353,12 @@ func update_xp_display() -> void:
 	var level_label = get_node_or_null("LevelLabel")
 	if level_label:
 		level_label.text = "Lv." + str(current_level)
+
+func update_stamina_display() -> void:
+	# Update the stamina bar display
+	var stamina_bar = get_node_or_null("StaminaBar")
+	if stamina_bar:
+		stamina_bar.update_stamina(current_stamina, max_stamina)
 
 func take_damage(amount: int, attacker: Node2D) -> void:
 	# Apply damage locally

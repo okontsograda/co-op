@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3 uid="uid://ewcge3xong6o"]
+[gd_scene load_steps=33 format=3 uid="uid://ewcge3xong6o"]
 
 [ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_6w5ry"]
 [ext_resource type="Texture2D" uid="uid://bkmrhxpq8yuwi" path="res://tileset/Archer_Shoot.png" id="2_7meia"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" uid="uid://c7x8lam3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="3_chat_bubble"]
 [ext_resource type="PackedScene" path="res://coop/scenes/health_bar.tscn" id="4_health_bar"]
 [ext_resource type="PackedScene" path="res://coop/scenes/xp_bar.tscn" id="5_xp_bar"]
+[ext_resource type="PackedScene" path="res://coop/scenes/stamina_bar.tscn" id="6_stamina_bar"]
 [ext_resource type="AudioStream" uid="uid://bsrbgbqnpjnka" path="res://assets/Sounds/Music/Intro.wav" id="9_mhqs7"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_af8pa"]
@@ -206,17 +207,25 @@ grow_vertical = 2
 layout_mode = 3
 anchors_preset = 0
 offset_left = -2.0
-offset_top = -19.0
+offset_top = -24.0
 offset_right = 58.0
-offset_bottom = -14.0
+offset_bottom = -19.0
+
+[node name="StaminaBar" parent="." instance=ExtResource("6_stamina_bar")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = -2.0
+offset_top = -24.0
+offset_right = 58.0
+offset_bottom = -19.0
 
 [node name="HealthBar" parent="." instance=ExtResource("4_health_bar")]
 layout_mode = 3
 anchors_preset = 0
 offset_left = -2.0
-offset_top = -17.0
+offset_top = -15.0
 offset_right = 58.0
-offset_bottom = -12.0
+offset_bottom = -10.0
 
 [node name="LevelLabel" type="Label" parent="."]
 offset_left = -101.0

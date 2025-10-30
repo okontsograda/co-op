@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3 uid="uid://stamina_bar"]
+
+[ext_resource type="Script" path="res://coop/scripts/stamina_bar.gd" id="1_stamina_bar"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.2, 0.2, 0.2, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill"]
+bg_color = Color(0.2, 0.6, 0.9, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="StaminaBar" type="Control"]
+script = ExtResource("1_stamina_bar")
+
+[node name="Background" type="Panel" parent="."]
+offset_left = -30.0
+offset_top = -53.0
+offset_right = 30.0
+offset_bottom = -48.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="Fill" type="Panel" parent="."]
+offset_left = -30.0
+offset_top = -53.0
+offset_right = -30.0
+offset_bottom = -48.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_fill")
+
