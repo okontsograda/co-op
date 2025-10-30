@@ -537,10 +537,13 @@ func spawn_players_with_classes() -> void:
 		# Store the player's selected class so player.gd can read it
 		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
 
+		# Store the player's selected weapon so player.gd can read it
+		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
+
 		# Add player to scene
 		get_tree().current_scene.add_child(player)
 
-		print("Spawned player ", peer_id, " with class ", LobbyManager.players[peer_id]["class"])
+		print("Spawned player ", peer_id, " with class ", LobbyManager.players[peer_id]["class"], " and weapon ", LobbyManager.players[peer_id]["weapon"])
 
 
 func get_spawn_position_at_index(index: int) -> Vector2:

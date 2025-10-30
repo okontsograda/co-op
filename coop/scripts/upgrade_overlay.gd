@@ -24,8 +24,10 @@ func show_upgrades(p_player: Node2D) -> void:
 	upgrade_accepted = false
 	selected_index = -1
 
-	# Get 3 random upgrades from UpgradeSystem
-	available_upgrades = UpgradeSystem.get_random_upgrades(3, player.upgrade_stacks)
+	# Get 3 random upgrades from UpgradeSystem (filtered by equipped weapon)
+	available_upgrades = UpgradeSystem.get_random_upgrades(
+		3, player.upgrade_stacks, player.equipped_weapon
+	)
 
 	# If we got less than 3 upgrades, something is wrong
 	if available_upgrades.size() == 0:

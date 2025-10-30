@@ -3,6 +3,7 @@ extends Control
 # UI References
 @onready var player_list_container = $PlayerListPanel/VBoxContainer/ScrollContainer/PlayerList
 @onready var class_selection_container = $ClassSelectionPanel/VBoxContainer/ClassGrid
+@onready var weapon_selection_container = $WeaponSelectionPanel/VBoxContainer/WeaponGrid
 @onready var chat_messages = $ChatPanel/VBoxContainer/MessageContainer/Messages
 @onready var chat_input = $ChatPanel/VBoxContainer/ChatInput
 @onready var online_id_label = $LobbyInfoPanel/VBoxContainer/OnlineIDLabel
@@ -13,6 +14,7 @@ extends Control
 
 var player_list_items: Dictionary = {}  # {peer_id: Control}
 var current_selected_class: String = "archer"
+var current_selected_weapon: String = "bow"
 
 
 func _ready():
@@ -21,6 +23,7 @@ func _ready():
 	LobbyManager.player_left.connect(_on_player_left)
 	LobbyManager.player_ready_changed.connect(_on_player_ready_changed)
 	LobbyManager.player_class_changed.connect(_on_player_class_changed)
+	LobbyManager.player_weapon_changed.connect(_on_player_weapon_changed)
 	LobbyManager.all_players_ready.connect(_on_all_players_ready)
 
 	print("Lobby UI signals connected")
@@ -34,6 +37,9 @@ func _ready():
 
 	# Set up class selection
 	_setup_class_selection()
+
+	# Set up weapon selection
+	_setup_weapon_selection()
 
 	# Update start button visibility (only host can see it)
 	start_button.visible = LobbyManager.is_local_player_host()
@@ -79,6 +85,39 @@ func _on_class_selected(class_id: String):
 	for child in class_selection_container.get_children():
 		if child is Button:
 			if child.name == "Class_" + class_id:
+				child.modulate = Color(1.2, 1.2, 1.2)
+			else:
+				child.modulate = Color.WHITE
+
+
+func _setup_weapon_selection():
+	var weapons = WeaponData.get_all_weapons()
+	for weapon_id in weapons:
+		var weapon_config = weapons[weapon_id]
+
+		var button = Button.new()
+		button.name = "Weapon_" + weapon_id
+		button.text = weapon_config.name
+		button.custom_minimum_size = Vector2(180, 80)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(_on_weapon_selected.bind(weapon_id))
+
+		weapon_selection_container.add_child(button)
+
+		# Highlight selected weapon
+		if weapon_id == current_selected_weapon:
+			button.modulate = Color(1.2, 1.2, 1.2)
+
+
+func _on_weapon_selected(weapon_id: String):
+	current_selected_weapon = weapon_id
+	LobbyManager.set_player_weapon(weapon_id)
+
+	# Update button highlights
+	for child in weapon_selection_container.get_children():
+		if child is Button:
+			if child.name == "Weapon_" + weapon_id:
 				child.modulate = Color(1.2, 1.2, 1.2)
 			else:
 				child.modulate = Color.WHITE
@@ -131,6 +170,15 @@ func _create_player_list_item(peer_id: int, player_data: Dictionary) -> PanelCon
 	class_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	class_label.name = "ClassLabel"
 	hbox.add_child(class_label)
+
+	# Weapon label
+	var weapon_label = Label.new()
+	var weapon_config = WeaponData.get_weapon(player_data["weapon"])
+	weapon_label.text = weapon_config.name
+	weapon_label.custom_minimum_size.x = 100
+	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	weapon_label.name = "WeaponLabel"
+	hbox.add_child(weapon_label)
 
 	# Ready status
 	var ready_label = Label.new()
@@ -190,6 +238,17 @@ func _on_player_class_changed(peer_id: int, selected_class: String):
 			class_label.text = class_data["name"]
 		else:
 			print("ERROR: Could not find ClassLabel for peer ", peer_id)
+
+
+func _on_player_weapon_changed(peer_id: int, selected_weapon: String):
+	if player_list_items.has(peer_id):
+		var panel = player_list_items[peer_id]
+		var weapon_label = panel.get_node_or_null("MarginContainer/HBoxContainer/WeaponLabel")
+		if weapon_label:
+			var weapon_config = WeaponData.get_weapon(selected_weapon)
+			weapon_label.text = weapon_config.name
+		else:
+			print("ERROR: Could not find WeaponLabel for peer ", peer_id)
 
 
 func _on_all_players_ready():

@@ -1,0 +1,41 @@
+[gd_scene load_steps=5 format=3 uid="uid://rocket_projectile"]
+
+[ext_resource type="Script" path="res://coop/scripts/rocket.gd" id="1_rocket"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_rocket"]
+size = Vector2(28, 12)
+
+[sub_resource type="Gradient" id="Gradient_trail"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 0.6, 0, 1, 1, 0.3, 0, 0.5, 0.5, 0.2, 0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_trail"]
+gradient = SubResource("Gradient_trail")
+
+[node name="Rocket" type="Area2D"]
+position = Vector2(0, -15)
+script = ExtResource("1_rocket")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -1)
+scale = Vector2(0.6, 0.6)
+offset = Vector2(0, -1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -1)
+shape = SubResource("RectangleShape2D_rocket")
+
+[node name="VisibilityNotifier2D" type="VisibleOnScreenNotifier2D" parent="."]
+position = Vector2(0, -1)
+
+[node name="TrailParticles" type="GPUParticles2D" parent="."]
+position = Vector2(-10, -1)
+amount = 32
+process_material = null
+lifetime = 0.5
+preprocess = 0.1
+explosiveness = 0.1
+randomness = 0.2
+local_coords = false
+
+[connection signal="body_entered" from="." to="." method="_on_body_entered"]
