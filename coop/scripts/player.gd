@@ -34,6 +34,10 @@ const fire_cooldown: float = .5  # Cooldown time after rapid fire
 var equipped_weapon: String = "bow"  # Default to bow, can be set from lobby
 var current_weapon_config: WeaponData.WeaponConfig = null
 
+# Preload weapon scenes for network compatibility
+const ARROW_SCENE = preload("res://coop/scenes/arrow.tscn")
+const ROCKET_SCENE = preload("res://coop/scenes/rocket.tscn")
+
 # Upgrade System - Weapon Stats
 var weapon_stats = {
 	"damage": 0.0,  # Additional flat damage (base is attack_damage)
@@ -313,6 +317,7 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 	# This function is called on all clients to spawn the arrow
 	# Get the player who sent this RPC
 	var shooter_peer_id = multiplayer.get_remote_sender_id()
+	print("Network spawn request from peer: ", shooter_peer_id)
 
 	# Find the shooter player
 	var shooter = null
@@ -322,9 +327,12 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 			break
 
 	if shooter:
-		# Play bow sound for remote clients when arrow spawns
-		play_bow_sound(shooter)
+		print("Found shooter player: ", shooter.name, " with weapon: ", shooter.equipped_weapon)
+		# Play weapon sound for remote clients when projectile spawns
+		play_weapon_sound(shooter)
 		spawn_arrow_for_player(shooter, target_pos)
+	else:
+		print("ERROR: Could not find shooter player with peer_id: ", shooter_peer_id)
 
 
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
@@ -771,15 +779,31 @@ func toggle_stats_screen() -> void:
 
 # Spawn projectile(s) in given direction with current weapon_stats
 func spawn_projectile(direction: Vector2) -> void:
-	# Load projectile scene dynamically based on equipped weapon
+	# Ensure weapon is initialized (safety check for multiplayer)
 	if not current_weapon_config:
-		print("ERROR: No weapon configured!")
+		print("WARNING: Weapon not initialized for player ", name, ", initializing now...")
+		initialize_weapon()
+
+	if not current_weapon_config:
+		print("ERROR: Failed to initialize weapon for player ", name, "! equipped_weapon=", equipped_weapon)
 		return
 
-	var projectile_scene = load(current_weapon_config.projectile_scene_path)
+	# Use preloaded scenes for network compatibility
+	var projectile_scene = null
+	match equipped_weapon:
+		"bow":
+			projectile_scene = ARROW_SCENE
+		"rocket":
+			projectile_scene = ROCKET_SCENE
+		_:
+			print("ERROR: Unknown weapon type: ", equipped_weapon)
+			return
+
 	if not projectile_scene:
-		print("ERROR: Failed to load projectile scene: ", current_weapon_config.projectile_scene_path)
+		print("ERROR: Failed to get projectile scene for weapon: ", equipped_weapon)
 		return
+
+	print("Spawning projectile for weapon: ", equipped_weapon, " (player: ", name, ")")
 
 	# Get spawn position (slightly ahead of player)
 	var animated_sprite = get_node("AnimatedSprite2D")
@@ -851,8 +875,14 @@ func get_attack_damage() -> int:
 
 
 func initialize_weapon() -> void:
+	print("Initializing weapon for player ", name, ": ", equipped_weapon)
+
 	# Get weapon configuration
 	current_weapon_config = WeaponData.get_weapon(equipped_weapon)
+
+	if not current_weapon_config:
+		print("ERROR: Failed to get weapon config for: ", equipped_weapon)
+		return
 
 	# Update base attack damage based on weapon
 	attack_damage = int(current_weapon_config.base_damage)
