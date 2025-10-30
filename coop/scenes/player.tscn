@@ -181,6 +181,11 @@ properties/4/path = NodePath("AnimatedSprite2D:flip_h")
 properties/4/spawn = true
 properties/4/replication_mode = 1
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_weapon"]
+properties/0/path = NodePath(".:equipped_weapon")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_6w5ry")
 
@@ -201,6 +206,9 @@ replication_config = SubResource("SceneReplicationConfig_3kx2g")
 
 [node name="AnimatedSpriteSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_anim")
+
+[node name="WeaponSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_weapon")
 
 [node name="ChatUI" parent="." instance=ExtResource("2_chat_ui")]
 anchors_preset = 0
