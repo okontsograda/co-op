@@ -8,12 +8,14 @@ const FADE_START: float = 0.5  # When to start fading (seconds)
 var time_alive: float = 0.0
 var label: Label = null
 
+
 func _ready():
 	label = get_node("Label")
 
 	# Add some random horizontal offset for variety
 	var random_offset = randf_range(-10, 10)
 	position.x += random_offset
+
 
 func _process(delta: float) -> void:
 	time_alive += delta
@@ -29,6 +31,7 @@ func _process(delta: float) -> void:
 	# Destroy after lifetime
 	if time_alive >= LIFETIME:
 		queue_free()
+
 
 # Set damage text and optional crit styling
 func set_damage(damage: float, is_crit: bool = false) -> void:
