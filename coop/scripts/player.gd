@@ -70,10 +70,16 @@ signal level_up_ready
 var bow_sound_player: AudioStreamPlayer2D = null
 
 
-func _ready() -> void:
+func _enter_tree() -> void:
 	# Set authority based on the player's name (peer ID)
+	# This MUST happen in _enter_tree() for MultiplayerSynchronizers to work
 	var peer_id = name.to_int()
 	set_multiplayer_authority(peer_id)
+	print("Player ", name, " (peer ", peer_id, ") authority set in _enter_tree()")
+
+
+func _ready() -> void:
+	var peer_id = name.to_int()
 	print("Player ", name, " (peer ", peer_id, ") has authority: ", is_multiplayer_authority())
 	print("Current multiplayer peer: ", multiplayer.get_unique_id())
 	print("Is server: ", multiplayer.is_server())
@@ -92,7 +98,12 @@ func _ready() -> void:
 	# Apply weapon selection if coming from lobby
 	if has_meta("selected_weapon"):
 		equipped_weapon = get_meta("selected_weapon")
-		print("Player ", name, " equipped weapon: ", equipped_weapon)
+		print("Player ", name, " equipped weapon from metadata: ", equipped_weapon)
+	elif LobbyManager and LobbyManager.players.has(peer_id):
+		equipped_weapon = LobbyManager.players[peer_id].get("weapon", "bow")
+		print("Player ", name, " equipped weapon from LobbyManager: ", equipped_weapon)
+	else:
+		print("Player ", name, " using default weapon: ", equipped_weapon)
 
 	# Initialize weapon configuration
 	initialize_weapon()
