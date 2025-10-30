@@ -554,11 +554,23 @@ func start_game_from_lobby() -> void:
 
 
 func spawn_players_with_classes() -> void:
+	# Only the server should instantiate player scenes.
+	if not multiplayer.is_server():
+		return
+
 	# Spawn all players from the lobby with their selected classes
 	var player_scene = preload("res://coop/scenes/player.tscn")
 	var spawn_index = 0
+	var current_scene := get_tree().current_scene
+	if current_scene == null:
+		print("ERROR: No current scene available for spawning players")
+		return
 
 	for peer_id in LobbyManager.players:
+		# Avoid spawning duplicates if this function is called more than once.
+		if current_scene.get_node_or_null(str(peer_id)):
+			continue
+
 		var player = player_scene.instantiate()
 		player.name = str(peer_id)
 
@@ -570,7 +582,7 @@ func spawn_players_with_classes() -> void:
 		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
 
 		# Add player to scene
-		get_tree().current_scene.add_child(player)
+		current_scene.add_child(player)
 
 		print("Spawned player ", peer_id, " with class ", LobbyManager.players[peer_id]["class"])
 

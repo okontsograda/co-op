@@ -73,8 +73,13 @@ func _ready() -> void:
 	print("Player visible: ", visible)
 
 	# Apply class modifiers if coming from lobby
+	var selected_class := ""
 	if has_meta("selected_class"):
-		apply_class_modifiers(get_meta("selected_class"))
+		selected_class = str(get_meta("selected_class"))
+	elif LobbyManager and LobbyManager.players.has(peer_id):
+		selected_class = LobbyManager.players[peer_id].get("class", "archer")
+	if selected_class != "":
+		apply_class_modifiers(selected_class)
 
 	# Add to players group so it can be found by other players
 	add_to_group("players")
