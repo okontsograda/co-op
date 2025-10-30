@@ -34,6 +34,8 @@ func _ready():
 	ready_button.pressed.connect(_on_ready_button_pressed)
 	start_button.pressed.connect(_on_start_button_pressed)
 	chat_input.text_submitted.connect(_on_chat_submitted)
+	if NetworkHandler and not NetworkHandler.chat_message_received.is_connected(_on_lobby_chat_message_received):
+		NetworkHandler.chat_message_received.connect(_on_lobby_chat_message_received)
 
 	# Set up class selection
 	_setup_class_selection()
@@ -288,20 +290,37 @@ func _update_player_count():
 
 
 func _on_chat_submitted(text: String):
-	if text.strip_edges().length() > 0:
-		NetworkHandler.send_chat_message(text)
+	var trimmed := text.strip_edges()
+	if trimmed.is_empty():
 		chat_input.text = ""
-		chat_input.release_focus()
+		chat_input.grab_focus()
+		return
+
+	NetworkHandler.send_chat_message(trimmed)
+	chat_input.text = ""
+	chat_input.release_focus()
+
+
+func _on_lobby_chat_message_received(sender_id: String, message: String) -> void:
+	add_chat_message(sender_id, message)
 
 
 # Called from NetworkHandler when chat message received
-func add_chat_message(sender_id: int, message: String):
+func add_chat_message(sender_id: String, message: String):
 	var label = Label.new()
 	label.text = "Player " + str(sender_id) + ": " + message
 	chat_messages.add_child(label)
 
 	# Auto-scroll to bottom
+	await _scroll_chat_to_bottom()
+
+
+func _scroll_chat_to_bottom() -> void:
 	await get_tree().process_frame
-	var scroll = $ChatPanel/VBoxContainer/MessageContainer
+	await get_tree().process_frame
+	var scroll := $ChatPanel/VBoxContainer/MessageContainer
 	if scroll is ScrollContainer:
+		var v_bar: VScrollBar = scroll.get_v_scroll_bar()
+		if v_bar:
+			v_bar.value = v_bar.max_value
 		scroll.scroll_vertical = scroll.get_v_scroll_bar().max_value

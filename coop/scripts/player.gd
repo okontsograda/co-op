@@ -77,8 +77,13 @@ func _ready() -> void:
 	print("Player visible: ", visible)
 
 	# Apply class modifiers if coming from lobby
+	var selected_class := ""
 	if has_meta("selected_class"):
-		apply_class_modifiers(get_meta("selected_class"))
+		selected_class = str(get_meta("selected_class"))
+	elif LobbyManager and LobbyManager.players.has(peer_id):
+		selected_class = LobbyManager.players[peer_id].get("class", "archer")
+	if selected_class != "":
+		apply_class_modifiers(selected_class)
 
 	# Apply weapon selection if coming from lobby
 	if has_meta("selected_weapon"):
@@ -335,6 +340,9 @@ func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
 
 
 func update_animation(direction: Vector2) -> void:
+	if not is_multiplayer_authority():
+		return
+
 	# Don't update animation if we're firing
 	if is_firing:
 		return

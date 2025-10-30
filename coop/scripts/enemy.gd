@@ -71,8 +71,6 @@ func _physics_process(_delta: float) -> void:
 
 	# Only process on server (authority)
 	if not is_multiplayer_authority():
-		# Still update animations on clients
-		update_animation()
 		return
 
 	# Find nearest player

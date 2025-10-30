@@ -88,6 +88,10 @@ func spawn_player(peer_id: int) -> void:
 	# Set spawn position
 	player.position = get_next_spawn_position()
 
+	# Attach class selection metadata if available so clients can apply modifiers.
+	if LobbyManager and LobbyManager.players.has(peer_id):
+		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
+
 	get_node(spawn_path).call_deferred("add_child", player)
 	print(
 		"Player spawned for peer: ",
