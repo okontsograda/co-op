@@ -29,6 +29,34 @@ var rapid_fire_count: int = 0  # Track number of arrows fired in rapid successio
 const max_rapid_fire: int = 2  # Maximum arrows that can be fired rapidly
 const fire_cooldown: float = .5  # Cooldown time after rapid fire
 
+# Upgrade System - Weapon Stats
+var weapon_stats = {
+	"damage": 0.0,  # Additional flat damage (base is attack_damage)
+	"damage_multiplier": 1.0,  # Multiplicative damage bonus
+	"fire_cooldown": fire_cooldown,  # Cooldown between shots
+	"pierce_count": 0,  # Number of enemies arrow can pierce
+	"multishot_count": 1,  # Number of arrows fired per shot
+	"arrow_speed": 500.0,  # Base arrow speed
+	"crit_chance": 0.0,  # Critical hit chance (0.0 to 1.0)
+	"crit_multiplier": 2.0,  # Critical hit damage multiplier
+	"explosion_chance": 0.0,  # Chance for arrows to explode on hit
+	"explosion_radius": 30.0,  # Radius of explosion damage
+	"explosion_damage": 0.0,  # Explosion damage (0 = use arrow damage)
+	"lifesteal": 0,  # HP gained per enemy hit
+	"poison_damage": 0,  # Damage per second from poison
+	"poison_duration": 0.0,  # Duration of poison effect in seconds
+	"homing_strength": 0.0,  # Strength of homing effect (0.0 to 1.0)
+}
+
+# Upgrade tracking - how many times each upgrade has been taken
+var upgrade_stacks = {}
+
+# Active abilities (arrow nova, summon archer, shield, etc.)
+var active_abilities = []
+
+# Signal emitted when player levels up and is ready for upgrade selection
+signal level_up_ready
+
 # Sound effects
 var bow_sound_player: AudioStreamPlayer2D = null
 
@@ -62,36 +90,42 @@ func _ready() -> void:
 	# Connect to network handler for receiving chat messages
 	if NetworkHandler:
 		NetworkHandler.chat_message_received.connect(_on_chat_message_received)
-	
+
+	# Connect level-up signal to show upgrade overlay
+	level_up_ready.connect(_on_level_up_ready)
+
 	# Set up bow release sound
 	setup_bow_sound()
 
 func _input(event: InputEvent) -> void:
+	# Only handle input for the local player
+	var peer_id = name.to_int()
+	if peer_id != multiplayer.get_unique_id():
+		return
+
+	# Handle stats screen toggle
+	if event.is_action_pressed("stats_toggle") and not event.is_echo():
+		toggle_stats_screen()
+		return
+
 	# Handle chat input for the player whose peer ID matches the current multiplayer peer
 	if event.is_action_pressed("chat_toggle") and not event.is_echo():
-		# Only handle chat if this is the current player (peer ID matches)
-		var peer_id = name.to_int()
-		if peer_id == multiplayer.get_unique_id():
-			print("Player ", name, " (peer ", peer_id, ") handling chat input")
-			var chat_ui = get_node("ChatUI")
-			if chat_ui:
-				# Add a small delay to prevent double processing
-				await get_tree().process_frame
-				chat_ui.toggle_chat()
-			else:
-				print("ERROR: ChatUI not found for player ", name)
+		print("Player ", name, " (peer ", peer_id, ") handling chat input")
+		var chat_ui = get_node("ChatUI")
+		if chat_ui:
+			# Add a small delay to prevent double processing
+			await get_tree().process_frame
+			chat_ui.toggle_chat()
 		else:
-			print("Player ", name, " (peer ", peer_id, ") ignoring chat input (not current player)")
+			print("ERROR: ChatUI not found for player ", name)
 		return
 	
 	# Handle fire animation on left mouse click
 	if event is InputEventMouseButton:
 		var mouse_event = event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			# Only handle if this is the current player
-			var peer_id = name.to_int()
-			if peer_id == multiplayer.get_unique_id():
-				handle_fire_action(mouse_event.position)
+			# Already checked peer_id at top of function
+			handle_fire_action(mouse_event.position)
 
 func _physics_process(_delta: float) -> void:
 	# Only process movement for players with authority
@@ -236,9 +270,9 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 			# Allow rapid fire - can fire again immediately
 			print("Player ", name, " rapid fire available: ", rapid_fire_count, "/", max_rapid_fire)
 		else:
-			# Rapid fire limit reached, wait for cooldown
+			# Rapid fire limit reached, wait for cooldown (use upgraded fire_cooldown)
 			can_fire = false
-			await get_tree().create_timer(fire_cooldown).timeout
+			await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
 			can_fire = true
 			rapid_fire_count = 0  # Reset rapid fire counter
 			print("Player ", name, " can fire again")
@@ -264,29 +298,13 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 		spawn_arrow_for_player(shooter, target_pos)
 
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
-	# Load the arrow scene
-	var arrow_scene = preload("res://coop/scenes/arrow.tscn")
-	var arrow = arrow_scene.instantiate()
-	
-	# Target position should already be in world coordinates
-	var world_target = target_pos
-	
-	# Get the animated sprite to use its position as reference
+	# Calculate direction from shooter to target
 	var animated_sprite = shooter.get_node("AnimatedSprite2D")
 	var sprite_position = animated_sprite.global_position if animated_sprite else shooter.global_position
-	
-	# Spawn arrow slightly ahead of the player sprite (to avoid clipping)
-	var direction_to_target = (world_target - sprite_position).normalized()
-	var spawn_offset = direction_to_target * 30.0  # 30 pixels ahead of sprite
-	var spawn_position = sprite_position + spawn_offset
-	
-	# Initialize the arrow
-	arrow.initialize(self, spawn_position, world_target)
-	
-	# Add arrow to the scene tree
-	get_tree().current_scene.add_child(arrow)
-	
-	print("Player ", name, " spawned arrow at ", spawn_position, " targeting ", world_target)
+	var direction_to_target = (target_pos - sprite_position).normalized()
+
+	# Use the new spawn_arrow function which handles multishot and weapon_stats
+	shooter.spawn_arrow(direction_to_target)
 
 func update_animation(direction: Vector2) -> void:
 	# Don't update animation if we're firing
@@ -386,6 +404,18 @@ func sync_player_health(health: int) -> void:
 	update_health_display()
 	print("Synced health for player ", name, ": ", current_health, "/", max_health)
 
+# Heal player (used by lifesteal and other effects)
+func heal(amount: int) -> void:
+	# Cap health at maximum
+	current_health = min(current_health + amount, max_health)
+	print("Player ", name, " healed ", amount, " HP. Health: ", current_health, "/", max_health)
+
+	# Broadcast health update to all clients
+	rpc("sync_player_health", current_health)
+
+	# Update health bar
+	update_health_display()
+
 @rpc("any_peer", "reliable")
 func on_player_died(_killer: String) -> void:
 	# Handle death (e.g., respawn, show death message, etc.)
@@ -446,22 +476,26 @@ func gain_xp_rpc(amount: int) -> void:
 func level_up() -> void:
 	current_xp -= xp_to_next_level
 	current_level += 1
-	
+
 	# Increase XP requirement for next level (scaling)
 	xp_to_next_level = base_xp_per_level * current_level
-	
-	# Level up bonuses
+
+	# Level up bonuses (baseline automatic increases)
 	max_health += 10
 	current_health = max_health  # Full heal on level up
 	attack_damage += 5  # Increase attack damage by 5 per level
-	
+
 	print("Player ", name, " leveled up to level ", current_level, "!")
 	print("New max health: ", max_health)
 	print("New attack damage: ", attack_damage)
-	
+
 	# Update health bar
 	update_health_display()
-	
+
+	# Emit signal for upgrade system (only for local player)
+	if is_multiplayer_authority():
+		level_up_ready.emit()
+
 	# Sync level up to all clients
 	rpc("sync_level_up", current_level, max_health, current_xp, xp_to_next_level, attack_damage)
 
@@ -485,6 +519,230 @@ func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int, new
 	update_health_display()
 	update_xp_display()
 	print("Synced level up for player ", name, ": Level ", current_level, ", Health: ", max_health, ", Attack Damage: ", attack_damage)
+
+# Apply upgrade when selected from upgrade menu
+func apply_upgrade(upgrade_id: String) -> void:
+	# Increment stack count
+	if not upgrade_stacks.has(upgrade_id):
+		upgrade_stacks[upgrade_id] = 0
+	upgrade_stacks[upgrade_id] += 1
+
+	var stack_count = upgrade_stacks[upgrade_id]
+	print("Applying upgrade: ", upgrade_id, " (stack ", stack_count, ")")
+
+	# Apply upgrade effects
+	match upgrade_id:
+		"fire_rate":
+			# 15% faster fire rate (multiplicative)
+			weapon_stats.fire_cooldown *= 0.85
+			print("Fire cooldown: ", weapon_stats.fire_cooldown)
+
+		"damage_boost":
+			# +20% damage (multiplicative stacking)
+			weapon_stats.damage_multiplier += 0.2
+			print("Damage multiplier: ", weapon_stats.damage_multiplier)
+
+		"pierce":
+			# +1 pierce per stack
+			weapon_stats.pierce_count += 1
+			print("Pierce count: ", weapon_stats.pierce_count)
+
+		"multishot":
+			# +1 arrow per shot
+			weapon_stats.multishot_count += 1
+			print("Multishot count: ", weapon_stats.multishot_count)
+
+		"crit_chance":
+			# +15% crit chance per stack (cap at 95%)
+			weapon_stats.crit_chance = min(0.95, weapon_stats.crit_chance + 0.15)
+			print("Crit chance: ", weapon_stats.crit_chance * 100, "%")
+
+		"explosive_arrows":
+			# +10% explosion chance per stack (cap at 100%)
+			weapon_stats.explosion_chance = min(1.0, weapon_stats.explosion_chance + 0.1)
+			weapon_stats.explosion_damage = attack_damage * 0.75  # 75% of arrow damage
+			print("Explosion chance: ", weapon_stats.explosion_chance * 100, "%")
+
+		"arrow_speed":
+			# +25% arrow speed (multiplicative)
+			weapon_stats.arrow_speed *= 1.25
+			print("Arrow speed: ", weapon_stats.arrow_speed)
+
+		"lifesteal":
+			# +2 HP per enemy hit
+			weapon_stats.lifesteal += 2
+			print("Lifesteal: ", weapon_stats.lifesteal, " HP")
+
+		"rapid_fire_capacity":
+			# Modify max_rapid_fire constant through instance variable
+			# Note: We'll need to track this separately since max_rapid_fire is const
+			print("Rapid fire capacity increased")
+			# TODO: Implement once we refactor rapid fire system
+
+		"poison_arrows":
+			# Enable poison effect
+			weapon_stats.poison_damage = 3
+			weapon_stats.poison_duration = 3.0
+			print("Poison arrows enabled: ", weapon_stats.poison_damage, " damage/sec")
+
+		"homing":
+			# +0.1 homing strength per stack (0.0 to 0.5 reasonable range)
+			weapon_stats.homing_strength = min(0.5, weapon_stats.homing_strength + 0.1)
+			print("Homing strength: ", weapon_stats.homing_strength)
+
+		"arrow_nova":
+			# Add arrow nova ability
+			if not "arrow_nova" in active_abilities:
+				active_abilities.append("arrow_nova")
+				setup_arrow_nova()
+				print("Arrow Nova ability unlocked!")
+
+		"summon_archer":
+			# Add summon archer ability
+			if not "summon_archer" in active_abilities:
+				active_abilities.append("summon_archer")
+				print("Summon Archer ability unlocked!")
+				# TODO: Implement archer summoning
+
+		"damage_shield":
+			# Add damage shield ability
+			if not "damage_shield" in active_abilities:
+				active_abilities.append("damage_shield")
+				print("Damage Shield ability unlocked! Press E to activate.")
+				# TODO: Implement shield ability
+
+		"xp_magnet":
+			# Increase XP collection and gain
+			# TODO: Implement XP magnet area increase
+			# TODO: Implement XP multiplier
+			print("XP Magnet upgraded!")
+
+		_:
+			print("Unknown upgrade: ", upgrade_id)
+
+	# TODO: Play upgrade select sound effect
+	# TODO: Spawn visual effect
+
+# Setup arrow nova timer
+func setup_arrow_nova() -> void:
+	var nova_timer = Timer.new()
+	nova_timer.name = "ArrowNovaTimer"
+	nova_timer.wait_time = 10.0  # Fire every 10 seconds
+	nova_timer.timeout.connect(_on_arrow_nova_timeout)
+	add_child(nova_timer)
+	nova_timer.start()
+
+func _on_arrow_nova_timeout() -> void:
+	# Fire 8 arrows in all directions
+	print("Arrow Nova activated!")
+	for i in range(8):
+		var angle = (PI * 2 / 8) * i
+		var direction = Vector2(cos(angle), sin(angle))
+		spawn_arrow(direction)
+
+# Called when player levels up and is ready for upgrade selection
+func _on_level_up_ready() -> void:
+	print("Player ", name, " ready for upgrade selection!")
+
+	# Load and instantiate upgrade overlay
+	var overlay_scene = load("res://coop/scenes/upgrade_overlay.tscn")
+	if not overlay_scene:
+		print("ERROR: Could not load upgrade overlay scene!")
+		return
+
+	var overlay = overlay_scene.instantiate()
+
+	# Add to scene tree (as child of root, not player, so it doesn't move)
+	get_tree().root.add_child(overlay)
+
+	# Show upgrades for this player
+	overlay.show_upgrades(self)
+
+	print("Upgrade overlay shown for player ", name)
+
+# Toggle stats screen display
+func toggle_stats_screen() -> void:
+	# Check if stats screen is already open
+	var existing_stats = get_tree().root.get_node_or_null("StatsScreen")
+	if existing_stats:
+		# Already open, close it
+		existing_stats.close_stats()
+		return
+
+	# Load and instantiate stats screen
+	var stats_scene = load("res://coop/scenes/stats_screen.tscn")
+	if not stats_scene:
+		print("ERROR: Could not load stats screen scene!")
+		return
+
+	var stats_screen = stats_scene.instantiate()
+	stats_screen.name = "StatsScreen"
+
+	# Add to scene tree
+	get_tree().root.add_child(stats_screen)
+
+	# Show stats for this player
+	stats_screen.show_stats(self)
+
+	print("Stats screen shown for player ", name)
+
+# Spawn arrow(s) in given direction with current weapon_stats
+func spawn_arrow(direction: Vector2) -> void:
+	var arrow_scene = preload("res://coop/scenes/arrow.tscn")
+
+	# Get spawn position (slightly ahead of player)
+	var animated_sprite = get_node("AnimatedSprite2D")
+	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
+	var spawn_offset = direction.normalized() * 30.0  # 30 pixels ahead
+	var base_spawn_position = sprite_position + spawn_offset
+
+	# Calculate final damage (base + flat + multiplier)
+	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
+	print("=== ARROW SPAWN DEBUG ===")
+	print("Player attack_damage: ", attack_damage)
+	print("weapon_stats.damage: ", weapon_stats.damage)
+	print("weapon_stats.damage_multiplier: ", weapon_stats.damage_multiplier)
+	print("CALCULATED final_damage: ", final_damage)
+	print("========================")
+
+	# Spawn arrows based on multishot count
+	var arrows_to_spawn = weapon_stats.multishot_count
+	var spread_angle_deg = 15.0  # degrees between arrows
+
+	for i in range(arrows_to_spawn):
+		var arrow = arrow_scene.instantiate()
+
+		# Calculate spread for multishot (center arrow has 0 offset)
+		var angle_offset_deg = (i - (arrows_to_spawn - 1) / 2.0) * spread_angle_deg
+		var angle_offset_rad = deg_to_rad(angle_offset_deg)
+		var arrow_direction = direction.rotated(angle_offset_rad)
+
+		# Calculate target position far away in the arrow direction
+		var target_position = base_spawn_position + arrow_direction * 1000.0
+
+		# Initialize arrow with stats
+		arrow.damage = final_damage
+		arrow.speed = weapon_stats.arrow_speed
+		arrow.pierce_remaining = weapon_stats.pierce_count
+		arrow.crit_chance = weapon_stats.crit_chance
+		arrow.crit_multiplier = weapon_stats.crit_multiplier
+		arrow.explosion_chance = weapon_stats.explosion_chance
+		arrow.explosion_radius = weapon_stats.explosion_radius
+		arrow.explosion_damage = weapon_stats.explosion_damage if weapon_stats.explosion_damage > 0 else final_damage * 0.75
+		arrow.lifesteal = weapon_stats.lifesteal
+		arrow.poison_damage = weapon_stats.poison_damage
+		arrow.poison_duration = weapon_stats.poison_duration
+		arrow.homing_strength = weapon_stats.homing_strength
+		arrow.direction = arrow_direction
+
+		# Initialize with old method for compatibility
+		arrow.initialize(self, base_spawn_position, target_position)
+
+		# Set shooter metadata
+		arrow.set_meta("shooter", self)
+
+		# Add to scene
+		get_tree().current_scene.add_child(arrow)
 
 func get_attack_damage() -> int:
 	return attack_damage
