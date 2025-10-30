@@ -472,9 +472,25 @@ func send_chat_message(message: String) -> void:
 		print("ERROR: No multiplayer peer!")
 		return
 
-	# Send to all peers including self
+	if multiplayer.is_server():
+		print("NetworkHandler: Host broadcasting chat message locally and to clients")
+		receive_chat_message(peer_id, message)
+		rpc("receive_chat_message", peer_id, message)
+	else:
+		print("NetworkHandler: Forwarding chat message to server for broadcast")
+		_send_chat_message_to_server.rpc_id(1, message)
+
+
+@rpc("any_peer", "reliable")
+func _send_chat_message_to_server(message: String) -> void:
+	if not multiplayer.is_server():
+		return
+
+	var sender_id := multiplayer.get_remote_sender_id()
+	var peer_id := str(sender_id if sender_id != 0 else multiplayer.get_unique_id())
+	print("NetworkHandler: Server received chat submission from peer ", peer_id)
+	receive_chat_message(peer_id, message)
 	rpc("receive_chat_message", peer_id, message)
-	print("NetworkHandler: RPC sent with peer_id: ", peer_id)
 
 
 @rpc("any_peer", "reliable")

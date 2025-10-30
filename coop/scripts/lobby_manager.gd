@@ -54,6 +54,8 @@ func leave_lobby():
 # Called when a new peer connects (server only)
 func _on_peer_connected(peer_id: int):
 	if is_in_lobby and multiplayer.is_server():
+		if not players.has(peer_id):
+			register_player(peer_id, false)
 		# Send current lobby state to new player
 		_send_lobby_state_to_peer.rpc_id(peer_id, players)
 
