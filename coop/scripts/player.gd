@@ -328,6 +328,9 @@ func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
 
 
 func update_animation(direction: Vector2) -> void:
+	if not is_multiplayer_authority():
+		return
+
 	# Don't update animation if we're firing
 	if is_firing:
 		return
