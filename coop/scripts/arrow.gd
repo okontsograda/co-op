@@ -19,6 +19,7 @@ var homing_strength: float = 0.0
 var enemies_hit: Array = []  # For pierce tracking
 var has_hit: bool = false  # Legacy flag, now using enemies_hit
 
+
 func _ready() -> void:
 	# Connect to body entered signal (only if not already connected)
 	# Note: This signal is already connected in the arrow.tscn scene file
@@ -29,6 +30,7 @@ func _ready() -> void:
 	var visibility = get_node_or_null("VisibilityNotifier2D")
 	if visibility:
 		visibility.screen_exited.connect(_on_screen_exited)
+
 
 func _physics_process(delta: float) -> void:
 	if has_hit:
@@ -44,6 +46,7 @@ func _physics_process(delta: float) -> void:
 
 	# Move the arrow in its direction
 	global_position += direction * speed * delta
+
 
 # Find nearest enemy for homing
 func find_nearest_enemy() -> Node2D:
@@ -61,6 +64,7 @@ func find_nearest_enemy() -> Node2D:
 			nearest = enemy
 
 	return nearest
+
 
 func _on_body_entered(body: Node2D) -> void:
 	# Don't hit the player who fired it
@@ -93,7 +97,9 @@ func _on_body_entered(body: Node2D) -> void:
 		# Apply damage
 		print("Calling take_damage on ", body.name, " with damage: ", final_damage)
 		body.take_damage(final_damage, shooter)
-		print("Arrow hit ", body.name, " for ", final_damage, " damage", " (crit)" if is_crit else "")
+		print(
+			"Arrow hit ", body.name, " for ", final_damage, " damage", " (crit)" if is_crit else ""
+		)
 
 		# Spawn damage number
 		print("Spawning damage number with: ", final_damage, ", is_crit: ", is_crit)
@@ -124,6 +130,7 @@ func _on_body_entered(body: Node2D) -> void:
 	# Destroy arrow (no pierce remaining or hit non-damageable object)
 	has_hit = true
 	queue_free()
+
 
 # Create explosion effect and deal AoE damage
 func create_explosion() -> void:
@@ -167,13 +174,16 @@ func create_explosion() -> void:
 	# Clean up explosion area
 	explosion_area.queue_free()
 
+
 func _on_screen_exited() -> void:
 	# Remove arrow when it leaves the screen
 	queue_free()
 
+
 func get_shooter() -> Node2D:
 	# Return the shooter for enemy collision detection
 	return get_meta("shooter", null)
+
 
 func initialize(shooter: Node2D, start_pos: Vector2, target_pos: Vector2) -> void:
 	# Set shooter metadata
@@ -187,6 +197,7 @@ func initialize(shooter: Node2D, start_pos: Vector2, target_pos: Vector2) -> voi
 
 	# Rotate arrow to face direction
 	rotation = direction.angle()
+
 
 # Spawn floating damage number
 func spawn_damage_number(pos: Vector2, damage_amount: float, is_crit: bool) -> void:

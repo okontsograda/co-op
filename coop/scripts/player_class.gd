@@ -1,0 +1,59 @@
+extends RefCounted
+class_name PlayerClass
+
+
+# Static class definitions for different player types
+static func get_class_by_name(class_id: String) -> Dictionary:
+	var classes = get_all_classes()
+	if classes.has(class_id):
+		return classes[class_id]
+	return classes["archer"]  # Default to archer
+
+
+static func get_all_classes() -> Dictionary:
+	return {
+		"archer":
+		{
+			"name": "Archer",
+			"description": "Balanced stats with standard damage and speed",
+			"health_modifier": 1.0,
+			"damage_modifier": 1.0,
+			"speed_modifier": 1.0,
+			"attack_speed_modifier": 1.0,
+			"color_tint": Color(0.7, 1.0, 0.7)  # Light green
+		},
+		"warrior":
+		{
+			"name": "Warrior",
+			"description": "High health and damage, but slower movement",
+			"health_modifier": 1.5,  # 150 health instead of 100
+			"damage_modifier": 1.3,  # ~20 damage instead of 15
+			"speed_modifier": 0.8,  # Slower movement
+			"attack_speed_modifier": 0.9,  # Slightly slower attack speed
+			"color_tint": Color(1.0, 0.7, 0.7)  # Light red
+		},
+		"mage":
+		{
+			"name": "Mage",
+			"description": "High damage and attack speed, but lower health",
+			"health_modifier": 0.7,  # 70 health
+			"damage_modifier": 1.5,  # ~23 damage
+			"speed_modifier": 1.0,
+			"attack_speed_modifier": 1.4,  # Much faster attack speed
+			"color_tint": Color(0.7, 0.7, 1.0)  # Light blue
+		},
+		"tank":
+		{
+			"name": "Tank",
+			"description": "Very high health and slow, focused on survival",
+			"health_modifier": 2.0,  # 200 health
+			"damage_modifier": 0.8,  # ~12 damage
+			"speed_modifier": 0.7,  # Quite slow
+			"attack_speed_modifier": 1.0,
+			"color_tint": Color(1.0, 1.0, 0.7)  # Light yellow
+		}
+	}
+
+
+static func get_class_names() -> Array:
+	return ["archer", "warrior", "mage", "tank"]

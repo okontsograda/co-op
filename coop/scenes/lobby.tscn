@@ -1,0 +1,176 @@
+[gd_scene load_steps=2 format=3 uid="uid://lobby_scene_001"]
+
+[ext_resource type="Script" path="res://coop/scripts/lobby_ui.gd" id="1"]
+
+[node name="Lobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.15, 0.15, 1)
+
+[node name="LobbyInfoPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 100.0
+grow_horizontal = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="LobbyInfoPanel"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="LobbyInfoPanel/VBoxContainer"]
+layout_mode = 2
+text = "Game Lobby"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OnlineIDLabel" type="Label" parent="LobbyInfoPanel/VBoxContainer"]
+layout_mode = 2
+text = "Lobby ID: "
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="LobbyInfoPanel/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="CopyButton" type="Button" parent="LobbyInfoPanel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Copy ID"
+
+[node name="PlayerCountLabel" type="Label" parent="LobbyInfoPanel/VBoxContainer"]
+layout_mode = 2
+text = "Players: 0"
+horizontal_alignment = 1
+
+[node name="PlayerListPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 20.0
+offset_top = -250.0
+offset_right = 470.0
+offset_bottom = 250.0
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayerListPanel"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PlayerListPanel/VBoxContainer"]
+layout_mode = 2
+text = "Players in Lobby"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="PlayerListPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="PlayerList" type="VBoxContainer" parent="PlayerListPanel/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ClassSelectionPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -420.0
+offset_top = -250.0
+offset_right = -20.0
+offset_bottom = 250.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ClassSelectionPanel"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="ClassSelectionPanel/VBoxContainer"]
+layout_mode = 2
+text = "Select Your Class"
+horizontal_alignment = 1
+
+[node name="ClassGrid" type="GridContainer" parent="ClassSelectionPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+columns = 2
+
+[node name="ChatPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -200.0
+offset_right = -20.0
+offset_bottom = -60.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ChatPanel"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="ChatPanel/VBoxContainer"]
+layout_mode = 2
+text = "Lobby Chat"
+horizontal_alignment = 1
+
+[node name="MessageContainer" type="ScrollContainer" parent="ChatPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Messages" type="VBoxContainer" parent="ChatPanel/VBoxContainer/MessageContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ChatInput" type="LineEdit" parent="ChatPanel/VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Press Enter to chat..."
+
+[node name="ReadyButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -100.0
+offset_top = -50.0
+offset_right = 100.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "Ready"
+
+[node name="StartButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 120.0
+offset_top = -50.0
+offset_right = 320.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "Start Game"

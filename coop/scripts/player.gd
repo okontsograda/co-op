@@ -4,6 +4,7 @@ extends CharacterBody2D
 const walk_speed: float = 100.0  # Default walking speed
 const run_speed: float = 135.0  # Running speed (when holding Shift)
 var current_speed: float = walk_speed
+var class_speed_modifier: float = 1.0  # Modifier from class selection
 
 # Stamina system
 var max_stamina: float = 100.0
@@ -60,6 +61,7 @@ signal level_up_ready
 # Sound effects
 var bow_sound_player: AudioStreamPlayer2D = null
 
+
 func _ready() -> void:
 	# Set authority based on the player's name (peer ID)
 	var peer_id = name.to_int()
@@ -69,24 +71,28 @@ func _ready() -> void:
 	print("Is server: ", multiplayer.is_server())
 	print("Player position: ", position)
 	print("Player visible: ", visible)
-	
+
+	# Apply class modifiers if coming from lobby
+	if has_meta("selected_class"):
+		apply_class_modifiers(get_meta("selected_class"))
+
 	# Add to players group so it can be found by other players
 	add_to_group("players")
-	
+
 	# Initialize health bar, XP display, and stamina bar
 	update_health_display()
 	update_xp_display()
 	update_stamina_display()
-	
+
 	# Set up camera to follow this player if this is the local player
 	setup_camera()
-	
+
 	# Try using the actual multiplayer peer ID instead
 	if peer_id == multiplayer.get_unique_id():
 		print("This player should have authority!")
 	else:
 		print("This player should NOT have authority")
-	
+
 	# Connect to network handler for receiving chat messages
 	if NetworkHandler:
 		NetworkHandler.chat_message_received.connect(_on_chat_message_received)
@@ -96,6 +102,7 @@ func _ready() -> void:
 
 	# Set up bow release sound
 	setup_bow_sound()
+
 
 func _input(event: InputEvent) -> void:
 	# Only handle input for the local player
@@ -119,7 +126,7 @@ func _input(event: InputEvent) -> void:
 		else:
 			print("ERROR: ChatUI not found for player ", name)
 		return
-	
+
 	# Handle fire animation on left mouse click
 	if event is InputEventMouseButton:
 		var mouse_event = event as InputEventMouseButton
@@ -127,11 +134,12 @@ func _input(event: InputEvent) -> void:
 			# Already checked peer_id at top of function
 			handle_fire_action(mouse_event.position)
 
+
 func _physics_process(_delta: float) -> void:
 	# Only process movement for players with authority
-	if !is_multiplayer_authority(): 
+	if !is_multiplayer_authority():
 		return
-	
+
 	# Check if chat is active - if so, don't process movement
 	var chat_ui = get_node("ChatUI")
 	if chat_ui and chat_ui.is_chat_active:
@@ -139,10 +147,10 @@ func _physics_process(_delta: float) -> void:
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
-	
+
 	# Use direct key input instead of input actions
 	var direction = Vector2()
-	
+
 	# Check for WASD keys
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
 		direction.y -= 1
@@ -152,49 +160,51 @@ func _physics_process(_delta: float) -> void:
 		direction.x -= 1
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		direction.x += 1
-	
+
 	# Also try input actions as fallback
 	if direction == Vector2.ZERO:
 		direction = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	
+
 	# Check for Shift key (running)
 	var wants_to_run = Input.is_key_pressed(KEY_SHIFT)
-	
+
 	# Determine if player can run (has stamina and is trying to run)
 	if wants_to_run and direction != Vector2.ZERO and current_stamina > 0:
 		is_running = true
-		current_speed = run_speed
+		current_speed = run_speed * class_speed_modifier
 		# Drain stamina while running
 		current_stamina -= stamina_drain_rate * _delta
 		if current_stamina < 0:
 			current_stamina = 0
 	else:
 		is_running = false
-		current_speed = walk_speed
+		current_speed = walk_speed * class_speed_modifier
 		# Regenerate stamina when not running
 		if current_stamina < max_stamina:
 			current_stamina += stamina_regen_rate * _delta
 			if current_stamina > max_stamina:
 				current_stamina = max_stamina
-	
+
 	# Update stamina display
 	update_stamina_display()
-	
+
 	# Debug input detection (removed spam)
 	#if direction != Vector2.ZERO:
-		#print("Player ", name, " input detected: ", direction)
-	
+	#print("Player ", name, " input detected: ", direction)
+
 	velocity = direction * current_speed
 	move_and_slide()
-	
+
 	# Update animation based on movement
 	update_animation(direction)
+
+
 func _on_chat_message_received(player_name: String, message: String) -> void:
 	print("Player ", name, " received chat message from ", player_name, ": ", message)
-	
+
 	# Check if this message is from this specific player
-	var is_message_from_this_player = (player_name == name or player_name == str(name.to_int()))
-	
+	var is_message_from_this_player = player_name == name or player_name == str(name.to_int())
+
 	if is_message_from_this_player:
 		print("This is our own message, ignoring (already shown locally)")
 	else:
@@ -211,60 +221,61 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 		else:
 			print("ERROR: Sender player not found!")
 
+
 func handle_fire_action(_mouse_position: Vector2) -> void:
 	# Check if player can fire (not on cooldown)
 	if not can_fire:
 		print("Player ", name, " cannot fire yet - on cooldown")
 		return
-	
+
 	# Check rapid fire limit
 	if rapid_fire_count >= max_rapid_fire:
 		print("Player ", name, " rapid fire limit reached, must wait")
 		return
-	
+
 	# Don't allow firing if already in fire animation and at rapid fire limit
 	if is_firing and rapid_fire_count >= max_rapid_fire:
 		return
-	
+
 	# Trigger the fire animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
 		print("Player ", name, " firing!")
-		
+
 		# Increment rapid fire count
 		rapid_fire_count += 1
-		
+
 		# Convert mouse position to world coordinates for network sync
 		var camera = get_viewport().get_camera_2d()
 		if camera:
 			var world_target = camera.get_global_mouse_position()
-			
+
 			# Turn player to face the shooting direction
 			var direction_to_target = (world_target - global_position).normalized()
 			if direction_to_target.x > 0:
 				animated_sprite.flip_h = false  # Face right
 			elif direction_to_target.x < 0:
 				animated_sprite.flip_h = true  # Face left
-			
+
 			# Play fire animation
 			is_firing = true
 			animated_sprite.play("fire")
-			
+
 			# Play bow release sound immediately when firing starts
 			play_bow_sound(self)
-			
+
 			# Wait for animation to play before firing arrow (about halfway through fire animation)
 			await get_tree().create_timer(0.5).timeout
 			# Spawn arrow locally immediately
 			spawn_arrow_for_player(self, world_target)
 			# Send RPC to network to spawn arrow on other clients
 			rpc("spawn_arrow_network", world_target)
-		
+
 		# After remaining animation time, return to normal animation
 		await get_tree().create_timer(0.4).timeout
 		is_firing = false
 		print("Player ", name, " finished firing")
-		
+
 		# Allow immediate refire if under rapid fire limit, otherwise wait for cooldown
 		if rapid_fire_count < max_rapid_fire:
 			# Allow rapid fire - can fire again immediately
@@ -278,50 +289,55 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 			print("Player ", name, " can fire again")
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
-	
+
+
 @rpc("any_peer", "reliable")
 func spawn_arrow_network(target_pos: Vector2) -> void:
 	# This function is called on all clients to spawn the arrow
 	# Get the player who sent this RPC
 	var shooter_peer_id = multiplayer.get_remote_sender_id()
-	
+
 	# Find the shooter player
 	var shooter = null
 	for player in get_tree().get_nodes_in_group("players"):
 		if player.name.to_int() == shooter_peer_id:
 			shooter = player
 			break
-	
+
 	if shooter:
 		# Play bow sound for remote clients when arrow spawns
 		play_bow_sound(shooter)
 		spawn_arrow_for_player(shooter, target_pos)
 
+
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
 	# Calculate direction from shooter to target
 	var animated_sprite = shooter.get_node("AnimatedSprite2D")
-	var sprite_position = animated_sprite.global_position if animated_sprite else shooter.global_position
+	var sprite_position = (
+		animated_sprite.global_position if animated_sprite else shooter.global_position
+	)
 	var direction_to_target = (target_pos - sprite_position).normalized()
 
 	# Use the new spawn_arrow function which handles multishot and weapon_stats
 	shooter.spawn_arrow(direction_to_target)
 
+
 func update_animation(direction: Vector2) -> void:
 	# Don't update animation if we're firing
 	if is_firing:
 		return
-	
+
 	# Get the AnimatedSprite2D node
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if not animated_sprite:
 		return
-	
+
 	# Determine which animation to play based on movement
 	if direction != Vector2.ZERO:
 		# Player is moving - play walk animation
 		if animated_sprite.animation != "walk":
 			animated_sprite.play("walk")
-			
+
 		# Flip sprite based on horizontal direction
 		if direction.x < 0:
 			animated_sprite.flip_h = true
@@ -331,6 +347,7 @@ func update_animation(direction: Vector2) -> void:
 		# Player is stationary - play idle animation
 		if animated_sprite.animation != "idle":
 			animated_sprite.play("idle")
+
 
 func setup_camera() -> void:
 	# Check if this is the local player
@@ -355,22 +372,25 @@ func setup_camera() -> void:
 			add_child(camera)
 			print("Created camera for player ", name)
 
+
 func update_health_display() -> void:
 	# Update the health bar display
 	var health_bar = get_node_or_null("HealthBar")
 	if health_bar:
 		health_bar.update_health(current_health, max_health)
 
+
 func update_xp_display() -> void:
 	# Update the XP bar
 	var xp_bar = get_node_or_null("XPBar")
 	if xp_bar:
 		xp_bar.update_xp(current_xp, xp_to_next_level)
-	
+
 	# Update the level label
 	var level_label = get_node_or_null("LevelLabel")
 	if level_label:
 		level_label.text = "Lv." + str(current_level)
+
 
 func update_stamina_display() -> void:
 	# Update the stamina bar display
@@ -378,24 +398,26 @@ func update_stamina_display() -> void:
 	if stamina_bar:
 		stamina_bar.update_stamina(current_stamina, max_stamina)
 
+
 func take_damage(amount: int, attacker: Node2D) -> void:
 	# Apply damage locally
-	
+
 	# Reduce health
 	current_health -= amount
 	print("Player ", name, " took ", amount, " damage. Health: ", current_health, "/", max_health)
-	
+
 	# Broadcast health update to all clients
 	rpc("sync_player_health", current_health)
-	
+
 	# Update health bar
 	update_health_display()
-	
+
 	# Check if player died
 	if current_health <= 0:
 		current_health = 0
 		handle_death()
 		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
+
 
 @rpc("any_peer", "reliable", "call_local")
 func sync_player_health(health: int) -> void:
@@ -403,6 +425,7 @@ func sync_player_health(health: int) -> void:
 	current_health = health
 	update_health_display()
 	print("Synced health for player ", name, ": ", current_health, "/", max_health)
+
 
 # Heal player (used by lifesteal and other effects)
 func heal(amount: int) -> void:
@@ -416,11 +439,13 @@ func heal(amount: int) -> void:
 	# Update health bar
 	update_health_display()
 
+
 @rpc("any_peer", "reliable")
 func on_player_died(_killer: String) -> void:
 	# Handle death (e.g., respawn, show death message, etc.)
 	print("Player ", name, " died!")
 	# You can add death effects here
+
 
 func handle_death() -> void:
 	# Handle death on authority/server
@@ -431,47 +456,56 @@ func handle_death() -> void:
 	update_health_display()
 	# You can add respawn logic here
 
+
 func find_player_by_name(player_name: String) -> Node2D:
 	# Find the player with the given name in the scene
 	var players = get_tree().get_nodes_in_group("players")
 	for player in players:
 		if player.name == player_name or str(player.name.to_int()) == player_name:
 			return player
-	
+
 	# Fallback: search all nodes in the scene
 	var all_nodes = get_tree().get_nodes_in_group("")
 	for node in all_nodes:
 		if node.name == player_name and node.has_method("get_node"):
 			return node
-	
+
 	return null
+
 
 # XP System Functions
 func gain_xp(amount: int) -> void:
 	# Always call via RPC so it processes on the correct player instance
 	rpc("gain_xp_rpc", amount)
 
+
 @rpc("any_peer", "reliable", "call_local")
 func gain_xp_rpc(amount: int) -> void:
-	print("gain_xp_rpc called for player ", name, ", is_multiplayer_authority: ", is_multiplayer_authority())
+	print(
+		"gain_xp_rpc called for player ",
+		name,
+		", is_multiplayer_authority: ",
+		is_multiplayer_authority()
+	)
 	# Only process on the player who has authority
 	if not is_multiplayer_authority():
 		print("Player ", name, " not authority, returning")
 		return
-	
+
 	current_xp += amount
 	print("Player ", name, " gained ", amount, " XP. Total: ", current_xp)
-	
+
 	# Check for level up
 	while current_xp >= xp_to_next_level:
 		level_up()
-	
+
 	# Update XP display locally
 	update_xp_display()
-	
+
 	# Sync XP to all clients (including self via call_local)
 	rpc("sync_xp", current_xp, current_level, xp_to_next_level)
 	print("Sent sync_xp RPC: ", current_xp, "/", xp_to_next_level, " level ", current_level)
+
 
 func level_up() -> void:
 	current_xp -= xp_to_next_level
@@ -499,6 +533,7 @@ func level_up() -> void:
 	# Sync level up to all clients
 	rpc("sync_level_up", current_level, max_health, current_xp, xp_to_next_level, attack_damage)
 
+
 @rpc("any_peer", "reliable", "call_local")
 func sync_xp(xp: int, level: int, xp_needed: int) -> void:
 	print("sync_xp RPC received for player ", name, ": ", xp, "/", xp_needed, " level ", level)
@@ -506,10 +541,23 @@ func sync_xp(xp: int, level: int, xp_needed: int) -> void:
 	current_level = level
 	xp_to_next_level = xp_needed
 	update_xp_display()
-	print("Synced XP for player ", name, ": ", current_xp, "/", xp_to_next_level, " (Level ", current_level, ")")
+	print(
+		"Synced XP for player ",
+		name,
+		": ",
+		current_xp,
+		"/",
+		xp_to_next_level,
+		" (Level ",
+		current_level,
+		")"
+	)
+
 
 @rpc("any_peer", "reliable", "call_local")
-func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int, new_attack_damage: int) -> void:
+func sync_level_up(
+	level: int, new_max_health: int, xp: int, xp_needed: int, new_attack_damage: int
+) -> void:
 	current_level = level
 	max_health = new_max_health
 	current_health = max_health
@@ -518,7 +566,17 @@ func sync_level_up(level: int, new_max_health: int, xp: int, xp_needed: int, new
 	attack_damage = new_attack_damage
 	update_health_display()
 	update_xp_display()
-	print("Synced level up for player ", name, ": Level ", current_level, ", Health: ", max_health, ", Attack Damage: ", attack_damage)
+	print(
+		"Synced level up for player ",
+		name,
+		": Level ",
+		current_level,
+		", Health: ",
+		max_health,
+		", Attack Damage: ",
+		attack_damage
+	)
+
 
 # Apply upgrade when selected from upgrade menu
 func apply_upgrade(upgrade_id: String) -> void:
@@ -623,6 +681,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	# TODO: Play upgrade select sound effect
 	# TODO: Spawn visual effect
 
+
 # Setup arrow nova timer
 func setup_arrow_nova() -> void:
 	var nova_timer = Timer.new()
@@ -632,6 +691,7 @@ func setup_arrow_nova() -> void:
 	add_child(nova_timer)
 	nova_timer.start()
 
+
 func _on_arrow_nova_timeout() -> void:
 	# Fire 8 arrows in all directions
 	print("Arrow Nova activated!")
@@ -639,6 +699,7 @@ func _on_arrow_nova_timeout() -> void:
 		var angle = (PI * 2 / 8) * i
 		var direction = Vector2(cos(angle), sin(angle))
 		spawn_arrow(direction)
+
 
 # Called when player levels up and is ready for upgrade selection
 func _on_level_up_ready() -> void:
@@ -659,6 +720,7 @@ func _on_level_up_ready() -> void:
 	overlay.show_upgrades(self)
 
 	print("Upgrade overlay shown for player ", name)
+
 
 # Toggle stats screen display
 func toggle_stats_screen() -> void:
@@ -685,6 +747,7 @@ func toggle_stats_screen() -> void:
 	stats_screen.show_stats(self)
 
 	print("Stats screen shown for player ", name)
+
 
 # Spawn arrow(s) in given direction with current weapon_stats
 func spawn_arrow(direction: Vector2) -> void:
@@ -728,7 +791,11 @@ func spawn_arrow(direction: Vector2) -> void:
 		arrow.crit_multiplier = weapon_stats.crit_multiplier
 		arrow.explosion_chance = weapon_stats.explosion_chance
 		arrow.explosion_radius = weapon_stats.explosion_radius
-		arrow.explosion_damage = weapon_stats.explosion_damage if weapon_stats.explosion_damage > 0 else final_damage * 0.75
+		arrow.explosion_damage = (
+			weapon_stats.explosion_damage
+			if weapon_stats.explosion_damage > 0
+			else final_damage * 0.75
+		)
 		arrow.lifesteal = weapon_stats.lifesteal
 		arrow.poison_damage = weapon_stats.poison_damage
 		arrow.poison_duration = weapon_stats.poison_duration
@@ -744,8 +811,10 @@ func spawn_arrow(direction: Vector2) -> void:
 		# Add to scene
 		get_tree().current_scene.add_child(arrow)
 
+
 func get_attack_damage() -> int:
 	return attack_damage
+
 
 func setup_bow_sound() -> void:
 	# Load the bow release sound
@@ -757,13 +826,16 @@ func setup_bow_sound() -> void:
 		bow_sound_player.stream = bow_sound
 		add_child(bow_sound_player)
 	else:
-		print("ERROR: Failed to load bow release sound from res://assets/Sounds/SFX/bow_release.mp3")
+		print(
+			"ERROR: Failed to load bow release sound from res://assets/Sounds/SFX/bow_release.mp3"
+		)
+
 
 func play_bow_sound(shooter: Node2D) -> void:
 	# Always create a new sound instance to allow overlapping sounds for rapid fire
 	var temp_sound = AudioStreamPlayer2D.new()
 	var bow_sound = null
-	
+
 	# Try to use the cached sound from bow_sound_player if available
 	var shooter_sound = shooter.get_node_or_null("BowSoundPlayer")
 	if shooter_sound and shooter_sound.stream:
@@ -771,7 +843,7 @@ func play_bow_sound(shooter: Node2D) -> void:
 	else:
 		# Load sound if not cached
 		bow_sound = load("res://assets/Sounds/SFX/bow_release.mp3")
-	
+
 	if bow_sound:
 		temp_sound.stream = bow_sound
 		temp_sound.position = shooter.global_position
@@ -782,3 +854,39 @@ func play_bow_sound(shooter: Node2D) -> void:
 		temp_sound.finished.connect(func(): temp_sound.queue_free())
 	else:
 		print("ERROR: Failed to load bow release sound for player ", shooter.name)
+
+
+# Apply class modifiers from lobby selection
+func apply_class_modifiers(selected_class: String) -> void:
+	var class_data = PlayerClass.get_class_by_name(selected_class)
+
+	print("Applying class modifiers for ", class_data["name"])
+
+	# Apply health modifier
+	max_health = int(max_health * class_data["health_modifier"])
+	current_health = max_health
+
+	# Apply damage modifier
+	attack_damage = int(attack_damage * class_data["damage_modifier"])
+
+	# Apply speed modifiers
+	class_speed_modifier = class_data["speed_modifier"]
+
+	# Apply attack speed modifier to fire cooldown
+	weapon_stats.fire_cooldown = fire_cooldown * (1.0 / class_data["attack_speed_modifier"])
+
+	# Apply color tint to sprite
+	var animated_sprite = get_node_or_null("AnimatedSprite2D")
+	if animated_sprite:
+		animated_sprite.modulate = class_data["color_tint"]
+
+	print("Class modifiers applied:")
+	print("  Health: ", max_health)
+	print("  Damage: ", attack_damage)
+	print("  Speed modifier: ", class_data["speed_modifier"])
+	print("  Fire cooldown: ", weapon_stats.fire_cooldown)
+	print("  Color tint: ", class_data["color_tint"])
+
+	# Update displays
+	update_health_display()
+	update_xp_display()

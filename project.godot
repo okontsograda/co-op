@@ -11,12 +11,13 @@ config_version=5
 [application]
 
 config/name="Co-op"
-run/main_scene="res://coop/scenes/example.tscn"
+run/main_scene="res://coop/scenes/main_menu.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
+LobbyManager="*res://coop/scripts/lobby_manager.gd"
 NetworkHandler="*res://coop/scripts/network_handler.gd"
 UpgradeSystem="*res://coop/scripts/upgrade_system.gd"
 

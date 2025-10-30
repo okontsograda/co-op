@@ -9,25 +9,20 @@ var available_upgrades: Array = []
 # Currently selected upgrade index (0-2, or -1 for none)
 var selected_index: int = -1
 
-# Double-tap detection
-var last_selected_index: int = -1
-var last_selection_time: float = 0.0
-const DOUBLE_TAP_WINDOW: float = 0.5  # seconds
-
 # Flag to prevent double-selection
 var upgrade_accepted: bool = false
+
 
 func _ready():
 	# Start hidden
 	hide()
+
 
 # Show upgrade selection for a player
 func show_upgrades(p_player: Node2D) -> void:
 	player = p_player
 	upgrade_accepted = false
 	selected_index = -1
-	last_selected_index = -1
-	last_selection_time = 0.0
 
 	# Get 3 random upgrades from UpgradeSystem
 	available_upgrades = UpgradeSystem.get_random_upgrades(3, player.upgrade_stacks)
@@ -54,6 +49,7 @@ func show_upgrades(p_player: Node2D) -> void:
 	# Make sure input is enabled
 	set_process_input(true)
 
+
 func populate_card(index: int, upgrade) -> void:
 	if upgrade == null:
 		# Hide the card if no upgrade
@@ -62,7 +58,9 @@ func populate_card(index: int, upgrade) -> void:
 			card.hide()
 		return
 
-	var card_path = "CenterContainer/VBoxContainer/UpgradeCards/Card" + str(index + 1) + "/VBoxContainer/"
+	var card_path = (
+		"CenterContainer/VBoxContainer/UpgradeCards/Card" + str(index + 1) + "/VBoxContainer/"
+	)
 
 	# Get current stack count
 	var current_level = player.upgrade_stacks.get(upgrade.id, 0)
@@ -82,6 +80,7 @@ func populate_card(index: int, upgrade) -> void:
 			level_label.text = "Lv. " + str(current_level) + " → " + str(current_level + 1)
 		else:
 			level_label.text = "NEW!"
+
 
 func _input(event: InputEvent) -> void:
 	if not visible or upgrade_accepted:
@@ -108,17 +107,10 @@ func _input(event: InputEvent) -> void:
 					select_upgrade(i)
 					break
 
+
 func select_upgrade(index: int) -> void:
 	if index < 0 or index >= available_upgrades.size():
 		print("ERROR: Invalid upgrade index: ", index)
-		return
-
-	var current_time = Time.get_ticks_msec() / 1000.0  # Convert to seconds
-
-	# Check for double-tap (same upgrade selected within time window)
-	if index == last_selected_index and (current_time - last_selection_time) <= DOUBLE_TAP_WINDOW:
-		print("Double-tap detected! Auto-accepting upgrade.")
-		accept_upgrade()
 		return
 
 	# Clear previous selection
@@ -127,8 +119,6 @@ func select_upgrade(index: int) -> void:
 
 	# Set new selection
 	selected_index = index
-	last_selected_index = index
-	last_selection_time = current_time
 	highlight_card(index)
 
 	# Enable accept button
@@ -136,7 +126,12 @@ func select_upgrade(index: int) -> void:
 	if accept_button:
 		accept_button.disabled = false
 
-	print("Selected upgrade: ", available_upgrades[index].name, " (click again or press ACCEPT to confirm)")
+	print(
+		"Selected upgrade: ",
+		available_upgrades[index].name,
+		" (press ACCEPT to confirm)"
+	)
+
 
 func highlight_card(index: int) -> void:
 	var card = get_node("CenterContainer/VBoxContainer/UpgradeCards/Card" + str(index + 1))
@@ -144,11 +139,13 @@ func highlight_card(index: int) -> void:
 		# Add a visual highlight (modulate to light green)
 		card.modulate = Color(0.7, 1.0, 0.7)
 
+
 func clear_card_highlight(index: int) -> void:
 	var card = get_node("CenterContainer/VBoxContainer/UpgradeCards/Card" + str(index + 1))
 	if card:
 		# Remove highlight
 		card.modulate = Color(1.0, 1.0, 1.0)
+
 
 func accept_upgrade() -> void:
 	if upgrade_accepted or selected_index < 0:
@@ -168,6 +165,7 @@ func accept_upgrade() -> void:
 
 	# Close overlay
 	close_overlay()
+
 
 func close_overlay() -> void:
 	# Hide and cleanup
