@@ -123,10 +123,10 @@ func _on_body_entered(body: Node2D) -> void:
 			body.apply_poison(poison_damage, poison_duration)
 			print("Applied poison: ", poison_damage, " damage/sec for ", poison_duration, "s")
 
-		# Explosion (rockets always explode unless explosion_chance is manually set to 0)
-		if randf() < explosion_chance:
-			create_explosion()
-			print("Rocket explosion!")
+			# Explosion (rockets always explode unless explosion_chance is manually set to 0)
+			if randf() < explosion_chance:
+				call_deferred("create_explosion")
+				print("Rocket explosion!")
 
 		# Pierce check - destroy rocket only if no pierce remaining
 		if pierce_remaining > 0:
