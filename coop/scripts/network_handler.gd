@@ -23,8 +23,13 @@ var wave_start_timer: Timer = null
 var max_waves: int = 3
 var boss_spawned: bool = false
 
+# Enemy spawn points
+var enemy_spawn_points: Array[Vector2] = []
+var next_enemy_spawn_index: int = 0
+
 func _ready() -> void:
 	multiplayer.multiplayer_peer = peer
+	randomize()
 	print("Connecting to relay...")
 	# Start relay connection in background without blocking
 	connect_to_relay_async()
@@ -78,6 +83,9 @@ func start_server() -> void:
 	# Spawn the server player after the server is fully established
 	await get_tree().create_timer(0.1).timeout
 	spawn_server_player()
+	
+	# Find enemy spawn points
+	find_enemy_spawn_points()
 	
 	# Start wave system after server player spawns
 	await get_tree().create_timer(0.5).timeout
@@ -158,6 +166,40 @@ func get_spawn_position() -> Vector2:
 	print("No spawn points found, using origin")
 	return Vector2.ZERO
 
+func find_enemy_spawn_points() -> void:
+	# Find enemy spawn points in the scene
+	# First try to find a dedicated EnemySpawnPoints node
+	var enemy_spawn_node = get_tree().current_scene.get_node_or_null("EnemySpawnPoints")
+	
+	if enemy_spawn_node:
+		for child in enemy_spawn_node.get_children():
+			if child is Marker2D:
+				enemy_spawn_points.append(child.global_position)
+		print("Found ", enemy_spawn_points.size(), " enemy spawn points")
+	else:
+		print("No EnemySpawnPoints node found, using default positions")
+		# Create some default spawn positions around the map
+		enemy_spawn_points = [
+			Vector2(800, 200),
+			Vector2(-800, 200),
+			Vector2(800, -200),
+			Vector2(-800, -200),
+			Vector2(0, 600),
+			Vector2(0, -600),
+			Vector2(1200, 0),
+			Vector2(-1200, 0)
+		]
+		print("Using ", enemy_spawn_points.size(), " default enemy spawn points")
+
+func get_next_enemy_spawn_position() -> Vector2:
+	if enemy_spawn_points.is_empty():
+		print("No enemy spawn points available, using origin")
+		return Vector2.ZERO
+	
+	var spawn_pos = enemy_spawn_points[next_enemy_spawn_index]
+	next_enemy_spawn_index = (next_enemy_spawn_index + 1) % enemy_spawn_points.size()
+	return spawn_pos
+
 func start_wave_system() -> void:
 	# Only start waves on server
 	if not multiplayer.is_server():
@@ -167,6 +209,8 @@ func start_wave_system() -> void:
 	wave_in_progress = true
 	enemies_spawned_this_wave = 0
 	enemies_killed_this_wave = 0
+	# Randomly spawn a boss at the start of some waves
+	maybe_spawn_boss_randomly()
 	
 	# Start spawning enemies for this wave
 	spawn_wave_enemies()
@@ -192,17 +236,8 @@ func check_wave_completion() -> void:
 		
 		# Show wave completion message
 		rpc("show_wave_completion", current_wave)
-		
-		# Check if this was the last wave
-		if current_wave >= max_waves:
-			# All waves complete, spawn boss
-			print("All waves complete! Spawning boss...")
-			rpc("show_boss_announcement")
-			await get_tree().create_timer(3.0).timeout
-			spawn_boss()
-		else:
-			# Start countdown to next wave
-			start_wave_countdown()
+		# Unlimited waves: always start countdown to next wave
+		start_wave_countdown()
 	else:
 		print("Wave not complete yet")
 
@@ -244,6 +279,19 @@ func show_boss_announcement() -> void:
 	print("=== BOSS APPROACHING! ===")
 	# TODO: Add UI display for boss announcement
 
+func maybe_spawn_boss_randomly() -> void:
+	# Only server decides boss spawns
+	if not multiplayer.is_server():
+		return
+	# Avoid multiple simultaneous bosses
+	if boss_spawned:
+		return
+	# 20% chance each wave to spawn a boss
+	if randf() < 0.2:
+		print("Random boss spawn triggered for wave ", current_wave)
+		rpc("show_boss_announcement")
+		spawn_boss()
+
 func spawn_boss() -> void:
 	# Only spawn boss on server
 	if not multiplayer.is_server():
@@ -254,23 +302,8 @@ func spawn_boss() -> void:
 	
 	boss_spawned = true
 	
-	# Get players to spawn boss away from them
-	var players = get_tree().get_nodes_in_group("players")
-	var spawn_position = Vector2.ZERO
-	
-	if not players.is_empty():
-		# Spawn boss at a distance from players
-		var base_player = players[0]
-		var angle = randf() * TAU
-		var distance = randf_range(200, 400)  # Further away than regular enemies
-		spawn_position = base_player.global_position + Vector2(cos(angle), sin(angle)) * distance
-		
-		# Clamp spawn position to visible area
-		spawn_position.x = clamp(spawn_position.x, -1800, 1800)
-		spawn_position.y = clamp(spawn_position.y, -1600, 1600)
-	else:
-		# No players, use random position
-		spawn_position = Vector2(randf_range(-1800, 1800), randf_range(-1600, 1600))
+	# Use predetermined spawn position from enemy spawn points
+	var spawn_position = get_next_enemy_spawn_position()
 	
 	# Spawn boss with unique ID
 	enemy_id_counter += 1
@@ -311,32 +344,23 @@ func on_boss_died() -> void:
 	if not multiplayer.is_server():
 		return
 	
-	print("Boss defeated! Game complete!")
-	rpc("show_game_complete")
+	print("Boss defeated! Boss flag reset, game continues.")
+	boss_spawned = false
+	rpc("show_boss_defeated")
 
 @rpc("any_peer", "reliable", "call_local")
 func show_game_complete() -> void:
 	print("=== GAME COMPLETE! BOSS DEFEATED! ===")
 	# TODO: Add UI display for game completion
 
+@rpc("any_peer", "reliable", "call_local")
+func show_boss_defeated() -> void:
+	print("=== BOSS DEFEATED! ===")
+	# TODO: Add UI display for boss defeated
+
 func spawn_single_enemy() -> void:
-	# Get players to spawn away from them
-	var players = get_tree().get_nodes_in_group("players")
-	var spawn_position = Vector2.ZERO
-	
-	if not players.is_empty():
-		# Spawn at a random distance from players (150-300 pixels away, within camera view)
-		var base_player = players[0]
-		var angle = randf() * TAU  # Random angle in radians
-		var distance = randf_range(150, 300)
-		spawn_position = base_player.global_position + Vector2(cos(angle), sin(angle)) * distance
-		
-		# Clamp spawn position to visible area (camera limits)
-		spawn_position.x = clamp(spawn_position.x, -1800, 1800)
-		spawn_position.y = clamp(spawn_position.y, -1600, 1600)
-	else:
-		# No players, use random position within visible bounds
-		spawn_position = Vector2(randf_range(-1800, 1800), randf_range(-1600, 1600))
+	# Use predetermined spawn position from enemy spawn points
+	var spawn_position = get_next_enemy_spawn_position()
 	
 	# Use RPC to spawn enemy on all clients with unique ID
 	enemy_id_counter += 1
