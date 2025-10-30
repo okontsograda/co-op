@@ -30,6 +30,14 @@ var rapid_fire_count: int = 0  # Track number of arrows fired in rapid successio
 const max_rapid_fire: int = 2  # Maximum arrows that can be fired rapidly
 const fire_cooldown: float = .5  # Cooldown time after rapid fire
 
+# Weapon System
+var equipped_weapon: String = "bow"  # Default to bow, can be set from lobby
+var current_weapon_config: WeaponData.WeaponConfig = null
+
+# Preload weapon scenes for network compatibility
+const ARROW_SCENE = preload("res://coop/scenes/arrow.tscn")
+const ROCKET_SCENE = preload("res://coop/scenes/rocket.tscn")
+
 # Upgrade System - Weapon Stats
 var weapon_stats = {
 	"damage": 0.0,  # Additional flat damage (base is attack_damage)
@@ -62,10 +70,16 @@ signal level_up_ready
 var bow_sound_player: AudioStreamPlayer2D = null
 
 
-func _ready() -> void:
+func _enter_tree() -> void:
 	# Set authority based on the player's name (peer ID)
+	# This MUST happen in _enter_tree() for MultiplayerSynchronizers to work
 	var peer_id = name.to_int()
 	set_multiplayer_authority(peer_id)
+	print("Player ", name, " (peer ", peer_id, ") authority set in _enter_tree()")
+
+
+func _ready() -> void:
+	var peer_id = name.to_int()
 	print("Player ", name, " (peer ", peer_id, ") has authority: ", is_multiplayer_authority())
 	print("Current multiplayer peer: ", multiplayer.get_unique_id())
 	print("Is server: ", multiplayer.is_server())
@@ -80,6 +94,19 @@ func _ready() -> void:
 		selected_class = LobbyManager.players[peer_id].get("class", "archer")
 	if selected_class != "":
 		apply_class_modifiers(selected_class)
+
+	# Apply weapon selection if coming from lobby
+	if has_meta("selected_weapon"):
+		equipped_weapon = get_meta("selected_weapon")
+		print("Player ", name, " equipped weapon from metadata: ", equipped_weapon)
+	elif LobbyManager and LobbyManager.players.has(peer_id):
+		equipped_weapon = LobbyManager.players[peer_id].get("weapon", "bow")
+		print("Player ", name, " equipped weapon from LobbyManager: ", equipped_weapon)
+	else:
+		print("Player ", name, " using default weapon: ", equipped_weapon)
+
+	# Initialize weapon configuration
+	initialize_weapon()
 
 	# Add to players group so it can be found by other players
 	add_to_group("players")
@@ -301,6 +328,7 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 	# This function is called on all clients to spawn the arrow
 	# Get the player who sent this RPC
 	var shooter_peer_id = multiplayer.get_remote_sender_id()
+	print("Network spawn request from peer: ", shooter_peer_id)
 
 	# Find the shooter player
 	var shooter = null
@@ -310,9 +338,12 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 			break
 
 	if shooter:
-		# Play bow sound for remote clients when arrow spawns
-		play_bow_sound(shooter)
+		print("Found shooter player: ", shooter.name, " with weapon: ", shooter.equipped_weapon)
+		# Play weapon sound for remote clients when projectile spawns
+		play_weapon_sound(shooter)
 		spawn_arrow_for_player(shooter, target_pos)
+	else:
+		print("ERROR: Could not find shooter player with peer_id: ", shooter_peer_id)
 
 
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
@@ -757,9 +788,33 @@ func toggle_stats_screen() -> void:
 	print("Stats screen shown for player ", name)
 
 
-# Spawn arrow(s) in given direction with current weapon_stats
-func spawn_arrow(direction: Vector2) -> void:
-	var arrow_scene = preload("res://coop/scenes/arrow.tscn")
+# Spawn projectile(s) in given direction with current weapon_stats
+func spawn_projectile(direction: Vector2) -> void:
+	# Ensure weapon is initialized (safety check for multiplayer)
+	if not current_weapon_config:
+		print("WARNING: Weapon not initialized for player ", name, ", initializing now...")
+		initialize_weapon()
+
+	if not current_weapon_config:
+		print("ERROR: Failed to initialize weapon for player ", name, "! equipped_weapon=", equipped_weapon)
+		return
+
+	# Use preloaded scenes for network compatibility
+	var projectile_scene = null
+	match equipped_weapon:
+		"bow":
+			projectile_scene = ARROW_SCENE
+		"rocket":
+			projectile_scene = ROCKET_SCENE
+		_:
+			print("ERROR: Unknown weapon type: ", equipped_weapon)
+			return
+
+	if not projectile_scene:
+		print("ERROR: Failed to get projectile scene for weapon: ", equipped_weapon)
+		return
+
+	print("Spawning projectile for weapon: ", equipped_weapon, " (player: ", name, ")")
 
 	# Get spawn position (slightly ahead of player)
 	var animated_sprite = get_node("AnimatedSprite2D")
@@ -769,62 +824,114 @@ func spawn_arrow(direction: Vector2) -> void:
 
 	# Calculate final damage (base + flat + multiplier)
 	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
-	print("=== ARROW SPAWN DEBUG ===")
+	print("=== PROJECTILE SPAWN DEBUG ===")
+	print("Weapon: ", current_weapon_config.name)
 	print("Player attack_damage: ", attack_damage)
 	print("weapon_stats.damage: ", weapon_stats.damage)
 	print("weapon_stats.damage_multiplier: ", weapon_stats.damage_multiplier)
 	print("CALCULATED final_damage: ", final_damage)
-	print("========================")
+	print("==============================")
 
-	# Spawn arrows based on multishot count
-	var arrows_to_spawn = weapon_stats.multishot_count
-	var spread_angle_deg = 15.0  # degrees between arrows
+	# Spawn projectiles based on multishot count
+	var projectiles_to_spawn = weapon_stats.multishot_count
+	var spread_angle_deg = 15.0  # degrees between projectiles
 
-	for i in range(arrows_to_spawn):
-		var arrow = arrow_scene.instantiate()
+	for i in range(projectiles_to_spawn):
+		var projectile = projectile_scene.instantiate()
 
-		# Calculate spread for multishot (center arrow has 0 offset)
-		var angle_offset_deg = (i - (arrows_to_spawn - 1) / 2.0) * spread_angle_deg
+		# Calculate spread for multishot (center projectile has 0 offset)
+		var angle_offset_deg = (i - (projectiles_to_spawn - 1) / 2.0) * spread_angle_deg
 		var angle_offset_rad = deg_to_rad(angle_offset_deg)
-		var arrow_direction = direction.rotated(angle_offset_rad)
+		var projectile_direction = direction.rotated(angle_offset_rad)
 
-		# Calculate target position far away in the arrow direction
-		var target_position = base_spawn_position + arrow_direction * 1000.0
+		# Calculate target position far away in the projectile direction
+		var target_position = base_spawn_position + projectile_direction * 1000.0
 
-		# Initialize arrow with stats
-		arrow.damage = final_damage
-		arrow.speed = weapon_stats.arrow_speed
-		arrow.pierce_remaining = weapon_stats.pierce_count
-		arrow.crit_chance = weapon_stats.crit_chance
-		arrow.crit_multiplier = weapon_stats.crit_multiplier
-		arrow.explosion_chance = weapon_stats.explosion_chance
-		arrow.explosion_radius = weapon_stats.explosion_radius
-		arrow.explosion_damage = (
+		# Initialize projectile with stats
+		projectile.damage = final_damage
+		projectile.speed = weapon_stats.arrow_speed
+		projectile.pierce_remaining = weapon_stats.pierce_count
+		projectile.crit_chance = weapon_stats.crit_chance
+		projectile.crit_multiplier = weapon_stats.crit_multiplier
+		projectile.explosion_chance = weapon_stats.explosion_chance
+		projectile.explosion_radius = weapon_stats.explosion_radius
+		projectile.explosion_damage = (
 			weapon_stats.explosion_damage
 			if weapon_stats.explosion_damage > 0
 			else final_damage * 0.75
 		)
-		arrow.lifesteal = weapon_stats.lifesteal
-		arrow.poison_damage = weapon_stats.poison_damage
-		arrow.poison_duration = weapon_stats.poison_duration
-		arrow.homing_strength = weapon_stats.homing_strength
-		arrow.direction = arrow_direction
+		projectile.lifesteal = weapon_stats.lifesteal
+		projectile.poison_damage = weapon_stats.poison_damage
+		projectile.poison_duration = weapon_stats.poison_duration
+		projectile.homing_strength = weapon_stats.homing_strength
+		projectile.direction = projectile_direction
 
 		# Initialize with old method for compatibility
-		arrow.initialize(self, base_spawn_position, target_position)
+		projectile.initialize(self, base_spawn_position, target_position)
 
 		# Set shooter metadata
-		arrow.set_meta("shooter", self)
+		projectile.set_meta("shooter", self)
 
 		# Add to scene
-		get_tree().current_scene.add_child(arrow)
+		get_tree().current_scene.add_child(projectile)
+
+
+# Legacy function for backwards compatibility
+func spawn_arrow(direction: Vector2) -> void:
+	spawn_projectile(direction)
 
 
 func get_attack_damage() -> int:
 	return attack_damage
 
 
+func initialize_weapon() -> void:
+	print("Initializing weapon for player ", name, ": ", equipped_weapon)
+
+	# Get weapon configuration
+	current_weapon_config = WeaponData.get_weapon(equipped_weapon)
+
+	if not current_weapon_config:
+		print("ERROR: Failed to get weapon config for: ", equipped_weapon)
+		return
+
+	# Update base attack damage based on weapon
+	attack_damage = int(current_weapon_config.base_damage)
+
+	# Update weapon_stats with weapon-specific defaults
+	weapon_stats.fire_cooldown = current_weapon_config.fire_cooldown
+	weapon_stats.arrow_speed = current_weapon_config.projectile_speed
+	weapon_stats.explosion_chance = current_weapon_config.base_explosion_chance
+	weapon_stats.explosion_radius = current_weapon_config.base_explosion_radius
+	weapon_stats.explosion_damage = current_weapon_config.base_explosion_damage
+
+	print("Initialized weapon: ", current_weapon_config.name)
+	print("  - Base damage: ", current_weapon_config.base_damage)
+	print("  - Fire cooldown: ", current_weapon_config.fire_cooldown)
+	print("  - Projectile speed: ", current_weapon_config.projectile_speed)
+
+	# Setup weapon sound
+	setup_weapon_sound()
+
+
+func setup_weapon_sound() -> void:
+	# Load the weapon sound based on current weapon
+	if not current_weapon_config:
+		return
+
+	var weapon_sound = load(current_weapon_config.sound_path)
+	if weapon_sound:
+		# Create AudioStreamPlayer2D as a child of this player
+		bow_sound_player = AudioStreamPlayer2D.new()
+		bow_sound_player.name = "WeaponSoundPlayer"
+		bow_sound_player.stream = weapon_sound
+		add_child(bow_sound_player)
+	else:
+		print("ERROR: Failed to load weapon sound from ", current_weapon_config.sound_path)
+
+
 func setup_bow_sound() -> void:
+	# Deprecated: Use setup_weapon_sound() instead
 	# Load the bow release sound
 	var bow_sound = load("res://assets/Sounds/SFX/bow_release.mp3")
 	if bow_sound:
@@ -839,21 +946,25 @@ func setup_bow_sound() -> void:
 		)
 
 
-func play_bow_sound(shooter: Node2D) -> void:
+func play_weapon_sound(shooter: Node2D) -> void:
 	# Always create a new sound instance to allow overlapping sounds for rapid fire
 	var temp_sound = AudioStreamPlayer2D.new()
-	var bow_sound = null
+	var weapon_sound = null
 
-	# Try to use the cached sound from bow_sound_player if available
-	var shooter_sound = shooter.get_node_or_null("BowSoundPlayer")
+	# Try to use the cached sound from weapon sound player if available
+	var shooter_sound = shooter.get_node_or_null("WeaponSoundPlayer")
+	if not shooter_sound:
+		# Fallback to legacy bow sound player
+		shooter_sound = shooter.get_node_or_null("BowSoundPlayer")
+
 	if shooter_sound and shooter_sound.stream:
-		bow_sound = shooter_sound.stream
+		weapon_sound = shooter_sound.stream
 	else:
-		# Load sound if not cached
-		bow_sound = load("res://assets/Sounds/SFX/bow_release.mp3")
+		# Fallback: Load bow sound if not cached (for backwards compatibility)
+		weapon_sound = load("res://assets/Sounds/SFX/bow_release.mp3")
 
-	if bow_sound:
-		temp_sound.stream = bow_sound
+	if weapon_sound:
+		temp_sound.stream = weapon_sound
 		temp_sound.position = shooter.global_position
 		# Add to scene tree and play
 		get_tree().current_scene.add_child(temp_sound)
@@ -861,7 +972,12 @@ func play_bow_sound(shooter: Node2D) -> void:
 		# Clean up after sound finishes
 		temp_sound.finished.connect(func(): temp_sound.queue_free())
 	else:
-		print("ERROR: Failed to load bow release sound for player ", shooter.name)
+		print("ERROR: Failed to load weapon sound for player ", shooter.name)
+
+
+# Legacy function for backwards compatibility
+func play_bow_sound(shooter: Node2D) -> void:
+	play_weapon_sound(shooter)
 
 
 # Apply class modifiers from lobby selection

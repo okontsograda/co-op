@@ -5,6 +5,7 @@ signal player_joined(peer_id: int, player_data: Dictionary)
 signal player_left(peer_id: int)
 signal player_ready_changed(peer_id: int, is_ready: bool)
 signal player_class_changed(peer_id: int, selected_class: String)
+signal player_weapon_changed(peer_id: int, selected_weapon: String)
 signal all_players_ready
 signal game_starting
 
@@ -70,7 +71,7 @@ func _on_peer_disconnected(peer_id: int):
 func register_player(peer_id: int, is_host: bool = false):
 	print("register_player called: peer_id=", peer_id, " is_host=", is_host)
 	if not players.has(peer_id):
-		players[peer_id] = {"class": "archer", "ready": false, "is_host": is_host}  # Default class
+		players[peer_id] = {"class": "archer", "weapon": "bow", "ready": false, "is_host": is_host}  # Defaults
 		print("Added player ", peer_id, " to players dict: ", players[peer_id])
 		print("Emitting player_joined signal for peer ", peer_id)
 		player_joined.emit(peer_id, players[peer_id])
@@ -115,6 +116,24 @@ func _broadcast_class_change(peer_id: int, selected_class: String):
 	if players.has(peer_id):
 		players[peer_id]["class"] = selected_class
 		player_class_changed.emit(peer_id, selected_class)
+
+
+# Set player's selected weapon
+func set_player_weapon(selected_weapon: String):
+	var local_id = multiplayer.get_unique_id()
+	if players.has(local_id):
+		players[local_id]["weapon"] = selected_weapon
+		player_weapon_changed.emit(local_id, selected_weapon)
+
+		# Broadcast to all clients
+		_broadcast_weapon_change.rpc(local_id, selected_weapon)
+
+
+@rpc("any_peer", "reliable")
+func _broadcast_weapon_change(peer_id: int, selected_weapon: String):
+	if players.has(peer_id):
+		players[peer_id]["weapon"] = selected_weapon
+		player_weapon_changed.emit(peer_id, selected_weapon)
 
 
 # Toggle ready status

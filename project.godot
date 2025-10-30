@@ -25,6 +25,10 @@ UpgradeSystem="*res://coop/scripts/upgrade_system.gd"
 
 window/stretch/mode="canvas_items"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/nodetunnel/plugin.cfg")
+
 [input]
 
 move_up={
