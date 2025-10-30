@@ -26,6 +26,15 @@ var hit_sound_player: AudioStreamPlayer2D = null
 func _ready() -> void:
 	# Add to enemies group
 	add_to_group("enemies")
+	
+	# Make enemy not pushable by other CharacterBody2D (players)
+	# Set motion mode to MOTION_MODE_FLOATING to prevent being pushed
+	# This prevents the bug where players can push enemies around
+	set_motion_mode(CharacterBody2D.MOTION_MODE_FLOATING)
+	
+	# Enable Y-sort for proper depth sorting
+	# Characters with higher Y position (lower on screen) will render in front
+	y_sort_enabled = true
 
 	# Connect Area2D signals for attack detection
 	var area = get_node("Area2D")
@@ -99,7 +108,6 @@ func _physics_process(_delta: float) -> void:
 		# Move towards target if not in attack range and not attacking
 		if not is_in_attack_range and not is_attacking:
 			velocity = direction_to_target * speed
-			move_and_slide()
 		else:
 			# Stop moving when in attack range or attacking
 			velocity = Vector2.ZERO
@@ -107,6 +115,12 @@ func _physics_process(_delta: float) -> void:
 		# No target, stop moving
 		velocity = Vector2.ZERO
 		is_in_attack_range = false
+			
+	# Always call move_and_slide for proper physics handling
+	move_and_slide()
+	
+	# Update z_index based on Y position for proper depth sorting
+	z_index = int(global_position.y)
 
 	# Update animation
 	update_animation()

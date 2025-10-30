@@ -85,6 +85,10 @@ func _ready() -> void:
 	print("Is server: ", multiplayer.is_server())
 	print("Player position: ", position)
 	print("Player visible: ", visible)
+	
+	# Enable Y-sort for proper depth sorting
+	# Characters with higher Y position (lower on screen) will render in front
+	y_sort_enabled = true
 
 	# Apply class modifiers if coming from lobby
 	var selected_class := ""
@@ -226,6 +230,9 @@ func _physics_process(_delta: float) -> void:
 
 	velocity = direction * current_speed
 	move_and_slide()
+	
+	# Update z_index based on Y position for proper depth sorting
+	z_index = int(global_position.y)
 
 	# Update animation based on movement
 	update_animation(direction)
