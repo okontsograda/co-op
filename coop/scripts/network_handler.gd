@@ -35,9 +35,11 @@ func connect_to_relay_async() -> void:
 	print("Waiting for relay connection...")
 	await peer.relay_connected
 	print("Relay connected in _ready(), online ID: ", peer.online_id)
-	
-	if %OnlineID:
-		%OnlineID.text = peer.online_id	
+
+	# Update OnlineID label if it exists (UI element may not be present in all scenes)
+	var online_id_label = get_node_or_null("%OnlineID")
+	if online_id_label:
+		online_id_label.text = peer.online_id	
 
 # Chat system signals
 signal chat_message_received(player_name: String, message: String)

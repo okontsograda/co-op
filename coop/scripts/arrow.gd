@@ -20,11 +20,13 @@ var enemies_hit: Array = []  # For pierce tracking
 var has_hit: bool = false  # Legacy flag, now using enemies_hit
 
 func _ready() -> void:
-	# Connect to body entered signal
-	body_entered.connect(_on_body_entered)
-	
-	# Connect to visibility notifier
-	var visibility = $VisibleOnScreenNotifier2D
+	# Connect to body entered signal (only if not already connected)
+	# Note: This signal is already connected in the arrow.tscn scene file
+	if not body_entered.is_connected(_on_body_entered):
+		body_entered.connect(_on_body_entered)
+
+	# Connect to visibility notifier (node name is "VisibilityNotifier2D" in the scene)
+	var visibility = get_node_or_null("VisibilityNotifier2D")
 	if visibility:
 		visibility.screen_exited.connect(_on_screen_exited)
 
