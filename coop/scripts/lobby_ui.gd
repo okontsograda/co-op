@@ -261,7 +261,7 @@ func _scroll_chat_to_bottom() -> void:
 	await get_tree().process_frame
 	var scroll := $ChatPanel/VBoxContainer/MessageContainer
 	if scroll is ScrollContainer:
-		var v_bar := scroll.get_v_scroll_bar()
+		var v_bar: VScrollBar = scroll.get_v_scroll_bar()
 		if v_bar:
 			v_bar.value = v_bar.max_value
 		scroll.scroll_vertical = scroll.get_v_scroll_bar().max_value
