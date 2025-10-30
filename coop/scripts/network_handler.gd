@@ -26,6 +26,7 @@ var boss_spawned: bool = false
 
 func _ready() -> void:
 	multiplayer.multiplayer_peer = peer
+	randomize()
 	print("Connecting to relay...")
 	# Start relay connection in background without blocking
 	connect_to_relay_async()
