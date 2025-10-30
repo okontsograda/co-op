@@ -23,6 +23,10 @@ var wave_start_timer: Timer = null
 var max_waves: int = 3
 var boss_spawned: bool = false
 
+# Enemy spawn points
+var enemy_spawn_points: Array[Vector2] = []
+var next_enemy_spawn_index: int = 0
+
 
 func _ready() -> void:
 	multiplayer.multiplayer_peer = peer
@@ -92,6 +96,9 @@ func start_server(go_to_lobby: bool = true) -> void:
 		# Old behavior: spawn player and start game immediately
 		await get_tree().create_timer(0.1).timeout
 		spawn_server_player()
+
+		# Find enemy spawn points
+		find_enemy_spawn_points()
 
 		# Start wave system after server player spawns
 		await get_tree().create_timer(0.5).timeout
@@ -182,6 +189,42 @@ func get_spawn_position() -> Vector2:
 
 	print("No spawn points found, using origin")
 	return Vector2.ZERO
+
+
+func find_enemy_spawn_points() -> void:
+	# Find enemy spawn points in the scene
+	# First try to find a dedicated EnemySpawnPoints node
+	var enemy_spawn_node = get_tree().current_scene.get_node_or_null("EnemySpawnPoints")
+
+	if enemy_spawn_node:
+		for child in enemy_spawn_node.get_children():
+			if child is Marker2D:
+				enemy_spawn_points.append(child.global_position)
+		print("Found ", enemy_spawn_points.size(), " enemy spawn points")
+	else:
+		print("No EnemySpawnPoints node found, using default positions")
+		# Create some default spawn positions around the map
+		enemy_spawn_points = [
+			Vector2(800, 200),
+			Vector2(-800, 200),
+			Vector2(800, -200),
+			Vector2(-800, -200),
+			Vector2(0, 600),
+			Vector2(0, -600),
+			Vector2(1200, 0),
+			Vector2(-1200, 0)
+		]
+		print("Using ", enemy_spawn_points.size(), " default enemy spawn points")
+
+
+func get_next_enemy_spawn_position() -> Vector2:
+	if enemy_spawn_points.is_empty():
+		print("No enemy spawn points available, using origin")
+		return Vector2.ZERO
+
+	var spawn_pos = enemy_spawn_points[next_enemy_spawn_index]
+	next_enemy_spawn_index = (next_enemy_spawn_index + 1) % enemy_spawn_points.size()
+	return spawn_pos
 
 
 func start_wave_system() -> void:
@@ -296,23 +339,8 @@ func spawn_boss() -> void:
 
 	boss_spawned = true
 
-	# Get players to spawn boss away from them
-	var players = get_tree().get_nodes_in_group("players")
-	var spawn_position = Vector2.ZERO
-
-	if not players.is_empty():
-		# Spawn boss at a distance from players
-		var base_player = players[0]
-		var angle = randf() * TAU
-		var distance = randf_range(200, 400)  # Further away than regular enemies
-		spawn_position = base_player.global_position + Vector2(cos(angle), sin(angle)) * distance
-
-		# Clamp spawn position to visible area
-		spawn_position.x = clamp(spawn_position.x, -1800, 1800)
-		spawn_position.y = clamp(spawn_position.y, -1600, 1600)
-	else:
-		# No players, use random position
-		spawn_position = Vector2(randf_range(-1800, 1800), randf_range(-1600, 1600))
+	# Use predetermined spawn position from enemy spawn points
+	var spawn_position = get_next_enemy_spawn_position()
 
 	# Spawn boss with unique ID
 	enemy_id_counter += 1
@@ -367,23 +395,8 @@ func show_game_complete() -> void:
 
 
 func spawn_single_enemy() -> void:
-	# Get players to spawn away from them
-	var players = get_tree().get_nodes_in_group("players")
-	var spawn_position = Vector2.ZERO
-
-	if not players.is_empty():
-		# Spawn at a random distance from players (150-300 pixels away, within camera view)
-		var base_player = players[0]
-		var angle = randf() * TAU  # Random angle in radians
-		var distance = randf_range(150, 300)
-		spawn_position = base_player.global_position + Vector2(cos(angle), sin(angle)) * distance
-
-		# Clamp spawn position to visible area (camera limits)
-		spawn_position.x = clamp(spawn_position.x, -1800, 1800)
-		spawn_position.y = clamp(spawn_position.y, -1600, 1600)
-	else:
-		# No players, use random position within visible bounds
-		spawn_position = Vector2(randf_range(-1800, 1800), randf_range(-1600, 1600))
+	# Use predetermined spawn position from enemy spawn points
+	var spawn_position = get_next_enemy_spawn_position()
 
 	# Use RPC to spawn enemy on all clients with unique ID
 	enemy_id_counter += 1
@@ -514,6 +527,9 @@ func start_game_from_lobby() -> void:
 
 	# Spawn players with their selected classes
 	spawn_players_with_classes()
+
+	# Find enemy spawn points
+	find_enemy_spawn_points()
 
 	# Start wave system after players spawn (server only)
 	if multiplayer.is_server():
