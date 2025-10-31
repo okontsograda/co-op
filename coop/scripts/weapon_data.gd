@@ -81,6 +81,21 @@ static func initialize_weapons() -> void:
 		"res://assets/Sounds/SFX/bow_release.mp3"  # TODO: Replace with rocket sound
 	)
 
+	# Sword weapon (for melee combat)
+	weapons["sword"] = WeaponConfig.new(
+		"sword",
+		"Sword",
+		"",  # No projectile for melee
+		20.0,  # base_damage (higher than bow)
+		1.0,   # fire_cooldown (1 second between swings)
+		0.0,   # projectile_speed (not used for melee)
+		0.0,   # base_explosion_chance
+		0.0,   # base_explosion_radius
+		0.0,   # base_explosion_damage
+		"attack",  # Uses attack animation instead of fire
+		"res://assets/Sounds/SFX/hit.mp3"  # Sword swing sound
+	)
+
 
 # Get weapon configuration by ID
 static func get_weapon(weapon_id: String) -> WeaponConfig:

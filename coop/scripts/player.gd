@@ -94,16 +94,7 @@ func _ready() -> void:
 	# Characters with higher Y position (lower on screen) will render in front
 	y_sort_enabled = true
 
-	# Apply class modifiers if coming from lobby
-	var selected_class := ""
-	if has_meta("selected_class"):
-		selected_class = str(get_meta("selected_class"))
-	elif LobbyManager and LobbyManager.players.has(peer_id):
-		selected_class = LobbyManager.players[peer_id].get("class", "archer")
-	if selected_class != "":
-		apply_class_modifiers(selected_class)
-
-	# Apply weapon selection if coming from lobby
+	# Apply weapon selection if coming from lobby (do this BEFORE class modifiers)
 	if has_meta("selected_weapon"):
 		equipped_weapon = get_meta("selected_weapon")
 		print("Player ", name, " equipped weapon from metadata: ", equipped_weapon)
@@ -112,6 +103,16 @@ func _ready() -> void:
 		print("Player ", name, " equipped weapon from LobbyManager: ", equipped_weapon)
 	else:
 		print("Player ", name, " using default weapon: ", equipped_weapon)
+
+	# Apply class modifiers if coming from lobby (this will override weapon for melee classes)
+	var selected_class := ""
+	if has_meta("selected_class"):
+		selected_class = str(get_meta("selected_class"))
+	elif LobbyManager and LobbyManager.players.has(peer_id):
+		selected_class = LobbyManager.players[peer_id].get("class", "archer")
+	if selected_class != "":
+		apply_class_modifiers(selected_class)
+		print("After class modifiers, equipped_weapon is: ", equipped_weapon)
 
 	# Initialize weapon configuration
 	initialize_weapon()
@@ -456,8 +457,11 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 		var direction_to_enemy = (enemy.global_position - global_position).normalized()
 		var dot_product = attack_direction.dot(direction_to_enemy)
 		
-		# If dot product > 0.3, enemy is within ~60 degree cone in front of player
-		if dot_product > 0.3:
+		# If whirlwind is active, hit all enemies in range (360 degrees)
+		# Otherwise, only hit enemies in ~60 degree cone in front
+		var in_attack_direction = "whirlwind" in active_abilities or dot_product > 0.3
+		
+		if in_attack_direction:
 			# Damage the enemy
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(int(final_damage), self)
@@ -923,6 +927,31 @@ func apply_upgrade(upgrade_id: String) -> void:
 			# TODO: Implement XP multiplier
 			print("XP Magnet upgraded!")
 
+		# ===== SWORD-SPECIFIC UPGRADES =====
+		"sweep_attack":
+			# Increase melee attack range by 50%
+			melee_attack_range *= 1.5
+			print("Melee attack range increased to: ", melee_attack_range)
+
+		"heavy_strike":
+			# +30% melee damage
+			weapon_stats.damage_multiplier += 0.3
+			print("Melee damage multiplier: ", weapon_stats.damage_multiplier)
+
+		"whirlwind":
+			# 360° attack (modify cone check to always hit)
+			# This will be handled in perform_melee_damage
+			if not "whirlwind" in active_abilities:
+				active_abilities.append("whirlwind")
+				print("Whirlwind ability unlocked! Attacks hit all around you")
+
+		"dash_strike":
+			# Dash and attack ability
+			if not "dash_strike" in active_abilities:
+				active_abilities.append("dash_strike")
+				print("Dash Strike ability unlocked! Press Q to dash attack")
+				# TODO: Implement dash strike ability
+
 		_:
 			print("Unknown upgrade: ", upgrade_id)
 
@@ -1212,6 +1241,15 @@ func apply_class_modifiers(selected_class: String) -> void:
 	if class_data.has("combat_type"):
 		combat_type = class_data["combat_type"]
 		print("  Combat type: ", combat_type)
+		
+		# Set appropriate weapon based on combat type
+		if combat_type == "melee":
+			equipped_weapon = "sword"
+			print("  Equipped weapon set to: sword (melee)")
+		elif equipped_weapon == "sword":
+			# If switching from melee to ranged, default to bow
+			equipped_weapon = "bow"
+			print("  Equipped weapon set to: bow (ranged)")
 	
 	if class_data.has("attack_range"):
 		melee_attack_range = class_data["attack_range"]

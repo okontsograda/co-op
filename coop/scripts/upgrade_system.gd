@@ -103,6 +103,23 @@ func _initialize_upgrades():
 		"arrow_nova", "Arrow Nova", "Fire 8 arrows in all directions every 10s", 1, 0.4, ["bow"]
 	)
 
+	# ===== SWORD-SPECIFIC UPGRADES (Melee) =====
+	upgrades["sweep_attack"] = Upgrade.new(
+		"sweep_attack", "Sweep Attack", "+50% melee attack range", 3, 0.7, ["sword"]
+	)
+	
+	upgrades["heavy_strike"] = Upgrade.new(
+		"heavy_strike", "Heavy Strike", "+30% melee damage", 5, 0.8, ["sword"]
+	)
+	
+	upgrades["whirlwind"] = Upgrade.new(
+		"whirlwind", "Whirlwind", "360° attack hits all nearby enemies", 1, 0.5, ["sword"]
+	)
+	
+	upgrades["dash_strike"] = Upgrade.new(
+		"dash_strike", "Dash Strike", "Press Q: Dash forward and attack (10s cooldown)", 1, 0.6, ["sword"]
+	)
+
 	upgrades["summon_archer"] = Upgrade.new(
 		"summon_archer", "Summon Archer", "Spawn ally archer for 60 seconds", 1, 0.3, ["bow"]
 	)
