@@ -1,5 +1,6 @@
-[gd_scene load_steps=12 format=3 uid="uid://c28e7e3l0hneh"]
+[gd_scene load_steps=13 format=3 uid="uid://c28e7e3l0hneh"]
 
+[ext_resource type="Script" uid="uid://c8k9lap3m2x6w" path="res://coop/scripts/tree.gd" id="1_tree"]
 [ext_resource type="Texture2D" uid="uid://bd4s4s2sti6ll" path="res://tileset/Tree3.png" id="1_nn1ex"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_rixao"]
@@ -69,11 +70,29 @@ animations = [{
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_nn1ex"]
 size = Vector2(16, 27)
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_anim"]
+properties/0/path = NodePath("AnimatedSprite2D:animation")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath("AnimatedSprite2D:frame")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath("AnimatedSprite2D:frame_progress")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath("AnimatedSprite2D:speed_scale")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+
 [node name="Tree1" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1_tree")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -68)
 sprite_frames = SubResource("SpriteFrames_dgmd1")
+animation = &"default"
+autoplay = &"default"
 frame_progress = 0.42807823
 
 [node name="StaticBody2D" type="StaticBody2D" parent="."]
@@ -81,3 +100,6 @@ frame_progress = 0.42807823
 [node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
 position = Vector2(1, -15)
 shape = SubResource("RectangleShape2D_nn1ex")
+
+[node name="AnimationSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_anim")

@@ -156,7 +156,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 
 func spawn_server_player() -> void:
 	# Get the player scene directly (same as what the spawner would use)
-	var player_scene = preload("res://coop/scenes/player.tscn")
+	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
 	var player = player_scene.instantiate()
 
 	# Set the player name to the server peer ID
@@ -545,7 +545,7 @@ func spawn_players_with_classes() -> void:
 		return
 
 	# Spawn all players from the lobby with their selected classes
-	var player_scene = preload("res://coop/scenes/player.tscn")
+	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
 	var spawn_index = 0
 	var current_scene := get_tree().current_scene
 	if current_scene == null:
