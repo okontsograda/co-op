@@ -435,11 +435,21 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 	# Calculate final damage
 	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
 	
+	# Debug damage calculation
+	print("=== MELEE DAMAGE CALCULATION ===")
+	print("Base attack_damage: ", attack_damage)
+	print("Weapon bonus damage: ", weapon_stats.damage)
+	print("Damage multiplier: ", weapon_stats.damage_multiplier)
+	print("Calculated damage: ", final_damage)
+	
 	# Check for critical hit
 	var is_crit = randf() < weapon_stats.crit_chance
 	if is_crit:
 		final_damage *= weapon_stats.crit_multiplier
-		print("CRITICAL HIT! Damage: ", final_damage)
+		print("CRITICAL HIT! Final damage: ", final_damage)
+	else:
+		print("Final damage: ", final_damage)
+	print("================================")
 	
 	var enemies_hit = 0
 	const KNOCKBACK_FORCE = 200.0  # Knockback strength
@@ -521,9 +531,13 @@ func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
 	if damage_scene:
 		var damage_instance = damage_scene.instantiate()
 		damage_instance.global_position = pos
+		
+		# Add to scene FIRST (this triggers _ready() which initializes the label reference)
+		get_tree().current_scene.add_child(damage_instance)
+		
+		# NOW set damage text and styling (after _ready() has been called)
 		if damage_instance.has_method("set_damage"):
 			damage_instance.set_damage(damage, is_crit)
-		get_tree().current_scene.add_child(damage_instance)
 
 
 @rpc("any_peer", "reliable")
@@ -1133,8 +1147,17 @@ func initialize_weapon() -> void:
 		print("ERROR: Failed to get weapon config for: ", equipped_weapon)
 		return
 
-	# Update base attack damage based on weapon
-	attack_damage = int(current_weapon_config.base_damage)
+	# Get the base damage from weapon, but don't override if we already have damage set
+	# This preserves class modifiers that were applied before weapon initialization
+	var weapon_base_damage = int(current_weapon_config.base_damage)
+	
+	# If attack_damage is still default (15), use weapon base damage
+	# Otherwise, keep the current value (which has class modifiers already applied)
+	if attack_damage == 15:
+		attack_damage = weapon_base_damage
+		print("  - Set attack damage to weapon base: ", weapon_base_damage)
+	else:
+		print("  - Keeping existing attack damage (has class modifiers): ", attack_damage)
 
 	# Update weapon_stats with weapon-specific defaults
 	weapon_stats.fire_cooldown = current_weapon_config.fire_cooldown
@@ -1144,7 +1167,7 @@ func initialize_weapon() -> void:
 	weapon_stats.explosion_damage = current_weapon_config.base_explosion_damage
 
 	print("Initialized weapon: ", current_weapon_config.name)
-	print("  - Base damage: ", current_weapon_config.base_damage)
+	print("  - Final attack damage: ", attack_damage)
 	print("  - Fire cooldown: ", current_weapon_config.fire_cooldown)
 	print("  - Projectile speed: ", current_weapon_config.projectile_speed)
 

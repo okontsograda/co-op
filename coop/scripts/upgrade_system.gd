@@ -41,16 +41,8 @@ func _ready():
 
 func _initialize_upgrades():
 	# ===== SHARED UPGRADES (work with all weapons) =====
-	upgrades["fire_rate"] = Upgrade.new(
-		"fire_rate", "Rapid Fire", "Fire 15% faster", -1, 1.0, ["all"]
-	)
-
 	upgrades["damage_boost"] = Upgrade.new(
 		"damage_boost", "Power Shot", "+20% damage", -1, 1.0, ["all"]
-	)
-
-	upgrades["pierce"] = Upgrade.new(
-		"pierce", "Piercing Shot", "Projectiles pass through +1 enemy", 10, 0.8, ["all"]
 	)
 
 	upgrades["crit_chance"] = Upgrade.new(
@@ -65,10 +57,6 @@ func _initialize_upgrades():
 		"poison_arrows", "Poison", "Enemies take 3 damage/sec for 3s", 1, 0.6, ["all"]
 	)
 
-	upgrades["homing"] = Upgrade.new(
-		"homing", "Homing", "Projectiles track nearest enemy", 5, 0.5, ["all"]
-	)
-
 	upgrades["damage_shield"] = Upgrade.new(
 		"damage_shield",
 		"Shield Barrier",
@@ -81,9 +69,22 @@ func _initialize_upgrades():
 	upgrades["xp_magnet"] = Upgrade.new(
 		"xp_magnet", "XP Magnet", "2x XP collection range, +10% XP gain", 3, 0.8, ["all"]
 	)
+	
+	# ===== RANGED WEAPON UPGRADES (Bow + Rocket) =====
+	upgrades["fire_rate"] = Upgrade.new(
+		"fire_rate", "Rapid Fire", "Fire 15% faster", -1, 1.0, ["bow", "rocket"]
+	)
+
+	upgrades["pierce"] = Upgrade.new(
+		"pierce", "Piercing Shot", "Projectiles pass through +1 enemy", 10, 0.8, ["bow", "rocket"]
+	)
+
+	upgrades["homing"] = Upgrade.new(
+		"homing", "Homing", "Projectiles track nearest enemy", 5, 0.5, ["bow", "rocket"]
+	)
 
 	upgrades["rapid_fire_capacity"] = Upgrade.new(
-		"rapid_fire_capacity", "Quick Draw", "+1 rapid fire shot before cooldown", 3, 0.8, ["all"]
+		"rapid_fire_capacity", "Quick Draw", "+1 rapid fire shot before cooldown", 3, 0.8, ["bow", "rocket"]
 	)
 
 	# ===== BOW-SPECIFIC UPGRADES =====
@@ -186,18 +187,23 @@ func get_random_upgrades(
 ) -> Array[Upgrade]:
 	var available_upgrades: Array[Upgrade] = []
 
+	print("=== UPGRADE SYSTEM DEBUG ===")
+	print("Filtering upgrades for weapon: ", weapon_id)
+
 	# Filter out maxed upgrades and incompatible weapons
 	for upgrade_id in upgrades:
 		var upgrade = upgrades[upgrade_id]
 		var current_count = current_stacks.get(upgrade_id, 0)
 
 		# Check weapon compatibility
-		if not upgrade.is_compatible_with_weapon(weapon_id):
+		var is_compatible = upgrade.is_compatible_with_weapon(weapon_id)
+		if not is_compatible:
 			continue
 
 		# Include if not maxed (max_stacks == -1 means infinite)
 		if upgrade.max_stacks == -1 or current_count < upgrade.max_stacks:
 			available_upgrades.append(upgrade)
+			print("  - Added: ", upgrade.name, " (compatible: ", upgrade.compatible_weapons, ")")
 
 	# If not enough available, return what we have
 	if available_upgrades.size() <= count:

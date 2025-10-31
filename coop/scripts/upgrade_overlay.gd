@@ -24,6 +24,12 @@ func show_upgrades(p_player: Node2D) -> void:
 	upgrade_accepted = false
 	selected_index = -1
 
+	# Debug: Check player's equipped weapon
+	print("=== UPGRADE OVERLAY DEBUG ===")
+	print("Player equipped_weapon: ", player.equipped_weapon)
+	print("Player combat_type: ", player.combat_type)
+	print("=============================")
+
 	# Get 3 random upgrades from UpgradeSystem (filtered by equipped weapon)
 	available_upgrades = UpgradeSystem.get_random_upgrades(
 		3, player.upgrade_stacks, player.equipped_weapon
