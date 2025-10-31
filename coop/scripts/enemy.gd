@@ -29,6 +29,12 @@ var is_hit: bool = false
 var hit_timer: float = 0.0
 const hit_animation_duration: float = 0.3  # Duration of hit animation
 
+# Knockback system
+var is_knocked_back: bool = false
+var knockback_timer: float = 0.0
+const knockback_duration: float = 0.2  # How long knockback lasts
+const knockback_friction: float = 8.0  # How quickly knockback decays
+
 # Sound effects
 var hit_sound_player: AudioStreamPlayer2D = null
 
@@ -161,43 +167,59 @@ func _physics_process(_delta: float) -> void:
 		if hit_timer <= 0:
 			is_hit = false
 
+	# Handle knockback timer
+	if is_knocked_back:
+		knockback_timer -= _delta
+		if knockback_timer <= 0:
+			is_knocked_back = false
+
 	# Only process on server (authority)
 	if not is_multiplayer_authority():
 		return
 
-	# Find nearest player
-	find_target_player()
-
-	# Check if target is in attack range
-	if target_player:
-		var distance_to_target = global_position.distance_to(target_player.global_position)
-		is_in_attack_range = distance_to_target <= attack_range
-
-		# Calculate direction to target for sprite facing
-		var direction_to_target = (target_player.global_position - global_position).normalized()
-
-		# Flip sprite to face target player
-		# flip_h = true faces left, flip_h = false faces right
-		# If target is to the right, we want to face right (flip_h = false)
-		# If target is to the left, we want to face left (flip_h = true)
-		var sprite = get_node_or_null("AnimatedSprite2D")
-		if sprite:
-			sprite.flip_h = direction_to_target.x > 0
-
-		# Attack if in range
-		if is_in_attack_range and can_attack and not is_attacking:
-			attack_target(target_player)
-
-		# Move towards target if not in attack range and not attacking
-		if not is_in_attack_range and not is_attacking:
-			velocity = direction_to_target * speed
-		else:
-			# Stop moving when in attack range or attacking
+	# If knocked back, apply friction to velocity and skip normal AI
+	if is_knocked_back:
+		# Apply friction to slow down knockback
+		velocity = velocity.lerp(Vector2.ZERO, knockback_friction * _delta)
+		# Stop knockback if velocity is very small
+		if velocity.length() < 5.0:
 			velocity = Vector2.ZERO
+			is_knocked_back = false
 	else:
-		# No target, stop moving
-		velocity = Vector2.ZERO
-		is_in_attack_range = false
+		# Normal AI behavior when not knocked back
+		# Find nearest player
+		find_target_player()
+
+		# Check if target is in attack range
+		if target_player:
+			var distance_to_target = global_position.distance_to(target_player.global_position)
+			is_in_attack_range = distance_to_target <= attack_range
+
+			# Calculate direction to target for sprite facing
+			var direction_to_target = (target_player.global_position - global_position).normalized()
+
+			# Flip sprite to face target player
+			# flip_h = true faces left, flip_h = false faces right
+			# If target is to the right, we want to face right (flip_h = false)
+			# If target is to the left, we want to face left (flip_h = true)
+			var sprite = get_node_or_null("AnimatedSprite2D")
+			if sprite:
+				sprite.flip_h = direction_to_target.x > 0
+
+			# Attack if in range
+			if is_in_attack_range and can_attack and not is_attacking:
+				attack_target(target_player)
+
+			# Move towards target if not in attack range and not attacking
+			if not is_in_attack_range and not is_attacking:
+				velocity = direction_to_target * speed
+			else:
+				# Stop moving when in attack range or attacking
+				velocity = Vector2.ZERO
+		else:
+			# No target, stop moving
+			velocity = Vector2.ZERO
+			is_in_attack_range = false
 			
 	# Always call move_and_slide for proper physics handling
 	move_and_slide()
@@ -232,6 +254,14 @@ func find_target_player() -> void:
 			closest_player = player
 
 	target_player = closest_player
+
+
+func apply_knockback(knockback_velocity: Vector2) -> void:
+	# Apply knockback to this enemy
+	velocity = knockback_velocity
+	is_knocked_back = true
+	knockback_timer = knockback_duration
+	print("Knockback applied to enemy: ", knockback_velocity)
 
 
 func take_damage(amount: int, attacker: Node2D) -> void:

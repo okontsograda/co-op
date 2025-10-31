@@ -41,7 +41,10 @@ Each character needs **3 sprite sheets** with the following animations:
 ### Required Animations:
 1. **idle** - Character standing still (6-8 frames recommended)
 2. **walk** - Character walking (4-8 frames recommended)
-3. **fire** or **attack** - Character attacking (6-10 frames recommended)
+3. **fire** OR **attack** - Character attacking (6-10 frames recommended)
+   - Ranged classes (Archer): Use **"fire"** for shooting
+   - Melee classes (Knight): Use **"attack"** for sword swing (or "fire" also works)
+   - The code automatically detects which one exists
 
 ### Sprite Sheet Format:
 - **Horizontal sprite sheets** (frames arranged left to right)
@@ -103,12 +106,13 @@ Knight_Attack.png: [Frame1][Frame2][Frame3][Frame4][Frame5][Frame6][Frame7][Fram
    - Check "Loop"
    - Add frames from `Archer_Walk.png` sprite sheet
 
-5. **Create the "fire" animation**:
+5. **Create the "fire" animation** (for archer):
    - Click "New Animation" button
    - Name it `fire`
    - Set FPS to `10`
    - Check "Loop"
    - Add frames from `Archer_Shoot.png` sprite sheet
+   - Note: You can also name this "attack" - the code detects both
 
 6. **Save** (Ctrl+S)
 
@@ -135,10 +139,10 @@ Knight_Attack.png: [Frame1][Frame2][Frame3][Frame4][Frame5][Frame6][Frame7][Fram
    - Right-click in Knight folder → Create New Resource → SpriteFrames
    - Name it `knight_sprite_frames.tres`
    - Follow the same steps as Step 2 to create animations
-   - **IMPORTANT**: Use the same animation names:
-     - `idle`
-     - `walk`
-     - `fire` (even though it's a melee attack)
+   - **IMPORTANT**: Use these animation names:
+     - `idle` - Knight standing
+     - `walk` - Knight walking
+     - `attack` - Knight sword swing (you can also use "fire" - both work!)
 
 4. **Verify animations work**:
    - Test by previewing in the SpriteFrames editor

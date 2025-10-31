@@ -45,9 +45,9 @@ Open Godot and do the following:
      - Loop: ✓ ON
      - Add frames from `Archer_Walk.png` (4 frames)
    
-   - **Fire Animation**:
+   - **Fire Animation** (attack):
      - Click "New Animation"
-     - Name: `fire`
+     - Name: `fire` (or `attack` - both work!)
      - FPS: `10`
      - Loop: ✓ ON
      - Add frames from `Archer_Shoot.png` (8 frames)
@@ -91,8 +91,9 @@ You need 3 PNG files with knight sprites:
 3. **Create Knight SpriteFrames**:
    - Right-click in Knight folder → New Resource → SpriteFrames
    - Name: `knight_sprite_frames.tres`
-   - Set up same 3 animations: `idle`, `walk`, `fire`
+   - Set up same 3 animations: `idle`, `walk`, `attack` (or `fire`)
    - Use same FPS and Loop settings as Archer
+   - **Note**: Name the attack animation `attack` for clarity (or `fire` also works)
 
 ---
 
@@ -150,7 +151,7 @@ Try to find knight sprites with similar frame counts for consistency!
 **"Knight shows archer graphics"**
 - Knight sprite_frames path is wrong or missing
 - Check: `assets/Characters/Knight/knight_sprite_frames.tres` exists
-- Verify animations are named exactly: `idle`, `walk`, `fire`
+- Verify animations are named: `idle`, `walk`, and `attack` (or `fire`)
 
 **"Can't find good knight sprites"**
 - Use same archer sprites temporarily to test system works

@@ -34,6 +34,10 @@ const fire_cooldown: float = .5  # Cooldown time after rapid fire
 var equipped_weapon: String = "bow"  # Default to bow, can be set from lobby
 var current_weapon_config: WeaponData.WeaponConfig = null
 
+# Combat System
+var combat_type: String = "ranged"  # "ranged" or "melee"
+var melee_attack_range: float = 60.0  # Range for melee attacks
+
 # Preload weapon scenes for network compatibility
 const ARROW_SCENE = preload("res://coop/scenes/arrow.tscn")
 const ROCKET_SCENE = preload("res://coop/scenes/rocket.tscn")
@@ -264,18 +268,26 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 func handle_fire_action(_mouse_position: Vector2) -> void:
 	# Check if player can fire (not on cooldown)
 	if not can_fire:
-		print("Player ", name, " cannot fire yet - on cooldown")
+		print("Player ", name, " cannot attack yet - on cooldown")
 		return
 
 	# Check rapid fire limit
 	if rapid_fire_count >= max_rapid_fire:
-		print("Player ", name, " rapid fire limit reached, must wait")
+		print("Player ", name, " rapid attack limit reached, must wait")
 		return
 
 	# Don't allow firing if already in fire animation and at rapid fire limit
 	if is_firing and rapid_fire_count >= max_rapid_fire:
 		return
 
+	# Check combat type and handle accordingly
+	if combat_type == "melee":
+		handle_melee_attack(_mouse_position)
+	else:
+		handle_ranged_attack(_mouse_position)
+
+
+func handle_ranged_attack(_mouse_position: Vector2) -> void:
 	# Trigger the fire animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
@@ -328,6 +340,167 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 			print("Player ", name, " can fire again")
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
+
+
+func handle_melee_attack(_mouse_position: Vector2) -> void:
+	# Trigger the melee attack animation
+	var animated_sprite = get_node("AnimatedSprite2D")
+	if animated_sprite:
+		print("Player ", name, " melee attacking!")
+
+		# Increment rapid fire count
+		rapid_fire_count += 1
+
+		# Convert mouse position to world coordinates
+		var camera = get_viewport().get_camera_2d()
+		if camera:
+			var world_target = camera.get_global_mouse_position()
+
+			# Turn player to face the attack direction
+			var direction_to_target = (world_target - global_position).normalized()
+			if direction_to_target.x > 0:
+				animated_sprite.flip_h = false  # Face right
+			elif direction_to_target.x < 0:
+				animated_sprite.flip_h = true  # Face left
+
+			# Play attack animation - check which animation exists
+			is_firing = true
+			var sprite_frames = animated_sprite.sprite_frames
+			if sprite_frames and sprite_frames.has_animation("attack"):
+				animated_sprite.play("attack")
+				print("Playing 'attack' animation for melee")
+			elif sprite_frames and sprite_frames.has_animation("fire"):
+				animated_sprite.play("fire")
+				print("Playing 'fire' animation for melee")
+			else:
+				print("WARNING: No attack or fire animation found!")
+
+			# Play attack sound
+			play_weapon_sound(self)
+
+			# Wait for animation to reach attack point (about halfway through)
+			await get_tree().create_timer(0.3).timeout
+			
+			# Perform melee attack - damage enemies in range
+			perform_melee_damage(world_target)
+			
+			# Send RPC to network to perform melee attack on other clients
+			rpc("perform_melee_damage_network", world_target)
+
+		# After remaining animation time, return to normal animation
+		await get_tree().create_timer(0.6).timeout
+		is_firing = false
+		print("Player ", name, " finished melee attack")
+
+		# Allow immediate refire if under rapid fire limit, otherwise wait for cooldown
+		if rapid_fire_count < max_rapid_fire:
+			# Allow rapid attacks
+			print("Player ", name, " rapid attack available: ", rapid_fire_count, "/", max_rapid_fire)
+		else:
+			# Rapid attack limit reached, wait for cooldown
+			can_fire = false
+			await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
+			can_fire = true
+			rapid_fire_count = 0  # Reset rapid fire counter
+			print("Player ", name, " can attack again")
+	else:
+		print("ERROR: AnimatedSprite2D not found!")
+
+
+func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> void:
+	# Find enemies within melee range and damage them
+	var attack_direction = (target_pos - global_position).normalized()
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	
+	# Calculate final damage
+	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
+	
+	# Check for critical hit
+	var is_crit = randf() < weapon_stats.crit_chance
+	if is_crit:
+		final_damage *= weapon_stats.crit_multiplier
+		print("CRITICAL HIT! Damage: ", final_damage)
+	
+	var enemies_hit = 0
+	const KNOCKBACK_FORCE = 200.0  # Knockback strength
+	
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+			
+		# Check if enemy is within range
+		var distance = global_position.distance_to(enemy.global_position)
+		if distance > melee_attack_range:
+			continue
+		
+		# Check if enemy is roughly in the direction of attack (cone check)
+		var direction_to_enemy = (enemy.global_position - global_position).normalized()
+		var dot_product = attack_direction.dot(direction_to_enemy)
+		
+		# If dot product > 0.3, enemy is within ~60 degree cone in front of player
+		if dot_product > 0.3:
+			# Damage the enemy
+			if enemy.has_method("take_damage"):
+				enemy.take_damage(int(final_damage), self)
+				enemies_hit += 1
+				print("Melee hit enemy at distance: ", distance)
+				
+				# Apply knockback to enemy
+				if apply_knockback and enemy.has_method("apply_knockback"):
+					var knockback_direction = direction_to_enemy
+					var knockback_velocity = knockback_direction * KNOCKBACK_FORCE
+					enemy.apply_knockback(knockback_velocity)
+				
+				# Apply lifesteal
+				if weapon_stats.lifesteal > 0:
+					heal(weapon_stats.lifesteal)
+				
+				# Spawn damage number
+				spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
+	
+	if enemies_hit == 0:
+		print("Melee attack missed - no enemies in range/direction")
+	else:
+		print("Melee attack hit ", enemies_hit, " enemies")
+
+
+@rpc("any_peer", "reliable")
+func perform_melee_damage_network(target_pos: Vector2) -> void:
+	# Get the player who sent this RPC
+	var attacker_peer_id = multiplayer.get_remote_sender_id()
+	print("Network melee attack from peer: ", attacker_peer_id)
+	
+	# Don't process on the client that sent it (they already did it locally)
+	if attacker_peer_id == multiplayer.get_unique_id():
+		print("Ignoring RPC from self to prevent double execution")
+		return
+	
+	# Find the attacker player
+	var attacker = null
+	for player in get_tree().get_nodes_in_group("players"):
+		if player.name.to_int() == attacker_peer_id:
+			attacker = player
+			break
+	
+	if attacker:
+		print("Found attacker player: ", attacker.name)
+		# Play attack sound for remote clients
+		play_weapon_sound(attacker)
+		# Perform melee damage from attacker's position (without knockback on remote - already applied)
+		attacker.perform_melee_damage(target_pos, false)
+	else:
+		print("ERROR: Could not find attacker player with peer_id: ", attacker_peer_id)
+
+
+func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
+	# Spawn damage number visual effect
+	var damage_scene = load("res://coop/scenes/damage_number.tscn")
+	if damage_scene:
+		var damage_instance = damage_scene.instantiate()
+		damage_instance.global_position = pos
+		if damage_instance.has_method("set_damage"):
+			damage_instance.set_damage(damage, is_crit)
+		get_tree().current_scene.add_child(damage_instance)
 
 
 @rpc("any_peer", "reliable")
@@ -1005,6 +1178,16 @@ func apply_class_modifiers(selected_class: String) -> void:
 
 	# Apply attack speed modifier to fire cooldown
 	weapon_stats.fire_cooldown = fire_cooldown * (1.0 / class_data["attack_speed_modifier"])
+
+	# Apply combat type and melee range
+	if class_data.has("combat_type"):
+		combat_type = class_data["combat_type"]
+		print("  Combat type: ", combat_type)
+	
+	if class_data.has("attack_range"):
+		melee_attack_range = class_data["attack_range"]
+		if combat_type == "melee":
+			print("  Melee attack range: ", melee_attack_range)
 
 	# Load and apply character sprite frames
 	var animated_sprite = get_node_or_null("AnimatedSprite2D")
