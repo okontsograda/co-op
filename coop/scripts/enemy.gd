@@ -40,6 +40,12 @@ var knockback_timer: float = 0.0
 const knockback_duration: float = 0.2  # How long knockback lasts
 const knockback_friction: float = 8.0  # How quickly knockback decays
 
+# Damage over time (poison, etc.)
+var poison_damage: int = 0  # Damage per second
+var poison_duration: float = 0.0  # Duration remaining in seconds
+var poison_tick_timer: float = 0.0  # Timer for damage ticks
+const poison_tick_rate: float = 1.0  # Apply poison damage every 1 second
+
 # Sound effects
 var hit_sound_player: AudioStreamPlayer2D = null
 
@@ -214,6 +220,43 @@ func create_boss_name_label() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	# Handle poison damage over time (only on server)
+	if is_multiplayer_authority() and poison_duration > 0.0:
+		poison_duration -= _delta
+		poison_tick_timer -= _delta
+		
+		# Apply poison damage every tick
+		if poison_tick_timer <= 0.0:
+			poison_tick_timer = poison_tick_rate
+			if current_health > 0:
+				# Apply poison damage
+				var damage_to_apply = poison_damage
+				current_health -= damage_to_apply
+				
+				# Show damage number for poison tick (green color for poison)
+				spawn_damage_number(global_position, damage_to_apply, false, true)
+				
+				# Update health bar
+				update_health_display()
+				
+				# Sync health to all clients
+				rpc("sync_health", current_health)
+				
+				# Check if poison killed the enemy
+				if current_health <= 0:
+					# Award XP to the last attacker
+					award_xp_to_killer()
+					# Notify NetworkHandler of enemy death
+					NetworkHandler.on_enemy_died()
+					# Broadcast death
+					rpc("die_rpc")
+					return
+		
+		# Clear poison when duration expires
+		if poison_duration <= 0.0:
+			poison_damage = 0
+			poison_tick_timer = 0.0
+
 	# Handle hit animation timer
 	if is_hit:
 		hit_timer -= _delta
@@ -618,3 +661,25 @@ func award_xp_to_killer() -> void:
 		if str(player.name) == last_attacker or str(player.name.to_int()) == last_attacker:
 			player.gain_xp(25)  # Award 25 XP per kill
 			break
+
+
+func apply_poison(damage_per_sec: int, duration: float) -> void:
+	# Apply or refresh poison effect
+	poison_damage = damage_per_sec
+	poison_duration = duration
+	poison_tick_timer = poison_tick_rate  # Apply first tick immediately on next frame
+
+
+func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool, is_poison: bool = false) -> void:
+	# Spawn floating damage number (for poison and other passive damage)
+	var damage_number_scene = preload("res://coop/scenes/damage_number.tscn")
+	var damage_number = damage_number_scene.instantiate()
+	
+	# Position at enemy location
+	damage_number.global_position = pos
+	
+	# Add to scene FIRST (this triggers _ready() which initializes the label reference)
+	get_tree().current_scene.add_child(damage_number)
+	
+	# NOW set damage text and styling (after _ready() has been called)
+	damage_number.set_damage(damage, is_crit, is_poison)

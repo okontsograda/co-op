@@ -496,7 +496,7 @@ func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
 		
 		# NOW set damage text and styling (after _ready() has been called)
 		if damage_instance.has_method("set_damage"):
-			damage_instance.set_damage(damage, is_crit)
+			damage_instance.set_damage(damage, is_crit, false)
 
 
 @rpc("any_peer", "reliable")
@@ -661,6 +661,9 @@ func heal(amount: int) -> void:
 func collect_coin(amount: int) -> void:
 	coins += amount
 	
+	# Play coin pickup sound
+	play_pickup_sound()
+	
 	# Broadcast coin update to all clients
 	rpc("sync_player_coins", coins)
 	
@@ -777,6 +780,9 @@ func gain_xp_rpc(amount: int) -> void:
 func level_up() -> void:
 	current_xp -= xp_to_next_level
 	current_level += 1
+
+	# Play level up sound
+	play_levelup_sound()
 
 	# Increase XP requirement for next level (scaling)
 	xp_to_next_level = base_xp_per_level * current_level
@@ -1240,6 +1246,34 @@ func play_weapon_sound(shooter: Node2D) -> void:
 # Legacy function for backwards compatibility
 func play_bow_sound(shooter: Node2D) -> void:
 	play_weapon_sound(shooter)
+
+
+func play_pickup_sound() -> void:
+	# Play coin pickup sound
+	var pickup_sound = load("res://assets/Sounds/SFX/pickup.mp3")
+	if pickup_sound:
+		var temp_sound = AudioStreamPlayer2D.new()
+		temp_sound.stream = pickup_sound
+		temp_sound.position = global_position
+		# Add to scene tree and play
+		get_tree().current_scene.add_child(temp_sound)
+		temp_sound.play()
+		# Clean up after sound finishes
+		temp_sound.finished.connect(func(): temp_sound.queue_free())
+
+
+func play_levelup_sound() -> void:
+	# Play player level up sound (note: filename has typo "leveup")
+	var levelup_sound = load("res://assets/Sounds/SFX/player_leveup.mp3")
+	if levelup_sound:
+		var temp_sound = AudioStreamPlayer2D.new()
+		temp_sound.stream = levelup_sound
+		temp_sound.position = global_position
+		# Add to scene tree and play
+		get_tree().current_scene.add_child(temp_sound)
+		temp_sound.play()
+		# Clean up after sound finishes
+		temp_sound.finished.connect(func(): temp_sound.queue_free())
 
 
 # Apply class modifiers from lobby selection

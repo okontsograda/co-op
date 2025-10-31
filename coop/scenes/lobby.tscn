@@ -18,93 +18,139 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.15, 0.15, 0.15, 1)
+color = Color(0.12, 0.12, 0.15, 1)
 
 [node name="LobbyInfoPanel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 100.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 140.0
 grow_horizontal = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="LobbyInfoPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="LobbyInfoPanel"]
 layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 15
 
-[node name="TitleLabel" type="Label" parent="LobbyInfoPanel/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="LobbyInfoPanel/MarginContainer"]
 layout_mode = 2
-text = "Game Lobby"
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="LobbyInfoPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "🎮 Game Lobby"
 horizontal_alignment = 1
-vertical_alignment = 1
 
-[node name="OnlineIDLabel" type="Label" parent="LobbyInfoPanel/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="LobbyInfoPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-text = "Lobby ID: "
-horizontal_alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="LobbyInfoPanel/VBoxContainer"]
+[node name="InfoHBox" type="HBoxContainer" parent="LobbyInfoPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 30
 alignment = 1
 
-[node name="CopyButton" type="Button" parent="LobbyInfoPanel/VBoxContainer/HBoxContainer"]
+[node name="OnlineIDLabel" type="Label" parent="LobbyInfoPanel/MarginContainer/VBoxContainer/InfoHBox"]
 layout_mode = 2
-text = "Copy ID"
+theme_override_font_sizes/font_size = 16
+text = "Lobby ID: "
 
-[node name="PlayerCountLabel" type="Label" parent="LobbyInfoPanel/VBoxContainer"]
+[node name="CopyButton" type="Button" parent="LobbyInfoPanel/MarginContainer/VBoxContainer/InfoHBox"]
+custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-text = "Players: 0"
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+text = "📋 Copy ID"
+
+[node name="PlayerCountLabel" type="Label" parent="LobbyInfoPanel/MarginContainer/VBoxContainer/InfoHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "👥 Players: 0"
 
 [node name="PlayerListPanel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 20.0
-offset_top = -250.0
-offset_right = 470.0
-offset_bottom = 250.0
+offset_left = 30.0
+offset_top = -200.0
+offset_right = 450.0
+offset_bottom = 19.0
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="PlayerListPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="PlayerListPanel"]
 layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
 
-[node name="Label" type="Label" parent="PlayerListPanel/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayerListPanel/MarginContainer"]
 layout_mode = 2
-text = "Players in Lobby"
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="PlayerListPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "👥 Players"
 horizontal_alignment = 1
 
-[node name="ScrollContainer" type="ScrollContainer" parent="PlayerListPanel/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="PlayerListPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="PlayerListPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="PlayerList" type="VBoxContainer" parent="PlayerListPanel/VBoxContainer/ScrollContainer"]
+[node name="PlayerList" type="VBoxContainer" parent="PlayerListPanel/MarginContainer/VBoxContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_constants/separation = 8
 
 [node name="WeaponSelectionPanel" type="PanelContainer" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
 offset_left = -200.0
-offset_top = 120.0
+offset_top = 200.0
 offset_right = 200.0
-offset_bottom = 320.0
+offset_bottom = 400.0
 grow_horizontal = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="WeaponSelectionPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="WeaponSelectionPanel"]
 layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
 
-[node name="Label" type="Label" parent="WeaponSelectionPanel/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="WeaponSelectionPanel/MarginContainer"]
 layout_mode = 2
-text = "Select Your Weapon"
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="WeaponSelectionPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "⚔️ Select Weapon"
 horizontal_alignment = 1
 
-[node name="WeaponGrid" type="GridContainer" parent="WeaponSelectionPanel/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="WeaponSelectionPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="WeaponGrid" type="GridContainer" parent="WeaponSelectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
 columns = 2
 
 [node name="ClassSelectionPanel" type="PanelContainer" parent="."]
@@ -114,24 +160,38 @@ anchor_left = 1.0
 anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -420.0
-offset_top = -250.0
-offset_right = -20.0
-offset_bottom = 250.0
+offset_left = -410.0
+offset_top = -200.0
+offset_right = -30.0
+offset_bottom = 180.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ClassSelectionPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="ClassSelectionPanel"]
 layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
 
-[node name="Label" type="Label" parent="ClassSelectionPanel/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="ClassSelectionPanel/MarginContainer"]
 layout_mode = 2
-text = "Select Your Class"
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="ClassSelectionPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "🛡️ Select Class"
 horizontal_alignment = 1
 
-[node name="ClassGrid" type="GridContainer" parent="ClassSelectionPanel/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="ClassSelectionPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ClassGrid" type="GridContainer" parent="ClassSelectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
 columns = 2
 
 [node name="ChatPanel" type="PanelContainer" parent="."]
@@ -140,34 +200,45 @@ anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -200.0
-offset_right = -20.0
-offset_bottom = -60.0
+offset_left = 30.0
+offset_top = -296.0
+offset_right = -563.0
+offset_bottom = -80.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ChatPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="ChatPanel"]
 layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 10
 
-[node name="Label" type="Label" parent="ChatPanel/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="ChatPanel/MarginContainer"]
 layout_mode = 2
-text = "Lobby Chat"
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="ChatPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "💬 Chat"
 horizontal_alignment = 1
 
-[node name="MessageContainer" type="ScrollContainer" parent="ChatPanel/VBoxContainer"]
+[node name="MessageContainer" type="ScrollContainer" parent="ChatPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="Messages" type="VBoxContainer" parent="ChatPanel/VBoxContainer/MessageContainer"]
+[node name="Messages" type="VBoxContainer" parent="ChatPanel/MarginContainer/VBoxContainer/MessageContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_constants/separation = 4
 
-[node name="ChatInput" type="LineEdit" parent="ChatPanel/VBoxContainer"]
+[node name="ChatInput" type="LineEdit" parent="ChatPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-placeholder_text = "Press Enter to chat..."
+theme_override_font_sizes/font_size = 14
+placeholder_text = "Type a message and press Enter..."
 
 [node name="ReadyButton" type="Button" parent="."]
 layout_mode = 1
@@ -176,13 +247,14 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -100.0
-offset_top = -50.0
-offset_right = 100.0
+offset_left = -150.0
+offset_top = -60.0
+offset_right = -10.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 0
-text = "Ready"
+theme_override_font_sizes/font_size = 18
+text = "✓ Ready"
 
 [node name="StartButton" type="Button" parent="."]
 layout_mode = 1
@@ -191,10 +263,11 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = 120.0
-offset_top = -50.0
-offset_right = 320.0
+offset_left = 10.0
+offset_top = -60.0
+offset_right = 150.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 0
-text = "Start Game"
+theme_override_font_sizes/font_size = 18
+text = "🚀 Start Game"

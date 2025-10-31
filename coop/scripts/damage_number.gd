@@ -33,23 +33,22 @@ func _process(delta: float) -> void:
 		queue_free()
 
 
-# Set damage text and optional crit styling
-func set_damage(damage: float, is_crit: bool = false) -> void:
+# Set damage text and optional styling
+func set_damage(damage: float, is_crit: bool = false, is_poison: bool = false) -> void:
 	if label:
 		var damage_int = int(damage)
 		label.text = str(damage_int)
-		print("=== DAMAGE NUMBER DEBUG ===")
-		print("Received damage (float): ", damage)
-		print("Converted to int: ", damage_int)
-		print("Label text set to: ", label.text)
-		print("Is crit: ", is_crit)
-		print("===========================")
 
 		if is_crit:
 			# Critical hits: bigger, yellow
 			label.add_theme_font_size_override("font_size", 24)
 			label.add_theme_color_override("font_color", Color.YELLOW)
 			label.text = "CRIT! " + label.text
+		elif is_poison:
+			# Poison damage: green/purple for passive damage
+			label.add_theme_font_size_override("font_size", 14)
+			label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.3))  # Bright green for poison
+			label.text = "☠ " + label.text
 		else:
 			# Normal hits: white
 			label.add_theme_font_size_override("font_size", 16)

@@ -150,7 +150,6 @@ func create_explosion() -> void:
 
 		if body.has_method("take_damage") and body.is_in_group("enemies"):
 			body.take_damage(explosion_dmg, shooter)
-			print("Explosion hit ", body.name, " for ", explosion_dmg, " damage")
 
 			# Spawn damage number for explosion damage
 			spawn_damage_number(body.global_position, explosion_dmg, false)
@@ -197,4 +196,4 @@ func spawn_damage_number(pos: Vector2, damage_amount: float, is_crit: bool) -> v
 	get_tree().current_scene.add_child(damage_number)
 
 	# NOW set damage text and styling (after _ready() has been called)
-	damage_number.set_damage(damage_amount, is_crit)
+	damage_number.set_damage(damage_amount, is_crit, false)

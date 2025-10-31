@@ -42,7 +42,7 @@ func _ready():
 func _initialize_upgrades():
 	# ===== SHARED UPGRADES (work with all weapons) =====
 	upgrades["damage_boost"] = Upgrade.new(
-		"damage_boost", "Power Shot", "+20% damage", -1, 1.0, ["all"]
+		"damage_boost", "Power Shot", "+20% damage", -1, 1.0, ["bow", "rocket"]
 	)
 
 	upgrades["crit_chance"] = Upgrade.new(
@@ -54,7 +54,7 @@ func _initialize_upgrades():
 	)
 
 	upgrades["poison_arrows"] = Upgrade.new(
-		"poison_arrows", "Poison", "Enemies take 3 damage/sec for 3s", 1, 0.6, ["all"]
+		"poison_arrows", "Poison Arrows", "Enemies take 3 damage/sec for 3s", 1, 0.6, ["bow", "rocket"]
 	)
 
 	upgrades["damage_shield"] = Upgrade.new(
