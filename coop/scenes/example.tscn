@@ -1,10 +1,11 @@
-[gd_scene load_steps=13 format=4 uid="uid://c66m8oem8ehsl"]
+[gd_scene load_steps=14 format=4 uid="uid://c66m8oem8ehsl"]
 
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="1_ewl3q"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="1_ta1gp"]
 [ext_resource type="Script" uid="uid://dxhnfj6uhslxp" path="res://coop/scripts/multiplayer_spawner.gd" id="2_cs02y"]
 [ext_resource type="Texture2D" uid="uid://br5f0t5m2fiki" path="res://tileset/water_foam.png" id="2_ewl3q"]
 [ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/Characters/player.tscn" id="3_cs02y"]
+[ext_resource type="PackedScene" uid="uid://debug_overlay_001" path="res://coop/scenes/debug_overlay.tscn" id="7_debug"]
 [ext_resource type="PackedScene" uid="uid://c28e7e3l0hneh" path="res://coop/scenes/tree_1.tscn" id="6_ydsdc"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ydsdc"]
@@ -1549,3 +1550,5 @@ position = Vector2(235, 92)
 
 [node name="Tree11" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(510, 414)
+
+[node name="DebugOverlay" parent="." instance=ExtResource("7_debug")]
