@@ -21,6 +21,7 @@ var enemies_killed_this_wave: int = 0
 var wave_in_progress: bool = false
 var wave_start_timer: Timer = null
 var max_waves: int = 3
+var total_enemies_killed: int = 0  # Track total across all waves
 
 # Boss system variables
 var boss_min_health: int = 200
@@ -246,6 +247,10 @@ func start_wave_system() -> void:
 	enemies_spawned_this_wave = 0
 	enemies_killed_this_wave = 0
 	boss_spawned_this_wave = false  # Reset boss flag for new wave
+	
+	# Track wave in GameStats
+	if GameStats:
+		GameStats.record_wave_reached(current_wave)
 
 	# Update wave display on all clients
 	rpc("update_wave_display", current_wave)
@@ -291,6 +296,10 @@ func check_wave_completion() -> void:
 
 func start_next_wave() -> void:
 	current_wave += 1
+	
+	# Track wave progression in GameStats
+	if GameStats:
+		GameStats.record_wave_reached(current_wave)
 	
 	# Progressive difficulty scaling
 	# Enemy count increases more aggressively as waves progress
@@ -347,12 +356,17 @@ func update_wave_display(wave_number: int) -> void:
 
 
 
-func on_enemy_died() -> void:
+func on_enemy_died(is_boss: bool = false) -> void:
 	# Called when an enemy dies to check wave completion
 	if not multiplayer.is_server():
 		return
 
 	enemies_killed_this_wave += 1
+	total_enemies_killed += 1
+	
+	# Track in GameStats
+	if GameStats:
+		GameStats.record_enemy_kill(is_boss)
 
 	# Wait a frame for the enemy to be removed from the scene tree
 	await get_tree().process_frame

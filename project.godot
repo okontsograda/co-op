@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 LobbyManager="*res://coop/scripts/lobby_manager.gd"
 NetworkHandler="*res://coop/scripts/network_handler.gd"
 UpgradeSystem="*res://coop/scripts/upgrade_system.gd"
+GameStats="*res://coop/scripts/game_stats.gd"
 
 [display]
 

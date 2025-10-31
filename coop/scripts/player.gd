@@ -17,6 +17,9 @@ var max_health: int = 100
 var current_health: int = max_health
 var attack_damage: int = 15  # Base arrow damage
 
+# Player state
+var is_alive: bool = true  # Track if player is alive for enemy targeting
+
 # Currency System
 var coins: int = 0  # Currency collected by the player
 
@@ -139,6 +142,10 @@ func _input(event: InputEvent) -> void:
 	var peer_id = name.to_int()
 	if peer_id != multiplayer.get_unique_id():
 		return
+	
+	# Don't handle input if player is dead (health <= 0)
+	if current_health <= 0:
+		return
 
 	# Handle stats screen toggle
 	if event.is_action_pressed("stats_toggle") and not event.is_echo():
@@ -168,6 +175,13 @@ func _input(event: InputEvent) -> void:
 func _physics_process(_delta: float) -> void:
 	# Only process movement for players with authority
 	if !is_multiplayer_authority():
+		return
+	
+	# Handle spectator camera if player is dead
+	if current_health <= 0:
+		update_spectator_camera()
+		velocity = Vector2.ZERO
+		move_and_slide()
 		return
 
 	# Check if chat is active - if so, don't process movement
@@ -453,12 +467,16 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 					var knockback_velocity = knockback_direction * KNOCKBACK_FORCE
 					enemy.apply_knockback(knockback_velocity)
 				
-				# Apply lifesteal
-				if weapon_stats.lifesteal > 0:
-					heal(weapon_stats.lifesteal)
-				
-				# Spawn damage number
-				spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
+			# Apply lifesteal
+			if weapon_stats.lifesteal > 0:
+				heal(weapon_stats.lifesteal)
+			
+			# Track damage dealt
+			if GameStats:
+				GameStats.record_damage_dealt(int(final_damage))
+			
+			# Spawn damage number
+			spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
 
 
 @rpc("any_peer", "reliable")
@@ -624,6 +642,10 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 	# Apply damage locally
 	# Reduce health
 	current_health -= amount
+	
+	# Track damage taken
+	if GameStats:
+		GameStats.record_damage_taken(amount)
 
 	# Broadcast health update to all clients
 	rpc("sync_player_health", current_health)
@@ -634,7 +656,8 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 	# Check if player died
 	if current_health <= 0:
 		current_health = 0
-		handle_death()
+		# Sync death to all clients
+		rpc("handle_death_rpc")
 		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
 
 
@@ -660,6 +683,10 @@ func heal(amount: int) -> void:
 # Collect coin (called when player picks up a coin)
 func collect_coin(amount: int) -> void:
 	coins += amount
+	
+	# Track coins collected
+	if GameStats:
+		GameStats.record_coin_collected(amount)
 	
 	# Play coin pickup sound
 	play_pickup_sound()
@@ -717,14 +744,144 @@ func on_player_died(_killer: String) -> void:
 	# You can add death effects here
 
 
+@rpc("any_peer", "reliable", "call_local")
+func handle_death_rpc() -> void:
+	# This RPC is called on all clients when a player dies
+	handle_death()
+
+
 func handle_death() -> void:
 	# Handle death on authority/server
 	print("Player ", name, " has died!")
-	# Reset health
-	current_health = max_health
-	# Update health bar
-	update_health_display()
-	# You can add respawn logic here
+	
+	# Mark player as dead
+	is_alive = false
+	
+	# Hide the player sprite but keep them in spectator mode
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.visible = false
+	
+	# Hide UI elements on ALL clients (so other players don't see dead player's UI)
+	hide_player_ui()
+	
+	# Disable collision so they don't block others
+	set_collision_layer_value(1, false)  # Disable player collision layer
+	set_collision_mask_value(1, false)  # Disable collision with other players
+	
+	# Stop movement
+	velocity = Vector2.ZERO
+	
+	# Check if ALL players are dead
+	if is_multiplayer_authority() and are_all_players_dead():
+		# Show game over to everyone
+		rpc("show_game_over_screen_rpc")
+
+
+func are_all_players_dead() -> bool:
+	# Check if all players in the game are dead
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		if "is_alive" in player and player.is_alive:
+			return false  # Found at least one alive player
+	return true  # All players are dead
+
+
+@rpc("any_peer", "reliable", "call_local")
+func show_game_over_screen_rpc() -> void:
+	# Sync stats from server to all clients before showing game over
+	if multiplayer.is_server():
+		# Server broadcasts its stats to all clients
+		rpc("sync_stats_from_server", 
+			GameStats.total_enemies_killed,
+			GameStats.total_coins_collected,
+			GameStats.highest_wave_reached,
+			GameStats.total_damage_dealt,
+			GameStats.total_damage_taken,
+			GameStats.bosses_killed
+		)
+	
+	# Show game over screen to all players (called when everyone is dead)
+	show_game_over_screen()
+
+
+@rpc("any_peer", "reliable")
+func sync_stats_from_server(enemies: int, coins: int, wave: int, damage_dealt: int, damage_taken: int, bosses: int) -> void:
+	# Receive synced stats from server
+	if GameStats:
+		GameStats.sync_all_stats(enemies, coins, wave, damage_dealt, damage_taken, bosses)
+
+
+func hide_player_ui() -> void:
+	# Hide all UI elements when player becomes a spectator
+	var health_bar = get_node_or_null("HealthBar")
+	if health_bar:
+		health_bar.visible = false
+	
+	var stamina_bar = get_node_or_null("StaminaBar")
+	if stamina_bar:
+		stamina_bar.visible = false
+	
+	var level_label = get_node_or_null("LevelLabel")
+	if level_label:
+		level_label.visible = false
+	
+	var xp_bar = get_node_or_null("XPBar")
+	if xp_bar:
+		xp_bar.visible = false
+	
+	var coin_display = get_node_or_null("CoinDisplay")
+	if coin_display:
+		coin_display.visible = false
+	
+	var wave_display = get_node_or_null("WaveDisplay")
+	if wave_display:
+		wave_display.visible = false
+	
+	# Hide stats screen if open
+	var stats_screen = get_node_or_null("StatsScreen")
+	if stats_screen:
+		stats_screen.visible = false
+
+
+func update_spectator_camera() -> void:
+	# Follow an alive player's camera (preferably the host)
+	var camera = get_node_or_null("Camera2D")
+	if not camera:
+		return
+	
+	# Find the first alive player to spectate
+	var players = get_tree().get_nodes_in_group("players")
+	var alive_player = null
+	
+	# First, try to find the host (peer ID 1)
+	for player in players:
+		if "is_alive" in player and player.is_alive:
+			var player_name = str(player.name)
+			if player_name == "1" or player_name.to_int() == 1:
+				alive_player = player
+				break
+	
+	# If host is dead, find any alive player
+	if not alive_player:
+		for player in players:
+			if "is_alive" in player and player.is_alive:
+				alive_player = player
+				break
+	
+	# Follow the alive player's position
+	if alive_player:
+		# Smoothly move our position towards the alive player
+		global_position = global_position.lerp(alive_player.global_position, 0.1)
+
+
+func show_game_over_screen() -> void:
+	# Load and show the game over screen (shown when all players are dead)
+	var game_over_scene = load("res://coop/scenes/game_over_screen.tscn")
+	if game_over_scene:
+		var game_over_instance = game_over_scene.instantiate()
+		# Add to root so it's above everything
+		get_tree().root.add_child(game_over_instance)
 
 
 func find_player_by_name(player_name: String) -> Node2D:

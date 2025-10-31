@@ -15,6 +15,9 @@ var is_boss: bool = false
 var boss_name: String = ""
 var boss_name_label: Label = null
 
+# Sound settings
+@export_file("*.mp3", "*.wav", "*.ogg") var attack_hit_sound_path: String = "res://assets/Sounds/SFX/mushroom_hit.mp3"
+
 # Base stats (for MEDIUM size)
 var speed: float = 80.0
 var attack_range: float = 40.0
@@ -247,7 +250,7 @@ func _physics_process(_delta: float) -> void:
 					# Award XP to the last attacker
 					award_xp_to_killer()
 					# Notify NetworkHandler of enemy death
-					NetworkHandler.on_enemy_died()
+					NetworkHandler.on_enemy_died(is_boss)
 					# Broadcast death
 					rpc("die_rpc")
 					return
@@ -339,11 +342,15 @@ func find_target_player() -> void:
 		target_player = null
 		return
 
-	# Find closest player (target all players, not just authoritative ones)
+	# Find closest ALIVE player (target all players, not just authoritative ones)
 	var closest_distance = INF
 	var closest_player = null
 
 	for player in players:
+		# Skip dead players (check if property exists and is false)
+		if "is_alive" in player and not player.is_alive:
+			continue
+		
 		var distance = global_position.distance_to(player.global_position)
 		if distance < closest_distance:
 			closest_distance = distance
@@ -399,7 +406,7 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 		# Award XP to the killer before death
 		award_xp_to_killer()
 		# Notify NetworkHandler of enemy death for wave tracking
-		NetworkHandler.on_enemy_died()
+		NetworkHandler.on_enemy_died(is_boss)
 		# Broadcast death to all clients
 		rpc("die_rpc")
 	else:
@@ -553,7 +560,9 @@ func attack_target(target: Node2D) -> void:
 		await get_tree().create_timer(0.3).timeout
 		if target and is_instance_valid(target):
 			target.take_damage(attack_damage, self)
-			print("Enemy attacked ", target.name, " for ", attack_damage, " damage")
+			
+			# Play mushroom hit sound when damage is dealt
+			play_mushroom_hit_sound()
 
 	# Play attack animation
 	rpc("play_attack_animation")
@@ -683,3 +692,20 @@ func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool, is_poison: bo
 	
 	# NOW set damage text and styling (after _ready() has been called)
 	damage_number.set_damage(damage, is_crit, is_poison)
+
+
+func play_mushroom_hit_sound() -> void:
+	# Play enemy attack hit sound (configurable via export var)
+	if attack_hit_sound_path.is_empty():
+		return
+		
+	var attack_sound = load(attack_hit_sound_path)
+	if attack_sound:
+		var temp_sound = AudioStreamPlayer2D.new()
+		temp_sound.stream = attack_sound
+		temp_sound.position = global_position
+		# Add to scene tree and play
+		get_tree().current_scene.add_child(temp_sound)
+		temp_sound.play()
+		# Clean up after sound finishes
+		temp_sound.finished.connect(func(): temp_sound.queue_free())
