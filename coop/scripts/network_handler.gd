@@ -149,6 +149,9 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	# When a peer disconnects, remove their player from the game
 	print("Peer ", peer_id, " disconnected, removing their player")
 
+	# Unregister player from GameDirector
+	GameDirector.unregister_player(peer_id)
+
 	# Find and remove the player node with this peer ID
 	var player_node_name = str(peer_id)
 	var player = get_tree().current_scene.get_node_or_null(player_node_name)
@@ -164,6 +167,13 @@ func _on_peer_disconnected(peer_id: int) -> void:
 				print("Removing player node from group: ", p.name)
 				p.queue_free()
 				break
+
+	# Update player count in GameDirector
+	# Count remaining players in LobbyManager
+	var remaining_player_count = LobbyManager.players.size() - 1
+	if remaining_player_count >= 0:
+		GameDirector.update_player_count(remaining_player_count)
+		print("GameDirector: Updated player count to ", remaining_player_count)
 
 
 func spawn_server_player() -> void:
@@ -247,7 +257,10 @@ func start_wave_system() -> void:
 	enemies_spawned_this_wave = 0
 	enemies_killed_this_wave = 0
 	boss_spawned_this_wave = false  # Reset boss flag for new wave
-	
+
+	# Initialize GameDirector with current wave
+	GameDirector.start_wave(current_wave)
+
 	# Track wave in GameStats
 	if GameStats:
 		GameStats.record_wave_reached(current_wave)
@@ -260,23 +273,33 @@ func start_wave_system() -> void:
 
 
 func spawn_wave_enemies() -> void:
+	# Get enemy count from GameDirector (handles player scaling)
+	enemies_in_wave = GameDirector.enemies_to_spawn_this_wave
+
 	# Determine random position for boss spawn (between 20-80% of wave progression)
 	var boss_spawn_at = randi_range(int(enemies_in_wave * 0.2), int(enemies_in_wave * 0.8))
-	
+
 	# Bosses only spawn after wave 3
 	var should_spawn_boss = current_wave > 3
-	
+
 	# Spawn enemies for the current wave
 	for i in range(enemies_in_wave):
+		# Check if GameDirector allows more spawns
+		if not GameDirector.should_spawn_enemy():
+			break
+
 		# Spawn boss at the random position (only if wave > 3)
 		if i == boss_spawn_at and not boss_spawned_this_wave and should_spawn_boss:
 			spawn_boss()
 			boss_spawned_this_wave = true
 		else:
 			spawn_single_enemy()
-		
+
 		enemies_spawned_this_wave += 1
-		await get_tree().create_timer(0.5).timeout  # Small delay between spawns
+
+		# Use dynamic spawn delay from GameDirector
+		var spawn_delay = GameDirector.get_spawn_delay()
+		await get_tree().create_timer(spawn_delay).timeout
 
 
 func check_wave_completion() -> void:
@@ -287,6 +310,9 @@ func check_wave_completion() -> void:
 		# Wave completed
 		wave_in_progress = false
 
+		# Notify GameDirector of wave completion
+		GameDirector.on_wave_complete()
+
 		# Show wave completion message
 		rpc("show_wave_completion", current_wave)
 
@@ -296,20 +322,14 @@ func check_wave_completion() -> void:
 
 func start_next_wave() -> void:
 	current_wave += 1
-	
+
 	# Track wave progression in GameStats
 	if GameStats:
 		GameStats.record_wave_reached(current_wave)
-	
-	# Progressive difficulty scaling
-	# Enemy count increases more aggressively as waves progress
-	if current_wave <= 5:
-		enemies_in_wave += 2  # Early waves: +2 enemies
-	elif current_wave <= 10:
-		enemies_in_wave += 3  # Mid waves: +3 enemies
-	else:
-		enemies_in_wave += 4  # Late waves: +4 enemies
-	
+
+	# Enemy count is now managed by GameDirector
+	# GameDirector handles scaling based on wave number and player count
+
 	start_wave_system()
 
 
@@ -378,48 +398,16 @@ func on_enemy_died(is_boss: bool = false) -> void:
 
 
 func get_random_enemy_size() -> int:
-	# Enemy size distribution based on wave number
-	# As waves progress, larger enemies become more common
-	
-	var rand_val = randf()  # 0.0 to 1.0
-	
-	# Base chances (early waves)
-	var small_chance = 0.30
-	var medium_chance = 0.50
-	var large_chance = 0.15
-	var huge_chance = 0.05
-	
-	# Adjust chances based on current wave
-	# Every 3 waves, reduce small/medium and increase large/huge
-	var wave_factor = floor(current_wave / 3.0)
-	small_chance = max(0.05, small_chance - (wave_factor * 0.05))
-	medium_chance = max(0.30, medium_chance - (wave_factor * 0.05))
-	large_chance = min(0.35, large_chance + (wave_factor * 0.05))
-	huge_chance = min(0.25, huge_chance + (wave_factor * 0.05))
-	
-	# Normalize to ensure they add up to 1.0
-	var total = small_chance + medium_chance + large_chance + huge_chance
-	small_chance /= total
-	medium_chance /= total
-	large_chance /= total
-	huge_chance /= total
-	
-	# Select size based on weighted random
-	if rand_val < small_chance:
-		return 0  # SMALL
-	elif rand_val < small_chance + medium_chance:
-		return 1  # MEDIUM
-	elif rand_val < small_chance + medium_chance + large_chance:
-		return 2  # LARGE
-	else:
-		return 3  # HUGE
+	# Delegate to GameDirector for enemy size calculation
+	# GameDirector handles wave-based distribution and special events
+	return GameDirector.get_next_enemy_size()
 
 
 func spawn_single_enemy() -> void:
 	# Use predetermined spawn position from enemy spawn points
 	var spawn_position = get_next_enemy_spawn_position()
 
-	# Randomly choose enemy size based on wave number and chance
+	# Get enemy size from GameDirector (handles special events and wave scaling)
 	var enemy_size = get_random_enemy_size()
 
 	# Use RPC to spawn enemy on all clients with unique ID
@@ -427,26 +415,32 @@ func spawn_single_enemy() -> void:
 	var enemy_id = "Enemy_" + str(enemy_id_counter)
 	rpc("spawn_enemy_rpc", spawn_position, enemy_id, enemy_size)
 
+	# Notify GameDirector that an enemy was spawned
+	GameDirector.on_enemy_spawned()
+
 
 func spawn_boss() -> void:
 	# Spawn a unique boss enemy with random name and health
 	var spawn_position = get_next_enemy_spawn_position()
-	
+
 	# Bosses are always HUGE size for visual impact
 	var boss_size = 3  # EnemySize.HUGE
-	
+
 	# Generate random boss health within configured range
 	var boss_health = randi_range(boss_min_health, boss_max_health)
-	
+
 	# Pick a random boss name
 	var boss_name = boss_names[randi() % boss_names.size()]
-	
+
 	# Generate unique boss ID
 	enemy_id_counter += 1
 	var boss_id = "Boss_" + str(enemy_id_counter)
-	
+
 	# Use RPC to spawn boss on all clients
 	rpc("spawn_boss_rpc", spawn_position, boss_id, boss_size, boss_health, boss_name)
+
+	# Notify GameDirector that an enemy was spawned
+	GameDirector.on_enemy_spawned()
 
 
 @rpc("any_peer", "reliable", "call_local")
@@ -639,6 +633,7 @@ func spawn_players_with_classes() -> void:
 		print("ERROR: No current scene available for spawning players")
 		return
 
+	var player_count = 0
 	for peer_id in LobbyManager.players:
 		# Avoid spawning duplicates if this function is called more than once.
 		if current_scene.get_node_or_null(str(peer_id)):
@@ -660,7 +655,15 @@ func spawn_players_with_classes() -> void:
 		# Add player to scene
 		current_scene.add_child(player)
 
+		# Register player with GameDirector for performance tracking
+		GameDirector.register_player(peer_id)
+		player_count += 1
+
 		print("Spawned player ", peer_id, " with class ", LobbyManager.players[peer_id]["class"], " and weapon ", LobbyManager.players[peer_id]["weapon"])
+
+	# Update GameDirector with total player count
+	GameDirector.update_player_count(player_count)
+	print("GameDirector: Updated player count to ", player_count)
 
 
 func get_spawn_position_at_index(index: int) -> Vector2:
