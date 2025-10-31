@@ -271,6 +271,12 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 		print("Player ", name, " cannot attack yet - on cooldown")
 		return
 
+	# For melee, ignore rapid fire system - one attack per click
+	if combat_type == "melee":
+		handle_melee_attack(_mouse_position)
+		return
+
+	# Ranged weapons use rapid fire system
 	# Check rapid fire limit
 	if rapid_fire_count >= max_rapid_fire:
 		print("Player ", name, " rapid attack limit reached, must wait")
@@ -280,11 +286,7 @@ func handle_fire_action(_mouse_position: Vector2) -> void:
 	if is_firing and rapid_fire_count >= max_rapid_fire:
 		return
 
-	# Check combat type and handle accordingly
-	if combat_type == "melee":
-		handle_melee_attack(_mouse_position)
-	else:
-		handle_ranged_attack(_mouse_position)
+	handle_ranged_attack(_mouse_position)
 
 
 func handle_ranged_attack(_mouse_position: Vector2) -> void:
@@ -348,8 +350,8 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 	if animated_sprite:
 		print("Player ", name, " melee attacking!")
 
-		# Increment rapid fire count
-		rapid_fire_count += 1
+		# Set cooldown immediately - one attack per click
+		can_fire = false
 
 		# Convert mouse position to world coordinates
 		var camera = get_viewport().get_camera_2d()
@@ -366,12 +368,20 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 			# Play attack animation - check which animation exists
 			is_firing = true
 			var sprite_frames = animated_sprite.sprite_frames
+			var attack_anim_name = ""
+			
 			if sprite_frames and sprite_frames.has_animation("attack"):
+				# Make sure attack animation doesn't loop
+				sprite_frames.set_animation_loop("attack", false)
+				attack_anim_name = "attack"
 				animated_sprite.play("attack")
-				print("Playing 'attack' animation for melee")
+				print("Playing 'attack' animation for melee (loop disabled)")
 			elif sprite_frames and sprite_frames.has_animation("fire"):
+				# Make sure fire animation doesn't loop for melee
+				sprite_frames.set_animation_loop("fire", false)
+				attack_anim_name = "fire"
 				animated_sprite.play("fire")
-				print("Playing 'fire' animation for melee")
+				print("Playing 'fire' animation for melee (loop disabled)")
 			else:
 				print("WARNING: No attack or fire animation found!")
 
@@ -387,22 +397,31 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 			# Send RPC to network to perform melee attack on other clients
 			rpc("perform_melee_damage_network", world_target)
 
-		# After remaining animation time, return to normal animation
-		await get_tree().create_timer(0.6).timeout
+		# Wait for the animation to actually finish
+		if animated_sprite:
+			# Wait until animation finishes or timeout
+			var max_wait = 1.0
+			var elapsed = 0.0
+			while animated_sprite.is_playing() and elapsed < max_wait:
+				await get_tree().create_timer(0.1).timeout
+				elapsed += 0.1
+		
 		is_firing = false
+		
+		# Force return to idle animation immediately
+		if animated_sprite and animated_sprite.sprite_frames:
+			var sprite_frames = animated_sprite.sprite_frames
+			if sprite_frames.has_animation("idle"):
+				sprite_frames.set_animation_loop("idle", true)
+				animated_sprite.play("idle")
+				print("Returned to idle animation")
+		
 		print("Player ", name, " finished melee attack")
 
-		# Allow immediate refire if under rapid fire limit, otherwise wait for cooldown
-		if rapid_fire_count < max_rapid_fire:
-			# Allow rapid attacks
-			print("Player ", name, " rapid attack available: ", rapid_fire_count, "/", max_rapid_fire)
-		else:
-			# Rapid attack limit reached, wait for cooldown
-			can_fire = false
-			await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
-			can_fire = true
-			rapid_fire_count = 0  # Reset rapid fire counter
-			print("Player ", name, " can attack again")
+		# Wait for 1 second cooldown before allowing next attack
+		await get_tree().create_timer(1.0).timeout
+		can_fire = true
+		print("Player ", name, " can attack again")
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
 
@@ -551,10 +570,17 @@ func update_animation(direction: Vector2) -> void:
 	if not animated_sprite:
 		return
 
+	var sprite_frames = animated_sprite.sprite_frames
+	if not sprite_frames:
+		return
+
 	# Determine which animation to play based on movement
 	if direction != Vector2.ZERO:
 		# Player is moving - play walk animation
 		if animated_sprite.animation != "walk":
+			# Make sure walk animation loops
+			if sprite_frames.has_animation("walk"):
+				sprite_frames.set_animation_loop("walk", true)
 			animated_sprite.play("walk")
 
 		# Flip sprite based on horizontal direction
@@ -565,6 +591,9 @@ func update_animation(direction: Vector2) -> void:
 	else:
 		# Player is stationary - play idle animation
 		if animated_sprite.animation != "idle":
+			# Make sure idle animation loops
+			if sprite_frames.has_animation("idle"):
+				sprite_frames.set_animation_loop("idle", true)
 			animated_sprite.play("idle")
 
 
