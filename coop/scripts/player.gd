@@ -1006,8 +1006,21 @@ func apply_class_modifiers(selected_class: String) -> void:
 	# Apply attack speed modifier to fire cooldown
 	weapon_stats.fire_cooldown = fire_cooldown * (1.0 / class_data["attack_speed_modifier"])
 
-	# Apply color tint to sprite
+	# Load and apply character sprite frames
 	var animated_sprite = get_node_or_null("AnimatedSprite2D")
+	if animated_sprite and class_data.has("sprite_frames_path"):
+		var sprite_frames = load(class_data["sprite_frames_path"])
+		if sprite_frames:
+			animated_sprite.sprite_frames = sprite_frames
+			print("  Loaded sprite frames from: ", class_data["sprite_frames_path"])
+			# Restart current animation with new sprite frames
+			if animated_sprite.is_playing():
+				var current_anim = animated_sprite.animation
+				animated_sprite.play(current_anim)
+		else:
+			print("  ERROR: Failed to load sprite frames from: ", class_data["sprite_frames_path"])
+	
+	# Apply color tint to sprite (if you want to tint on top of the sprite)
 	if animated_sprite:
 		animated_sprite.modulate = class_data["color_tint"]
 
@@ -1016,7 +1029,6 @@ func apply_class_modifiers(selected_class: String) -> void:
 	print("  Damage: ", attack_damage)
 	print("  Speed modifier: ", class_data["speed_modifier"])
 	print("  Fire cooldown: ", weapon_stats.fire_cooldown)
-	print("  Color tint: ", class_data["color_tint"])
 
 	# Update displays
 	update_health_display()

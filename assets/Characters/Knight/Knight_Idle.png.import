@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bxrpwnwe5f6u5"
-path="res://.godot/imported/Archer_Run.png-22da04c99cf56f702eb2deb3e29defb0.ctex"
+uid="uid://bpurivg3ciuw8"
+path="res://.godot/imported/Knight_Idle.png-ad79127b03741b3677bb91b3700c5f40.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://tileset/Archer_Run.png"
-dest_files=["res://.godot/imported/Archer_Run.png-22da04c99cf56f702eb2deb3e29defb0.ctex"]
+source_file="res://assets/Characters/Knight/Knight_Idle.png"
+dest_files=["res://.godot/imported/Knight_Idle.png-ad79127b03741b3677bb91b3700c5f40.ctex"]
 
 [params]
 

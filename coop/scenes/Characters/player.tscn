@@ -1,86 +1,86 @@
 [gd_scene load_steps=33 format=3 uid="uid://ewcge3xong6o"]
 
-[ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_6w5ry"]
-[ext_resource type="Texture2D" uid="uid://bkmrhxpq8yuwi" path="res://tileset/Archer_Shoot.png" id="2_7meia"]
-[ext_resource type="PackedScene" uid="uid://b8x7lam2n4p5q" path="res://coop/scenes/chat_ui.tscn" id="2_chat_ui"]
-[ext_resource type="Texture2D" uid="uid://b5yyw187p3x41" path="res://tileset/Archer_Idle.png" id="2_wp2cf"]
-[ext_resource type="Texture2D" uid="uid://bxrpwnwe5f6u5" path="res://tileset/Archer_Run.png" id="3_8m0gs"]
-[ext_resource type="PackedScene" uid="uid://c7x8lam3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="3_chat_bubble"]
-[ext_resource type="PackedScene" path="res://coop/scenes/health_bar.tscn" id="4_health_bar"]
-[ext_resource type="PackedScene" path="res://coop/scenes/xp_bar.tscn" id="5_xp_bar"]
-[ext_resource type="PackedScene" path="res://coop/scenes/stamina_bar.tscn" id="6_stamina_bar"]
-[ext_resource type="AudioStream" uid="uid://bsrbgbqnpjnka" path="res://assets/Sounds/Music/Intro.wav" id="9_mhqs7"]
+[ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_epkag"]
+[ext_resource type="Texture2D" uid="uid://bkmrhxpq8yuwi" path="res://assets/Characters/Archer/Archer_Shoot.png" id="2_v5c7p"]
+[ext_resource type="Texture2D" uid="uid://b5yyw187p3x41" path="res://assets/Characters/Archer/Archer_Idle.png" id="3_xgaoj"]
+[ext_resource type="Texture2D" uid="uid://bxrpwnwe5f6u5" path="res://assets/Characters/Archer/Archer_Run.png" id="4_dpd5g"]
+[ext_resource type="PackedScene" uid="uid://b8x7lam2n4p5q" path="res://coop/scenes/chat_ui.tscn" id="5_m6nj8"]
+[ext_resource type="PackedScene" uid="uid://c7x8lam3n5p6r" path="res://coop/scenes/chat_bubble.tscn" id="6_0jc2w"]
+[ext_resource type="PackedScene" path="res://coop/scenes/xp_bar.tscn" id="7_d7lt4"]
+[ext_resource type="PackedScene" path="res://coop/scenes/stamina_bar.tscn" id="8_cs4c4"]
+[ext_resource type="PackedScene" path="res://coop/scenes/health_bar.tscn" id="9_dklcx"]
+[ext_resource type="AudioStream" uid="uid://bsrbgbqnpjnka" path="res://assets/Sounds/Music/Intro.wav" id="10_yfvd0"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_af8pa"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(0, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_q3nis"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(192, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_uxglr"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(384, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_8ixva"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(576, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_axmss"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(768, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_l5cac"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(960, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_w8hv7"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(1152, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_habki"]
-atlas = ExtResource("2_7meia")
+atlas = ExtResource("2_v5c7p")
 region = Rect2(1344, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_8m0gs"]
-atlas = ExtResource("2_wp2cf")
+atlas = ExtResource("3_xgaoj")
 region = Rect2(0, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_7meia"]
-atlas = ExtResource("2_wp2cf")
+atlas = ExtResource("3_xgaoj")
 region = Rect2(192, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_lwbl6"]
-atlas = ExtResource("2_wp2cf")
+atlas = ExtResource("3_xgaoj")
 region = Rect2(384, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_e1vfm"]
-atlas = ExtResource("2_wp2cf")
+atlas = ExtResource("3_xgaoj")
 region = Rect2(576, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_mhqs7"]
-atlas = ExtResource("2_wp2cf")
+atlas = ExtResource("3_xgaoj")
 region = Rect2(768, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_j6th1"]
-atlas = ExtResource("2_wp2cf")
+atlas = ExtResource("3_xgaoj")
 region = Rect2(960, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_db3n1"]
-atlas = ExtResource("3_8m0gs")
+atlas = ExtResource("4_dpd5g")
 region = Rect2(0, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_4qu1x"]
-atlas = ExtResource("3_8m0gs")
+atlas = ExtResource("4_dpd5g")
 region = Rect2(192, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_kk3o6"]
-atlas = ExtResource("3_8m0gs")
+atlas = ExtResource("4_dpd5g")
 region = Rect2(384, 0, 192, 192)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_a1pgw"]
-atlas = ExtResource("3_8m0gs")
+atlas = ExtResource("4_dpd5g")
 region = Rect2(576, 0, 192, 192)
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_db3n1"]
@@ -182,15 +182,13 @@ properties/4/spawn = true
 properties/4/replication_mode = 1
 
 [node name="Player" type="CharacterBody2D"]
-script = ExtResource("1_6w5ry")
+script = ExtResource("1_epkag")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -35)
 scale = Vector2(0.5546875, 0.5546875)
 sprite_frames = SubResource("SpriteFrames_db3n1")
-animation = &"fire"
-frame = 5
-frame_progress = 0.6700861
+animation = &"walk"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -29)
@@ -202,12 +200,12 @@ replication_config = SubResource("SceneReplicationConfig_3kx2g")
 [node name="AnimatedSpriteSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_anim")
 
-[node name="ChatUI" parent="." instance=ExtResource("2_chat_ui")]
+[node name="ChatUI" parent="." instance=ExtResource("5_m6nj8")]
 anchors_preset = 0
 anchor_right = 0.0
 anchor_bottom = 0.0
 
-[node name="ChatBubble" parent="." instance=ExtResource("3_chat_bubble")]
+[node name="ChatBubble" parent="." instance=ExtResource("6_0jc2w")]
 offset_left = -102.0
 offset_top = -117.0
 offset_right = 102.0
@@ -215,7 +213,7 @@ offset_bottom = -83.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="XPBar" parent="." instance=ExtResource("5_xp_bar")]
+[node name="XPBar" parent="." instance=ExtResource("7_d7lt4")]
 layout_mode = 3
 anchors_preset = 0
 offset_left = -2.0
@@ -223,7 +221,7 @@ offset_top = -24.0
 offset_right = 58.0
 offset_bottom = -19.0
 
-[node name="StaminaBar" parent="." instance=ExtResource("6_stamina_bar")]
+[node name="StaminaBar" parent="." instance=ExtResource("8_cs4c4")]
 layout_mode = 3
 anchors_preset = 0
 offset_left = -2.0
@@ -231,7 +229,7 @@ offset_top = -24.0
 offset_right = 58.0
 offset_bottom = -19.0
 
-[node name="HealthBar" parent="." instance=ExtResource("4_health_bar")]
+[node name="HealthBar" parent="." instance=ExtResource("9_dklcx")]
 layout_mode = 3
 anchors_preset = 0
 offset_left = -2.0
@@ -249,6 +247,6 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("9_mhqs7")
+stream = ExtResource("10_yfvd0")
 volume_db = -19.024
 autoplay = true

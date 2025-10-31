@@ -16,44 +16,48 @@ static func get_all_classes() -> Dictionary:
 		{
 			"name": "Archer",
 			"description": "Balanced stats with standard damage and speed",
+			"sprite_frames_path": "res://assets/Characters/Archer/archer_sprite_frames.tres",
 			"health_modifier": 1.0,
 			"damage_modifier": 1.0,
 			"speed_modifier": 1.0,
 			"attack_speed_modifier": 1.0,
-			"color_tint": Color(0.7, 1.0, 0.7)  # Light green
+			"color_tint": Color.WHITE  # No tint for base sprite
 		},
-		"warrior":
+		"knight":
 		{
-			"name": "Warrior",
-			"description": "High health and damage, but slower movement",
+			"name": "Knight",
+			"description": "Armored melee warrior with high defense",
+			"sprite_frames_path": "res://assets/Characters/Knight/knight_sprite_frames.tres",
 			"health_modifier": 1.5,  # 150 health instead of 100
 			"damage_modifier": 1.3,  # ~20 damage instead of 15
 			"speed_modifier": 0.8,  # Slower movement
 			"attack_speed_modifier": 0.9,  # Slightly slower attack speed
-			"color_tint": Color(1.0, 0.7, 0.7)  # Light red
+			"color_tint": Color.WHITE  # No tint for base sprite
 		},
 		"mage":
 		{
 			"name": "Mage",
 			"description": "High damage and attack speed, but lower health",
+			"sprite_frames_path": "res://assets/Characters/Mage/mage_sprite_frames.tres",
 			"health_modifier": 0.7,  # 70 health
 			"damage_modifier": 1.5,  # ~23 damage
 			"speed_modifier": 1.0,
 			"attack_speed_modifier": 1.4,  # Much faster attack speed
-			"color_tint": Color(0.7, 0.7, 1.0)  # Light blue
+			"color_tint": Color.WHITE  # No tint for base sprite
 		},
 		"tank":
 		{
 			"name": "Tank",
 			"description": "Very high health and slow, focused on survival",
+			"sprite_frames_path": "res://assets/Characters/Tank/tank_sprite_frames.tres",
 			"health_modifier": 2.0,  # 200 health
 			"damage_modifier": 0.8,  # ~12 damage
 			"speed_modifier": 0.7,  # Quite slow
 			"attack_speed_modifier": 1.0,
-			"color_tint": Color(1.0, 1.0, 0.7)  # Light yellow
+			"color_tint": Color.WHITE  # No tint for base sprite
 		}
 	}
 
 
 static func get_class_names() -> Array:
-	return ["archer", "warrior", "mage", "tank"]
+	return ["archer", "knight", "mage", "tank"]
