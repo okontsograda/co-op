@@ -87,13 +87,13 @@ static func initialize_weapons() -> void:
 		"Sword",
 		"",  # No projectile for melee
 		20.0,  # base_damage (higher than bow)
-		1.0,   # fire_cooldown (1 second between swings)
+		0.6,   # fire_cooldown (0.6 seconds between swings for faster combat)
 		0.0,   # projectile_speed (not used for melee)
 		0.0,   # base_explosion_chance
 		0.0,   # base_explosion_radius
 		0.0,   # base_explosion_damage
 		"attack",  # Uses attack animation instead of fire
-		"res://assets/Sounds/SFX/hit.mp3"  # Sword swing sound
+		"res://assets/Sounds/SFX/sword.mp3"  # Sword swing sound
 	)
 
 

@@ -419,8 +419,8 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 		
 		print("Player ", name, " finished melee attack")
 
-		# Wait for 1 second cooldown before allowing next attack
-		await get_tree().create_timer(1.0).timeout
+		# Wait for cooldown before allowing next attack (0.6 seconds for faster combat)
+		await get_tree().create_timer(0.6).timeout
 		can_fire = true
 		print("Player ", name, " can attack again")
 	else:

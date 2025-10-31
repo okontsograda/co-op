@@ -22,6 +22,17 @@ var wave_in_progress: bool = false
 var wave_start_timer: Timer = null
 var max_waves: int = 3
 
+# Boss system variables
+var boss_min_health: int = 200
+var boss_max_health: int = 500
+var boss_spawned_this_wave: bool = false
+var boss_names: Array[String] = [
+	"Gargantua", "Titan", "Colossus", "Behemoth", "Leviathan",
+	"Juggernaut", "Goliath", "Destroyer", "Ravager", "Annihilator",
+	"Dreadnought", "Obliterator", "Executioner", "Warlord", "Overlord",
+	"Havoc", "Reaper", "Crusher", "Demolisher", "Decimator"
+]
+
 # Enemy spawn points
 var enemy_spawn_points: Array[Vector2] = []
 var next_enemy_spawn_index: int = 0
@@ -235,15 +246,29 @@ func start_wave_system() -> void:
 	wave_in_progress = true
 	enemies_spawned_this_wave = 0
 	enemies_killed_this_wave = 0
+	boss_spawned_this_wave = false  # Reset boss flag for new wave
 
 	# Start spawning enemies for this wave
 	spawn_wave_enemies()
 
 
 func spawn_wave_enemies() -> void:
+	# Determine random position for boss spawn (between 20-80% of wave progression)
+	var boss_spawn_at = randi_range(int(enemies_in_wave * 0.2), int(enemies_in_wave * 0.8))
+	
+	# Bosses only spawn after wave 3
+	var should_spawn_boss = current_wave > 3
+	
 	# Spawn enemies for the current wave
 	for i in range(enemies_in_wave):
-		spawn_single_enemy()
+		# Spawn boss at the random position (only if wave > 3)
+		if i == boss_spawn_at and not boss_spawned_this_wave and should_spawn_boss:
+			spawn_boss()
+			boss_spawned_this_wave = true
+			print("🔥 BOSS SPAWNED at position ", i + 1, " of ", enemies_in_wave)
+		else:
+			spawn_single_enemy()
+		
 		enemies_spawned_this_wave += 1
 		await get_tree().create_timer(0.5).timeout  # Small delay between spawns
 
@@ -278,7 +303,16 @@ func check_wave_completion() -> void:
 
 func start_next_wave() -> void:
 	current_wave += 1
-	enemies_in_wave += 3  # Increase enemy count by 3 each wave
+	
+	# Progressive difficulty scaling
+	# Enemy count increases more aggressively as waves progress
+	if current_wave <= 5:
+		enemies_in_wave += 2  # Early waves: +2 enemies
+	elif current_wave <= 10:
+		enemies_in_wave += 3  # Mid waves: +3 enemies
+	else:
+		enemies_in_wave += 4  # Late waves: +4 enemies
+	
 	print("Starting Wave ", current_wave, " with ", enemies_in_wave, " enemies")
 	start_wave_system()
 
@@ -385,6 +419,29 @@ func spawn_single_enemy() -> void:
 	rpc("spawn_enemy_rpc", spawn_position, enemy_id, enemy_size)
 
 
+func spawn_boss() -> void:
+	# Spawn a unique boss enemy with random name and health
+	var spawn_position = get_next_enemy_spawn_position()
+	
+	# Bosses are always HUGE size for visual impact
+	var boss_size = 3  # EnemySize.HUGE
+	
+	# Generate random boss health within configured range
+	var boss_health = randi_range(boss_min_health, boss_max_health)
+	
+	# Pick a random boss name
+	var boss_name = boss_names[randi() % boss_names.size()]
+	
+	# Generate unique boss ID
+	enemy_id_counter += 1
+	var boss_id = "Boss_" + str(enemy_id_counter)
+	
+	print("Spawning boss: ", boss_name, " with ", boss_health, " HP")
+	
+	# Use RPC to spawn boss on all clients
+	rpc("spawn_boss_rpc", spawn_position, boss_id, boss_size, boss_health, boss_name)
+
+
 @rpc("any_peer", "reliable", "call_local")
 func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int) -> void:
 	var enemy_scene = preload("res://coop/scenes/enemy.tscn")
@@ -395,6 +452,20 @@ func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int)
 	
 	# Set enemy size before adding to scene
 	enemy.set_enemy_size(enemy_size)
+	
+	# Progressive stat scaling: enemies get slightly stronger each wave
+	# +5% health and +2% damage per wave (capped at reasonable amounts)
+	if current_wave > 1:
+		var health_multiplier = 1.0 + ((current_wave - 1) * 0.05)  # +5% per wave
+		var damage_multiplier = 1.0 + ((current_wave - 1) * 0.02)  # +2% per wave
+		
+		# Cap multipliers to prevent extreme scaling
+		health_multiplier = min(health_multiplier, 3.0)  # Max 3x health
+		damage_multiplier = min(damage_multiplier, 2.0)  # Max 2x damage
+		
+		# Apply wave scaling to enemy stats
+		if enemy.has_method("apply_wave_scaling"):
+			enemy.apply_wave_scaling(health_multiplier, damage_multiplier)
 
 	# Add enemy to scene
 	get_tree().current_scene.add_child(enemy)
@@ -411,6 +482,36 @@ func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int)
 		current_enemy_count,
 		") on ",
 		"server" if multiplayer.is_server() else "client"
+	)
+
+
+@rpc("any_peer", "reliable", "call_local")
+func spawn_boss_rpc(spawn_position: Vector2, boss_id: String, boss_size: int, boss_health: int, boss_name: String) -> void:
+	var enemy_scene = preload("res://coop/scenes/enemy.tscn")
+	var boss = enemy_scene.instantiate()
+
+	boss.global_position = spawn_position
+	boss.name = boss_id  # Give consistent name across all clients
+	
+	# Set boss size
+	boss.set_enemy_size(boss_size)
+	
+	# Add boss to scene first (so _ready() is called)
+	get_tree().current_scene.add_child(boss)
+	
+	# Convert this enemy into a boss with custom name and health
+	if boss.has_method("make_boss"):
+		boss.make_boss(boss_name, boss_health)
+
+	current_enemy_count += 1
+	print(
+		"🔥 BOSS '",
+		boss_name,
+		"' spawned at global_position: ",
+		boss.global_position,
+		" with ",
+		boss_health,
+		" HP"
 	)
 
 

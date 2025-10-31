@@ -10,6 +10,11 @@ enum EnemySize {
 
 var enemy_size: EnemySize = EnemySize.MEDIUM
 
+# Boss properties
+var is_boss: bool = false
+var boss_name: String = ""
+var boss_name_label: Label = null
+
 # Base stats (for MEDIUM size)
 var speed: float = 80.0
 var attack_range: float = 40.0
@@ -158,6 +163,62 @@ func get_size_name() -> String:
 		EnemySize.HUGE:
 			return "HUGE"
 	return "UNKNOWN"
+
+
+func apply_wave_scaling(health_multiplier: float, damage_multiplier: float) -> void:
+	# Apply progressive wave scaling to enemy stats
+	max_health = int(max_health * health_multiplier)
+	current_health = max_health
+	attack_damage = int(attack_damage * damage_multiplier)
+	
+	print("Wave scaling applied - Health: ", max_health, ", Damage: ", attack_damage)
+
+
+func make_boss(boss_name_param: String, boss_health: int) -> void:
+	# Convert this enemy into a boss with unique properties
+	is_boss = true
+	boss_name = boss_name_param
+	max_health = boss_health
+	current_health = boss_health
+	
+	# Bosses are tougher and deal more damage
+	attack_damage = int(attack_damage * 1.5)  # 50% more damage
+	speed = speed * 0.8  # Slightly slower (more menacing)
+	
+	# Visual distinction: Add golden/red tint to sprite
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.modulate = Color(1.2, 0.8, 0.8)  # Reddish tint
+	
+	# Create and position name label above the boss
+	create_boss_name_label()
+	
+	# Update health bar to show boss health
+	update_health_display()
+	
+	print("Enemy converted to BOSS: ", boss_name, " with ", boss_health, " HP and ", attack_damage, " damage")
+
+
+func create_boss_name_label() -> void:
+	# Create a label to display the boss name above the sprite
+	boss_name_label = Label.new()
+	boss_name_label.text = boss_name
+	boss_name_label.name = "BossNameLabel"
+	
+	# Style the label
+	boss_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_name_label.add_theme_font_size_override("font_size", 16)
+	boss_name_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.0))  # Golden color
+	boss_name_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	boss_name_label.add_theme_constant_override("outline_size", 3)
+	
+	# Position label above the enemy sprite
+	# Offset upward based on enemy scale (bosses are larger)
+	var offset_y = -32.5 * scale.y  # Adjust based on sprite size
+	boss_name_label.position = Vector2(-50, offset_y)  # Center horizontally, above sprite
+	boss_name_label.size = Vector2(100, 30)
+	
+	add_child(boss_name_label)
 
 
 func _physics_process(_delta: float) -> void:
