@@ -17,6 +17,9 @@ var max_health: int = 100
 var current_health: int = max_health
 var attack_damage: int = 15  # Base arrow damage
 
+# Currency System
+var coins: int = 0  # Currency collected by the player
+
 # XP System
 var current_xp: int = 0
 var current_level: int = 1
@@ -84,11 +87,6 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	var peer_id = name.to_int()
-	print("Player ", name, " (peer ", peer_id, ") has authority: ", is_multiplayer_authority())
-	print("Current multiplayer peer: ", multiplayer.get_unique_id())
-	print("Is server: ", multiplayer.is_server())
-	print("Player position: ", position)
-	print("Player visible: ", visible)
 	
 	# Enable Y-sort for proper depth sorting
 	# Characters with higher Y position (lower on screen) will render in front
@@ -97,12 +95,8 @@ func _ready() -> void:
 	# Apply weapon selection if coming from lobby (do this BEFORE class modifiers)
 	if has_meta("selected_weapon"):
 		equipped_weapon = get_meta("selected_weapon")
-		print("Player ", name, " equipped weapon from metadata: ", equipped_weapon)
 	elif LobbyManager and LobbyManager.players.has(peer_id):
 		equipped_weapon = LobbyManager.players[peer_id].get("weapon", "bow")
-		print("Player ", name, " equipped weapon from LobbyManager: ", equipped_weapon)
-	else:
-		print("Player ", name, " using default weapon: ", equipped_weapon)
 
 	# Apply class modifiers if coming from lobby (this will override weapon for melee classes)
 	var selected_class := ""
@@ -112,7 +106,6 @@ func _ready() -> void:
 		selected_class = LobbyManager.players[peer_id].get("class", "archer")
 	if selected_class != "":
 		apply_class_modifiers(selected_class)
-		print("After class modifiers, equipped_weapon is: ", equipped_weapon)
 
 	# Initialize weapon configuration
 	initialize_weapon()
@@ -120,19 +113,15 @@ func _ready() -> void:
 	# Add to players group so it can be found by other players
 	add_to_group("players")
 
-	# Initialize health bar, XP display, and stamina bar
+	# Initialize health bar, XP display, stamina bar, coin display, and wave display
 	update_health_display()
 	update_xp_display()
 	update_stamina_display()
+	setup_coin_display()
+	setup_wave_display()
 
 	# Set up camera to follow this player if this is the local player
 	setup_camera()
-
-	# Try using the actual multiplayer peer ID instead
-	if peer_id == multiplayer.get_unique_id():
-		print("This player should have authority!")
-	else:
-		print("This player should NOT have authority")
 
 	# Connect to network handler for receiving chat messages
 	if NetworkHandler:
@@ -349,8 +338,6 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 	# Trigger the melee attack animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
-		print("Player ", name, " melee attacking!")
-
 		# Set cooldown immediately - one attack per click
 		can_fire = false
 
@@ -376,13 +363,11 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 				sprite_frames.set_animation_loop("attack", false)
 				attack_anim_name = "attack"
 				animated_sprite.play("attack")
-				print("Playing 'attack' animation for melee (loop disabled)")
 			elif sprite_frames and sprite_frames.has_animation("fire"):
 				# Make sure fire animation doesn't loop for melee
 				sprite_frames.set_animation_loop("fire", false)
 				attack_anim_name = "fire"
 				animated_sprite.play("fire")
-				print("Playing 'fire' animation for melee (loop disabled)")
 			else:
 				print("WARNING: No attack or fire animation found!")
 
@@ -415,14 +400,10 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 			if sprite_frames.has_animation("idle"):
 				sprite_frames.set_animation_loop("idle", true)
 				animated_sprite.play("idle")
-				print("Returned to idle animation")
-		
-		print("Player ", name, " finished melee attack")
 
 		# Wait for cooldown before allowing next attack (0.6 seconds for faster combat)
 		await get_tree().create_timer(0.6).timeout
 		can_fire = true
-		print("Player ", name, " can attack again")
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
 
@@ -435,21 +416,10 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 	# Calculate final damage
 	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
 	
-	# Debug damage calculation
-	print("=== MELEE DAMAGE CALCULATION ===")
-	print("Base attack_damage: ", attack_damage)
-	print("Weapon bonus damage: ", weapon_stats.damage)
-	print("Damage multiplier: ", weapon_stats.damage_multiplier)
-	print("Calculated damage: ", final_damage)
-	
 	# Check for critical hit
 	var is_crit = randf() < weapon_stats.crit_chance
 	if is_crit:
 		final_damage *= weapon_stats.crit_multiplier
-		print("CRITICAL HIT! Final damage: ", final_damage)
-	else:
-		print("Final damage: ", final_damage)
-	print("================================")
 	
 	var enemies_hit = 0
 	const KNOCKBACK_FORCE = 200.0  # Knockback strength
@@ -476,7 +446,6 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(int(final_damage), self)
 				enemies_hit += 1
-				print("Melee hit enemy at distance: ", distance)
 				
 				# Apply knockback to enemy
 				if apply_knockback and enemy.has_method("apply_knockback"):
@@ -490,22 +459,15 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 				
 				# Spawn damage number
 				spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
-	
-	if enemies_hit == 0:
-		print("Melee attack missed - no enemies in range/direction")
-	else:
-		print("Melee attack hit ", enemies_hit, " enemies")
 
 
 @rpc("any_peer", "reliable")
 func perform_melee_damage_network(target_pos: Vector2) -> void:
 	# Get the player who sent this RPC
 	var attacker_peer_id = multiplayer.get_remote_sender_id()
-	print("Network melee attack from peer: ", attacker_peer_id)
 	
 	# Don't process on the client that sent it (they already did it locally)
 	if attacker_peer_id == multiplayer.get_unique_id():
-		print("Ignoring RPC from self to prevent double execution")
 		return
 	
 	# Find the attacker player
@@ -516,13 +478,10 @@ func perform_melee_damage_network(target_pos: Vector2) -> void:
 			break
 	
 	if attacker:
-		print("Found attacker player: ", attacker.name)
 		# Play attack sound for remote clients
 		play_weapon_sound(attacker)
 		# Perform melee damage from attacker's position (without knockback on remote - already applied)
 		attacker.perform_melee_damage(target_pos, false)
-	else:
-		print("ERROR: Could not find attacker player with peer_id: ", attacker_peer_id)
 
 
 func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
@@ -545,7 +504,6 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 	# This function is called on all clients to spawn the arrow
 	# Get the player who sent this RPC
 	var shooter_peer_id = multiplayer.get_remote_sender_id()
-	print("Network spawn request from peer: ", shooter_peer_id)
 
 	# Find the shooter player
 	var shooter = null
@@ -555,12 +513,9 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 			break
 
 	if shooter:
-		print("Found shooter player: ", shooter.name, " with weapon: ", shooter.equipped_weapon)
 		# Play weapon sound for remote clients when projectile spawns
 		play_weapon_sound(shooter)
 		spawn_arrow_for_player(shooter, target_pos)
-	else:
-		print("ERROR: Could not find shooter player with peer_id: ", shooter_peer_id)
 
 
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
@@ -667,10 +622,8 @@ func update_stamina_display() -> void:
 
 func take_damage(amount: int, attacker: Node2D) -> void:
 	# Apply damage locally
-
 	# Reduce health
 	current_health -= amount
-	print("Player ", name, " took ", amount, " damage. Health: ", current_health, "/", max_health)
 
 	# Broadcast health update to all clients
 	rpc("sync_player_health", current_health)
@@ -690,20 +643,68 @@ func sync_player_health(health: int) -> void:
 	# Update health on all clients (including the local player)
 	current_health = health
 	update_health_display()
-	print("Synced health for player ", name, ": ", current_health, "/", max_health)
 
 
 # Heal player (used by lifesteal and other effects)
 func heal(amount: int) -> void:
 	# Cap health at maximum
 	current_health = min(current_health + amount, max_health)
-	print("Player ", name, " healed ", amount, " HP. Health: ", current_health, "/", max_health)
 
 	# Broadcast health update to all clients
 	rpc("sync_player_health", current_health)
 
 	# Update health bar
 	update_health_display()
+
+
+# Collect coin (called when player picks up a coin)
+func collect_coin(amount: int) -> void:
+	coins += amount
+	
+	# Broadcast coin update to all clients
+	rpc("sync_player_coins", coins)
+	
+	# Update UI if you have a coin display
+	update_coin_display()
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_player_coins(total_coins: int) -> void:
+	# Sync coins across all clients
+	coins = total_coins
+	update_coin_display()
+
+
+func setup_coin_display() -> void:
+	# Create coin display if it doesn't exist (only for local player)
+	var peer_id = name.to_int()
+	if peer_id == multiplayer.get_unique_id() and not get_node_or_null("CoinDisplay"):
+		var coin_display_scene = load("res://coop/scenes/coin_display.tscn")
+		if coin_display_scene:
+			var coin_display = coin_display_scene.instantiate()
+			coin_display.name = "CoinDisplay"
+			add_child(coin_display)
+	
+	# Initialize the display
+	update_coin_display()
+
+
+func setup_wave_display() -> void:
+	# Create wave display if it doesn't exist (only for local player)
+	var peer_id = name.to_int()
+	if peer_id == multiplayer.get_unique_id() and not get_node_or_null("WaveDisplay"):
+		var wave_display_scene = load("res://coop/scenes/wave_display.tscn")
+		if wave_display_scene:
+			var wave_display = wave_display_scene.instantiate()
+			wave_display.name = "WaveDisplay"
+			add_child(wave_display)
+
+
+func update_coin_display() -> void:
+	# Update the coin display UI
+	var coin_display = get_node_or_null("CoinDisplay")
+	if coin_display and coin_display.has_method("update_coins"):
+		coin_display.update_coins(coins)
 
 
 @rpc("any_peer", "reliable")

@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3 uid="uid://cqh8yv3xbh5yd"]
+
+[ext_resource type="Script" path="res://coop/scripts/coin.gd" id="1_coin"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_coin"]
+radius = 8.0
+
+[node name="Coin" type="Area2D"]
+collision_layer = 8
+collision_mask = 1
+script = ExtResource("1_coin")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_coin")
+
+[node name="Sprite" type="Polygon2D" parent="."]
+color = Color(1, 0.843137, 0, 1)
+polygon = PackedVector2Array(-8, 0, -6, 6, 0, 8, 6, 6, 8, 0, 6, -6, 0, -8, -6, -6)
+
+[node name="InnerCircle" type="Polygon2D" parent="."]
+color = Color(1, 0.952941, 0.6, 1)
+polygon = PackedVector2Array(-4, 0, -3, 3, 0, 4, 3, 3, 4, 0, 3, -3, 0, -4, -3, -3)
+

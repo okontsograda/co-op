@@ -73,11 +73,9 @@ func _ready() -> void:
 	if multiplayer.is_server():
 		# On server, set authority to 1 (server) and run AI
 		set_multiplayer_authority(1)
-		print("Enemy (", get_size_name(), ") spawned on server at position: ", global_position)
 	else:
 		# On clients, set authority to 1 (server) so they sync from server
 		set_multiplayer_authority(1)
-		print("Enemy (", get_size_name(), ") spawned on client at position: ", global_position)
 
 	# Initialize sync position
 	last_sync_position = global_position
@@ -148,8 +146,6 @@ func apply_size_stats() -> void:
 	
 	# Set current health to max health
 	current_health = max_health
-	
-	print("Enemy size set to ", get_size_name(), " - Health: ", max_health, ", Speed: ", speed, ", Damage: ", attack_damage)
 
 
 func get_size_name() -> String:
@@ -170,8 +166,6 @@ func apply_wave_scaling(health_multiplier: float, damage_multiplier: float) -> v
 	max_health = int(max_health * health_multiplier)
 	current_health = max_health
 	attack_damage = int(attack_damage * damage_multiplier)
-	
-	print("Wave scaling applied - Health: ", max_health, ", Damage: ", attack_damage)
 
 
 func make_boss(boss_name_param: String, boss_health: int) -> void:
@@ -195,8 +189,6 @@ func make_boss(boss_name_param: String, boss_health: int) -> void:
 	
 	# Update health bar to show boss health
 	update_health_display()
-	
-	print("Enemy converted to BOSS: ", boss_name, " with ", boss_health, " HP and ", attack_damage, " damage")
 
 
 func create_boss_name_label() -> void:
@@ -322,55 +314,26 @@ func apply_knockback(knockback_velocity: Vector2) -> void:
 	velocity = knockback_velocity
 	is_knocked_back = true
 	knockback_timer = knockback_duration
-	print("Knockback applied to enemy: ", knockback_velocity)
 
 
 func take_damage(amount: int, attacker: Node2D) -> void:
-	var attacker_name_str = "null"
-	if attacker:
-		attacker_name_str = str(attacker.name)
-	print(
-		"take_damage called on enemy ",
-		name,
-		" (instance ID: ",
-		get_instance_id(),
-		") for ",
-		amount,
-		" damage from ",
-		attacker_name_str
-	)
-
 	# Only process damage on server instances
 	if not is_multiplayer_authority():
-		print("Client instance, ignoring damage")
 		return
 
 	var attacker_name = str(attacker.name) if attacker else "unknown"
 
 	# Process damage directly on server
-	print("Server instance, processing damage directly")
 	take_damage_rpc(amount, attacker_name)
 
 
 @rpc("any_peer", "reliable")
 func take_damage_rpc(amount: int, attacker_name: String) -> void:
-	print(
-		"take_damage_rpc received on enemy ",
-		name,
-		" (instance ID: ",
-		get_instance_id(),
-		") for ",
-		amount,
-		" damage, is_authority: ",
-		is_multiplayer_authority()
-	)
 	# Only process damage on server (authority)
 	if not is_multiplayer_authority():
-		print("Not authority, returning")
 		return
 
 	current_health -= amount
-	print("Enemy took ", amount, " damage from ", attacker_name, ", health: ", current_health)
 
 	# Track the attacker for XP purposes
 	last_attacker = attacker_name
@@ -405,14 +368,53 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 func sync_health(health: int) -> void:
 	current_health = health
 	update_health_display()
-	print("Enemy health synced to ", health)
 
 
 @rpc("any_peer", "reliable", "call_local")
 func die_rpc() -> void:
-	print("Enemy died")
+	# Random chance to drop a coin (only on server to prevent duplicate drops)
+	if multiplayer.is_server():
+		spawn_coin_drop()
+	
 	# Immediately queue for deletion
 	queue_free()
+
+
+func spawn_coin_drop() -> void:
+	# Random chance to drop a coin
+	var drop_chance = 0.3  # 30% base chance
+	
+	# Bosses have higher drop chance
+	if is_boss:
+		drop_chance = 0.8  # 80% chance for bosses
+	
+	# Roll for drop
+	if randf() < drop_chance:
+		# Determine coin value based on enemy size
+		var coin_value = 1
+		match enemy_size:
+			EnemySize.SMALL:
+				coin_value = 1
+			EnemySize.MEDIUM:
+				coin_value = 2
+			EnemySize.LARGE:
+				coin_value = 3
+			EnemySize.HUGE:
+				coin_value = 5
+		
+		# Bosses drop extra coins
+		if is_boss:
+			coin_value *= 3
+		
+		# Spawn coin at enemy's position
+		var coin_scene = load("res://coop/scenes/coin.tscn")
+		if coin_scene:
+			var coin = coin_scene.instantiate()
+			coin.global_position = global_position
+			coin.coin_value = coin_value
+			
+			# Add coin to the scene
+			get_tree().current_scene.add_child(coin)
 
 
 @rpc("any_peer", "reliable", "call_local")
@@ -614,6 +616,5 @@ func award_xp_to_killer() -> void:
 	var players = get_tree().get_nodes_in_group("players")
 	for player in players:
 		if str(player.name) == last_attacker or str(player.name.to_int()) == last_attacker:
-			print("Awarding XP to player ", player.name, " for killing enemy")
 			player.gain_xp(25)  # Award 25 XP per kill
 			break

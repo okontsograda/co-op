@@ -242,11 +242,13 @@ func start_wave_system() -> void:
 	if not multiplayer.is_server():
 		return
 
-	print("Starting wave system - Wave ", current_wave, " with ", enemies_in_wave, " enemies")
 	wave_in_progress = true
 	enemies_spawned_this_wave = 0
 	enemies_killed_this_wave = 0
 	boss_spawned_this_wave = false  # Reset boss flag for new wave
+
+	# Update wave display on all clients
+	rpc("update_wave_display", current_wave)
 
 	# Start spawning enemies for this wave
 	spawn_wave_enemies()
@@ -265,31 +267,19 @@ func spawn_wave_enemies() -> void:
 		if i == boss_spawn_at and not boss_spawned_this_wave and should_spawn_boss:
 			spawn_boss()
 			boss_spawned_this_wave = true
-			print("🔥 BOSS SPAWNED at position ", i + 1, " of ", enemies_in_wave)
 		else:
 			spawn_single_enemy()
 		
 		enemies_spawned_this_wave += 1
 		await get_tree().create_timer(0.5).timeout  # Small delay between spawns
 
-	print(
-		"Wave ", current_wave, " spawning complete. ", enemies_spawned_this_wave, " enemies spawned"
-	)
-
 
 func check_wave_completion() -> void:
 	# Check if all enemies in the current wave are dead
 	var current_enemies = get_tree().get_nodes_in_group("enemies").size()
-	print(
-		"Current enemies: ",
-		current_enemies,
-		", enemies_spawned_this_wave: ",
-		enemies_spawned_this_wave
-	)
 
 	if current_enemies == 0 and enemies_spawned_this_wave > 0:
 		# Wave completed
-		print("Wave ", current_wave, " completed!")
 		wave_in_progress = false
 
 		# Show wave completion message
@@ -297,8 +287,6 @@ func check_wave_completion() -> void:
 
 		# Start countdown to next wave (waves are unlimited)
 		start_wave_countdown()
-	else:
-		print("Wave not complete yet")
 
 
 func start_next_wave() -> void:
@@ -313,7 +301,6 @@ func start_next_wave() -> void:
 	else:
 		enemies_in_wave += 4  # Late waves: +4 enemies
 	
-	print("Starting Wave ", current_wave, " with ", enemies_in_wave, " enemies")
 	start_wave_system()
 
 
@@ -332,20 +319,30 @@ func start_wave_countdown() -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func show_wave_completion(wave_number: int) -> void:
-	print("=== WAVE ", wave_number, " COMPLETED! ===")
-	# TODO: Add UI display for wave completion
+	pass  # TODO: Add UI display for wave completion
 
 
 @rpc("any_peer", "reliable", "call_local")
 func show_countdown(seconds: int) -> void:
-	print("=== NEXT WAVE IN ", seconds, " SECONDS ===")
-	# TODO: Add UI display for countdown
+	pass  # TODO: Add UI display for countdown
 
 
 @rpc("any_peer", "reliable", "call_local")
 func show_wave_start(wave_number: int) -> void:
-	print("=== WAVE ", wave_number, " STARTING! ===")
-	# TODO: Add UI display for wave start
+	pass  # TODO: Add UI display for wave start
+
+
+@rpc("any_peer", "reliable", "call_local")
+func update_wave_display(wave_number: int) -> void:
+	# Update wave display on all players
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		# Only update the local player's wave display
+		if player.name.to_int() == multiplayer.get_unique_id():
+			var wave_display = player.get_node_or_null("WaveDisplay")
+			if wave_display and wave_display.has_method("update_wave"):
+				wave_display.update_wave(wave_number)
+			break
 
 
 
@@ -356,13 +353,11 @@ func on_enemy_died() -> void:
 		return
 
 	enemies_killed_this_wave += 1
-	print("Enemy killed. Wave progress: ", enemies_killed_this_wave, "/", enemies_spawned_this_wave)
 
 	# Wait a frame for the enemy to be removed from the scene tree
 	await get_tree().process_frame
 
 	# Check if wave is complete
-	print("Checking wave completion...")
 	check_wave_completion()
 
 
@@ -436,8 +431,6 @@ func spawn_boss() -> void:
 	enemy_id_counter += 1
 	var boss_id = "Boss_" + str(enemy_id_counter)
 	
-	print("Spawning boss: ", boss_name, " with ", boss_health, " HP")
-	
 	# Use RPC to spawn boss on all clients
 	rpc("spawn_boss_rpc", spawn_position, boss_id, boss_size, boss_health, boss_name)
 
@@ -471,18 +464,6 @@ func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int)
 	get_tree().current_scene.add_child(enemy)
 
 	current_enemy_count += 1
-	print(
-		"Enemy (",
-		enemy.get_size_name(),
-		") spawned at global_position: ",
-		enemy.global_position,
-		" with name ",
-		enemy.name,
-		" (total enemies: ",
-		current_enemy_count,
-		") on ",
-		"server" if multiplayer.is_server() else "client"
-	)
 
 
 @rpc("any_peer", "reliable", "call_local")
@@ -504,15 +485,6 @@ func spawn_boss_rpc(spawn_position: Vector2, boss_id: String, boss_size: int, bo
 		boss.make_boss(boss_name, boss_health)
 
 	current_enemy_count += 1
-	print(
-		"🔥 BOSS '",
-		boss_name,
-		"' spawned at global_position: ",
-		boss.global_position,
-		" with ",
-		boss_health,
-		" HP"
-	)
 
 
 # Client will join existing game

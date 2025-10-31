@@ -84,47 +84,33 @@ func _on_body_entered(body: Node2D) -> void:
 
 		# Calculate damage (using damage variable set by player)
 		var final_damage = damage
-		print("=== ARROW HIT DEBUG ===")
-		print("Arrow's damage property: ", damage)
-		print("final_damage (before crit): ", final_damage)
 
 		# Critical hit check
 		var is_crit = randf() < crit_chance
 		if is_crit:
 			final_damage *= crit_multiplier
-			print("CRITICAL HIT! ", final_damage, " damage")
 
 		# Apply damage
-		print("Calling take_damage on ", body.name, " with damage: ", final_damage)
 		body.take_damage(final_damage, shooter)
-		print(
-			"Arrow hit ", body.name, " for ", final_damage, " damage", " (crit)" if is_crit else ""
-		)
 
 		# Spawn damage number
-		print("Spawning damage number with: ", final_damage, ", is_crit: ", is_crit)
 		spawn_damage_number(body.global_position, final_damage, is_crit)
-		print("=======================")
 
 		# Lifesteal
 		if lifesteal > 0 and shooter and shooter.has_method("heal"):
 			shooter.heal(lifesteal)
-			print("Lifesteal: healed ", lifesteal, " HP")
 
 		# Poison application
 		if poison_damage > 0 and body.has_method("apply_poison"):
 			body.apply_poison(poison_damage, poison_duration)
-			print("Applied poison: ", poison_damage, " damage/sec for ", poison_duration, "s")
 
 		# Explosion chance
 		if randf() < explosion_chance:
 			create_explosion()
-			print("Arrow explosion!")
 
 		# Pierce check - destroy arrow only if no pierce remaining
 		if pierce_remaining > 0:
 			pierce_remaining -= 1
-			print("Arrow pierced! ", pierce_remaining, " pierce remaining")
 			return  # Don't destroy arrow, let it continue
 
 	# Destroy arrow (no pierce remaining or hit non-damageable object)
