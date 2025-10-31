@@ -456,15 +456,21 @@ func spawn_coin_drop() -> void:
 		if is_boss:
 			coin_value *= 3
 		
-		# Spawn coin at enemy's position
-		var coin_scene = load("res://coop/scenes/coin.tscn")
-		if coin_scene:
-			var coin = coin_scene.instantiate()
-			coin.global_position = global_position
-			coin.coin_value = coin_value
-			
-			# Add coin to the scene
-			get_tree().current_scene.add_child(coin)
+		# Broadcast coin spawn to all clients
+		rpc("spawn_coin_rpc", global_position, coin_value)
+
+
+@rpc("any_peer", "reliable", "call_local")
+func spawn_coin_rpc(spawn_position: Vector2, coin_value: int) -> void:
+	# Spawn coin at the specified position on all clients
+	var coin_scene = load("res://coop/scenes/coin.tscn")
+	if coin_scene:
+		var coin = coin_scene.instantiate()
+		coin.global_position = spawn_position
+		coin.coin_value = coin_value
+		
+		# Add coin to the scene
+		get_tree().current_scene.add_child(coin)
 
 
 @rpc("any_peer", "reliable", "call_local")
