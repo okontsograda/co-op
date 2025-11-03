@@ -174,6 +174,25 @@ func determine_special_event(wave_number: int) -> SpecialEventType:
 func on_wave_complete() -> void:
 	print("[GameDirector] Wave %d complete - Stress level: %.1f%%" % [current_wave, group_stress_level * 100])
 
+## Check if all spawned enemies have been killed
+func check_all_enemies_killed() -> bool:
+	# Only check if we've spawned enemies
+	if enemies_spawned_count == 0:
+		return false
+
+	# Get current enemy count from scene
+	var scene_tree = Engine.get_main_loop() as SceneTree
+	if not scene_tree:
+		return false
+
+	var enemies_alive = scene_tree.get_nodes_in_group("enemies").size()
+
+	# If we've spawned all enemies and none are alive, all are killed
+	if enemies_spawned_count >= enemies_to_spawn_this_wave and enemies_alive == 0:
+		return true
+
+	return false
+
 # ============================================================================
 # INTENSITY MANAGEMENT
 # ============================================================================
@@ -181,6 +200,14 @@ func on_wave_complete() -> void:
 ## Update intensity phase based on time and conditions
 func update_intensity_phase(delta: float) -> void:
 	intensity_phase_timer += delta
+
+	# Check if all spawned enemies have been killed (early wave completion)
+	# This handles cases where players kill enemies faster than expected
+	if current_intensity != IntensityPhase.RELIEF:
+		if check_all_enemies_killed():
+			print("[GameDirector] All enemies killed early, transitioning to RELIEF")
+			transition_to_intensity(IntensityPhase.RELIEF)
+			return
 
 	# Check if phase duration elapsed
 	if intensity_phase_timer >= intensity_phase_duration:

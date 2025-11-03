@@ -72,6 +72,11 @@ func update_display():
 	# === INTENSITY SECTION ===
 	text += "[font_size=14][b]INTENSITY[/b][/font_size]\n"
 	text += "Phase: [color=#%s][b]%s[/b][/color]\n" % [color.to_html(false), data.intensity]
+
+	# Add phase description
+	var phase_desc = get_phase_description(data.intensity)
+	text += "[color=gray][font_size=11]%s[/font_size][/color]\n" % phase_desc
+
 	text += "Timer: %.1f / %.1f s [color=gray](%.0f%%)[/color]\n" % [
 		data.intensity_timer,
 		data.intensity_duration,
@@ -86,17 +91,39 @@ func update_display():
 
 	# Color code event type
 	var event_color = "white"
+	var event_desc = ""
 	if data.event == "BOSS_WAVE":
 		event_color = "red"
-	elif data.event != "NONE":
+		event_desc = "Multiple HUGE bosses!"
+	elif data.event == "ELITE_SWARM":
 		event_color = "orange"
+		event_desc = "All enemies +1 size larger"
+	elif data.event == "TANK_WAVE":
+		event_color = "orange"
+		event_desc = "More Large/Huge enemies"
+	elif data.event == "SPEED_CHALLENGE":
+		event_color = "orange"
+		event_desc = "Faster enemies, bonus XP"
 
 	text += "Event: [color=%s]%s[/color]\n" % [event_color, data.event]
+	if event_desc != "":
+		text += "[color=gray][font_size=11]%s[/font_size][/color]\n" % event_desc
+
 	text += "Spawned: %d / %d [color=gray](%.0f%%)[/color]\n" % [
 		data.enemies_spawned,
 		data.enemies_total,
 		data.spawn_progress * 100
 	]
+
+	# Get current enemy count from the scene
+	var enemies_alive = get_tree().get_nodes_in_group("enemies").size()
+	var alive_color = "green"
+	if enemies_alive > data.enemies_total * 0.7:
+		alive_color = "red"
+	elif enemies_alive > data.enemies_total * 0.4:
+		alive_color = "yellow"
+
+	text += "Alive: [color=%s]%d[/color]\n" % [alive_color, enemies_alive]
 	text += "\n"
 
 	# === STRESS & SCALING ===
@@ -163,3 +190,16 @@ func get_health_color(health_percent: float) -> Color:
 		return Color(0.9, 0.6, 0.2)  # Orange - low health
 	else:
 		return Color(0.9, 0.2, 0.2)  # Red - critical health
+
+func get_phase_description(phase: String) -> String:
+	match phase:
+		"CALM":
+			return "Slow spawn rate, easy start"
+		"BUILDING":
+			return "Gradual spawn acceleration"
+		"PEAK":
+			return "Maximum spawn rate & intensity"
+		"RELIEF":
+			return "Wind down before wave end"
+		_:
+			return "Unknown phase"
