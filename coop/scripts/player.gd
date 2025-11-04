@@ -1,5 +1,6 @@
 extends CharacterBody2D
 
+
 # Movement speeds
 const walk_speed: float = 100.0  # Default walking speed
 const run_speed: float = 135.0  # Running speed (when holding Shift)
@@ -35,6 +36,17 @@ var can_fire: bool = true
 var is_fire_button_held: bool = false  # Track if fire button is held
 var fire_timer: float = 0.0  # Timer for automatic fire when holding
 const fire_cooldown: float = 1.0  # Cooldown time between shots (1 shot per second max)
+
+# Dodge/Evade System
+var is_dodging: bool = false  # Currently performing a dodge roll
+var dodge_invincible: bool = false  # Invincibility frames during dodge
+var can_dodge: bool = true  # Dodge cooldown
+var dodge_direction: Vector2 = Vector2.ZERO  # Direction of dodge roll
+const dodge_duration: float = 0.25  # How long the dodge roll lasts
+const dodge_distance: float = 120.0  # How far the dodge roll travels
+const dodge_cooldown: float = 1.8  # Cooldown between dodges
+const dodge_iframe_duration: float = 0.25  # Duration of invincibility frames (only during roll)
+const dodge_stamina_cost: float = 35.0  # Stamina cost to perform a dodge
 
 # Weapon System
 var equipped_weapon: String = "bow"  # Default to bow, can be set from lobby
@@ -147,6 +159,12 @@ func _input(event: InputEvent) -> void:
 	if current_health <= 0:
 		return
 
+	# Handle dodge roll (Spacebar)
+	if event.is_action_pressed("ui_accept") and not event.is_echo():  # Spacebar
+		if can_dodge and not is_dodging:
+			perform_dodge_roll()
+		return
+	
 	# Handle stats screen toggle
 	if event.is_action_pressed("stats_toggle") and not event.is_echo():
 		toggle_stats_screen()
@@ -193,6 +211,16 @@ func _physics_process(_delta: float) -> void:
 		is_fire_button_held = false  # Reset fire button when chat is active
 		velocity = Vector2.ZERO
 		move_and_slide()
+		return
+	
+	# Handle dodge roll movement
+	if is_dodging:
+		# During dodge, move in dodge direction at high speed
+		var dodge_speed = dodge_distance / dodge_duration
+		velocity = dodge_direction * dodge_speed
+		move_and_slide()
+		# Update z_index even while dodging
+		z_index = int(global_position.y)
 		return
 	
 	# Handle automatic firing when fire button is held
@@ -282,6 +310,10 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 
 
 func handle_fire_action(_mouse_position: Vector2) -> void:
+	# Don't fire while dodging
+	if is_dodging:
+		return
+	
 	# Check if player can fire (not on cooldown)
 	if not can_fire:
 		return
@@ -362,17 +394,14 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 			# Play attack animation - check which animation exists
 			is_firing = true
 			var sprite_frames = animated_sprite.sprite_frames
-			var attack_anim_name = ""
 			
 			if sprite_frames and sprite_frames.has_animation("attack"):
 				# Make sure attack animation doesn't loop
 				sprite_frames.set_animation_loop("attack", false)
-				attack_anim_name = "attack"
 				animated_sprite.play("attack")
 			elif sprite_frames and sprite_frames.has_animation("fire"):
 				# Make sure fire animation doesn't loop for melee
 				sprite_frames.set_animation_loop("fire", false)
-				attack_anim_name = "fire"
 				animated_sprite.play("fire")
 			else:
 				print("WARNING: No attack or fire animation found!")
@@ -427,7 +456,6 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 	if is_crit:
 		final_damage *= weapon_stats.crit_multiplier
 	
-	var enemies_hit = 0
 	const KNOCKBACK_FORCE = 200.0  # Knockback strength
 	
 	for enemy in enemies:
@@ -451,7 +479,6 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 			# Damage the enemy
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(int(final_damage), self)
-				enemies_hit += 1
 				
 				# Apply knockback to enemy
 				if apply_knockback and enemy.has_method("apply_knockback"):
@@ -631,6 +658,13 @@ func update_stamina_display() -> void:
 
 
 func take_damage(amount: int, attacker: Node2D) -> void:
+	# Check if player is invincible from dodge roll
+	if dodge_invincible:
+		# Spawn visual feedback that damage was evaded
+		spawn_evade_text()
+		print("Player ", name, " evaded attack!")
+		return
+	
 	# Apply damage locally
 	# Reduce health
 	current_health -= amount
@@ -651,6 +685,106 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 		# Sync death to all clients
 		rpc("handle_death_rpc")
 		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
+
+
+func perform_dodge_roll() -> void:
+	# Don't dodge if already dodging or if dead
+	if is_dodging or current_health <= 0:
+		return
+	
+	# Check if player has enough stamina
+	if current_stamina < dodge_stamina_cost:
+		print("Player ", name, " not enough stamina to dodge (", current_stamina, "/", dodge_stamina_cost, ")")
+		return
+	
+	# Consume stamina
+	current_stamina -= dodge_stamina_cost
+	if current_stamina < 0:
+		current_stamina = 0
+	update_stamina_display()
+	
+	# Determine dodge direction based on movement input or facing direction
+	var direction = Vector2()
+	
+	# Check for WASD keys for dodge direction
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		direction.y -= 1
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		direction.y += 1
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		direction.x -= 1
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		direction.x += 1
+	
+	# If no direction input, dodge away from mouse (backwards)
+	if direction == Vector2.ZERO:
+		var camera = get_viewport().get_camera_2d()
+		if camera:
+			var mouse_pos = camera.get_global_mouse_position()
+			direction = (global_position - mouse_pos).normalized()
+		else:
+			# Fallback: dodge downward
+			direction = Vector2(0, 1)
+	else:
+		direction = direction.normalized()
+	
+	# Start dodge roll
+	is_dodging = true
+	dodge_invincible = true
+	can_dodge = false
+	dodge_direction = direction
+	
+	# Visual feedback - make player semi-transparent during dodge
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.modulate.a = 0.5  # 50% opacity
+	
+	# Broadcast dodge to all clients for visual sync
+	rpc("sync_dodge_visual", true)
+	
+	print("Player ", name, " dodge rolling in direction: ", direction)
+	
+	# End dodge roll after duration
+	await get_tree().create_timer(dodge_duration).timeout
+	is_dodging = false
+	dodge_invincible = false  # End invincibility when dodge ends
+	
+	# Restore visual appearance
+	if sprite:
+		sprite.modulate.a = 1.0  # Full opacity
+	rpc("sync_dodge_visual", false)
+	
+	# Start cooldown before next dodge
+	await get_tree().create_timer(dodge_cooldown).timeout
+	can_dodge = true
+	print("Player ", name, " can dodge again")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_dodge_visual(is_dodging_state: bool) -> void:
+	# Sync dodge visual effect across all clients
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.modulate.a = 0.5 if is_dodging_state else 1.0
+
+
+func spawn_evade_text() -> void:
+	# Spawn "EVADED!" text visual effect using damage number system
+	var damage_scene = load("res://coop/scenes/damage_number.tscn")
+	if damage_scene:
+		var evade_instance = damage_scene.instantiate()
+		evade_instance.global_position = global_position + Vector2(0, -30)
+		
+		# Add to scene FIRST
+		get_tree().current_scene.add_child(evade_instance)
+		
+		# Set as evade text (special styling)
+		if evade_instance.has_method("set_evade_text"):
+			evade_instance.set_evade_text()
+		else:
+			# Fallback: use damage text with 0 damage
+			if evade_instance.has_method("set_damage"):
+				evade_instance.set_damage(0, false, true)  # Pass true for "is_evade"
 
 
 @rpc("any_peer", "reliable", "call_local")
@@ -798,10 +932,10 @@ func show_game_over_screen_rpc() -> void:
 
 
 @rpc("any_peer", "reliable")
-func sync_stats_from_server(enemies: int, coins: int, wave: int, damage_dealt: int, damage_taken: int, bosses: int) -> void:
+func sync_stats_from_server(enemies: int, total_coins: int, wave: int, damage_dealt: int, damage_taken: int, bosses: int) -> void:
 	# Receive synced stats from server
 	if GameStats:
-		GameStats.sync_all_stats(enemies, coins, wave, damage_dealt, damage_taken, bosses)
+		GameStats.sync_all_stats(enemies, total_coins, wave, damage_dealt, damage_taken, bosses)
 
 
 func hide_player_ui() -> void:

@@ -1,0 +1,118 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8vx2rlkgm7pb"]
+
+[ext_resource type="Script" path="res://coop/scripts/shop_ui.gd" id="1_shop_ui"]
+
+[node name="ShopUI" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_shop_ui")
+
+[node name="Panel" type="Panel" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -300.0
+offset_right = 400.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 200.0
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 24
+text = "Shop"
+
+[node name="CloseButton" type="Button" parent="Panel"]
+layout_mode = 0
+offset_left = 740.0
+offset_top = 10.0
+offset_right = 790.0
+offset_bottom = 41.0
+text = "X"
+
+[node name="PlayerCoinsLabel" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 600.0
+offset_top = 15.0
+offset_right = 730.0
+offset_bottom = 38.0
+theme_override_font_sizes/font_size = 18
+text = "Your Coins: 0"
+
+[node name="CategoryContainer" type="HBoxContainer" parent="Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 780.0
+offset_bottom = 90.0
+theme_override_constants/separation = 10
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 100.0
+offset_right = 420.0
+offset_bottom = 580.0
+horizontal_scroll_mode = 0
+
+[node name="ItemsContainer" type="VBoxContainer" parent="Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="ItemDetailsPanel" type="Panel" parent="Panel"]
+layout_mode = 0
+offset_left = 440.0
+offset_top = 100.0
+offset_right = 780.0
+offset_bottom = 580.0
+
+[node name="ItemNameLabel" type="Label" parent="Panel/ItemDetailsPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 330.0
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 20
+text = "Select an item"
+
+[node name="ItemDescLabel" type="Label" parent="Panel/ItemDetailsPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 50.0
+offset_right = 330.0
+offset_bottom = 120.0
+text = "Item description will appear here"
+autowrap_mode = 3
+
+[node name="ItemCostLabel" type="Label" parent="Panel/ItemDetailsPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 130.0
+offset_right = 200.0
+offset_bottom = 153.0
+theme_override_font_sizes/font_size = 16
+text = "Cost: 0 coins"
+
+[node name="ItemOwnedLabel" type="Label" parent="Panel/ItemDetailsPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 160.0
+offset_right = 200.0
+offset_bottom = 183.0
+text = "Owned: 0"
+
+[node name="PurchaseButton" type="Button" parent="Panel/ItemDetailsPanel"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 430.0
+offset_right = 330.0
+offset_bottom = 470.0
+text = "Purchase"
+

@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=4 uid="uid://c66m8oem8ehsl"]
+[gd_scene load_steps=20 format=4 uid="uid://c66m8oem8ehsl"]
 
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="1_ewl3q"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="1_ta1gp"]
@@ -7,6 +7,10 @@
 [ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/Characters/player.tscn" id="3_cs02y"]
 [ext_resource type="Texture2D" uid="uid://dqu0c522j04i6" path="res://tileset/Bridge_All.png" id="6_mnf6x"]
 [ext_resource type="PackedScene" uid="uid://c28e7e3l0hneh" path="res://coop/scenes/tree_1.tscn" id="6_ydsdc"]
+[ext_resource type="PackedScene" uid="uid://c7y8qm5jh3dpb" path="res://coop/scenes/shop_building.tscn" id="7_shop"]
+[ext_resource type="Texture2D" uid="uid://dw5wdxd2wki68" path="res://tileset/01.png" id="8_lfjhb"]
+[ext_resource type="Texture2D" uid="uid://d2jx20a5b8cwr" path="res://tileset/02.png" id="9_1f1uy"]
+[ext_resource type="Texture2D" uid="uid://dmyfxyhhw8kfx" path="res://tileset/03.png" id="10_tyu68"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ydsdc"]
 texture = ExtResource("1_ewl3q")
@@ -1639,10 +1643,10 @@ network_player = ExtResource("3_cs02y")
 position = Vector2(241, 292)
 
 [node name="Marker2D" type="Marker2D" parent="EnemySpawnPoints"]
-position = Vector2(-132, 600)
+position = Vector2(-109, 543)
 
 [node name="Marker2D2" type="Marker2D" parent="EnemySpawnPoints"]
-position = Vector2(391, 141)
+position = Vector2(419, 149)
 
 [node name="Water" type="TileMapLayer" parent="."]
 position = Vector2(20, -80)
@@ -1661,14 +1665,14 @@ tile_set = SubResource("TileSet_ta1gp")
 
 [node name="Bridge" type="TileMapLayer" parent="."]
 position = Vector2(20, -80)
-tile_map_data = PackedByteArray("AABkADMAAAAJAAQAAABkADQAAAAJAAUAAABkADUAAAAJAAYAAABkADYAAAAJAAcAAABlADMAAAAKAAQAAABlADQAAAAKAAUAAABlADUAAAAKAAYAAABlADYAAAAKAAcAAABmADMAAAALAAQAAABmADQAAAALAAUAAABmADUAAAALAAYAAABmADYAAAALAAcAAABjADcAAAAEAAgAAABjADgAAAAEAAkAAABkADcAAAAFAAgAAABkADgAAAAFAAkAAABlADcAAAAGAAgAAABlADgAAAAGAAkAAABmADcAAAAHAAgAAABmADgAAAAHAAkAAAB5ADMAAAAKAAAAAAB4ADMAAAAJAAAAAAB3ADMAAAAIAAAAAAB5ADQAAAAKAAEAAAB4ADQAAAAJAAEAAAB3ADQAAAAIAAEAAAB5ADUAAAAKAAIAAAB4ADUAAAAJAAIAAAB3ADUAAAAIAAIAAAB5ADYAAAAKAAMAAAB4ADYAAAAJAAMAAAB3ADYAAAAIAAMAAAB0ADMAAAAKAAQAAAB0ADQAAAAKAAUAAAB0ADUAAAAKAAYAAAB0ADYAAAAKAAcAAAB1ADMAAAALAAQAAAB1ADQAAAALAAUAAAB1ADUAAAALAAYAAAB1ADYAAAALAAcAAAB2ADMAAAAHAAAAAAB2ADQAAAAHAAEAAAB2ADUAAAAHAAIAAAB2ADYAAAAHAAMAAABzADMAAAAJAAQAAABzADQAAAAJAAUAAABzADUAAAAJAAYAAABzADYAAAAJAAcAAAA=")
+tile_map_data = PackedByteArray("AABkADMAAAABAAAAAABkADQAAAABAAEAAABkADUAAAABAAIAAABlADMAAAACAAAAAABlADQAAAACAAEAAABlADUAAAACAAIAAABlADYAAAACAAMAAABmADMAAAADAAAAAABmADQAAAADAAEAAABmADUAAAADAAIAAABmADYAAAADAAMAAAB5ADMAAAAKAAAAAAB4ADMAAAAJAAAAAAB3ADMAAAAIAAAAAAB5ADQAAAAKAAEAAAB4ADQAAAAJAAEAAAB3ADQAAAAIAAEAAAB5ADUAAAAKAAIAAAB4ADUAAAAJAAIAAAB3ADUAAAAIAAIAAAB5ADYAAAAKAAMAAAB4ADYAAAAJAAMAAAB3ADYAAAAIAAMAAAB0ADMAAAAFAAAAAAB0ADQAAAAFAAEAAAB0ADUAAAAFAAIAAAB0ADYAAAAFAAMAAAB1ADMAAAAGAAAAAAB1ADQAAAAGAAEAAAB1ADUAAAAGAAIAAAB1ADYAAAAGAAMAAAB2ADMAAAAHAAAAAAB2ADQAAAAHAAEAAAB2ADUAAAAHAAIAAAB2ADYAAAAHAAMAAABzADMAAAAEAAAAAABzADQAAAAEAAEAAABzADUAAAAEAAIAAABzADYAAAAEAAMAAABnADMAAAAEAAAAAABnADQAAAAEAAEAAABnADUAAAAEAAIAAABnADYAAAAEAAMAAABoADMAAAAFAAAAAABoADQAAAAFAAEAAABoADUAAAAFAAIAAABoADYAAAAFAAMAAABpADMAAAAEAAAAAABpADQAAAAEAAEAAABpADUAAAAEAAIAAABpADYAAAAEAAMAAABqADMAAAAFAAAAAABqADQAAAAFAAEAAABqADUAAAAFAAIAAABqADYAAAAFAAMAAABrADMAAAAGAAAAAABrADQAAAAGAAEAAABrADUAAAAGAAIAAABrADYAAAAGAAMAAABsADMAAAAHAAAAAABsADQAAAAHAAEAAABsADUAAAAHAAIAAABsADYAAAAHAAMAAABtADMAAAAEAAAAAABtADQAAAAEAAEAAABtADUAAAAEAAIAAABtADYAAAAEAAMAAABuADMAAAAFAAAAAABuADQAAAAFAAEAAABuADUAAAAFAAIAAABuADYAAAAFAAMAAABvADMAAAAGAAAAAABvADQAAAAGAAEAAABvADUAAAAGAAIAAABvADYAAAAGAAMAAABwADMAAAAEAAAAAABwADQAAAAEAAEAAABwADUAAAAEAAIAAABwADYAAAAEAAMAAABxADMAAAAFAAAAAABxADQAAAAFAAEAAABxADUAAAAFAAIAAABxADYAAAAFAAMAAAByADMAAAAGAAAAAAByADQAAAAGAAEAAAByADUAAAAGAAIAAAByADYAAAAGAAMAAABkADYAAAABAAMAAABmADcAAAAHAAgAAABmADgAAAAHAAkAAABlADcAAAAGAAgAAABlADgAAAAGAAkAAABlADkAAAAGAAoAAABlADoAAAAGAAsAAABkADcAAAAFAAgAAABkADgAAAAFAAkAAABkADkAAAAFAAoAAABkADoAAAAFAAsAAABjADcAAAAEAAgAAABjADgAAAAEAAkAAABjADkAAAAEAAoAAABjADoAAAAEAAsAAAB6ADcAAAAHAAgAAAB6ADgAAAAHAAkAAAB5ADcAAAAGAAgAAAB5ADgAAAAGAAkAAAB5ADkAAAAGAAoAAAB5ADoAAAAGAAsAAAB4ADcAAAAFAAgAAAB4ADgAAAAFAAkAAAB4ADkAAAAFAAoAAAB4ADoAAAAFAAsAAAB3ADcAAAAEAAgAAAB3ADgAAAAEAAkAAAB3ADkAAAAEAAoAAAB3ADoAAAAEAAsAAAA=")
 tile_set = SubResource("TileSet_agm8t")
 
 [node name="Tree1" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(704, 312)
+position = Vector2(684, 363)
 
 [node name="Tree2" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(614, 346)
+position = Vector2(589, 382)
 
 [node name="Tree3" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(1069, 746)
@@ -1686,7 +1690,7 @@ position = Vector2(235, 413)
 position = Vector2(824, 901)
 
 [node name="Tree8" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(742, 405)
+position = Vector2(758, 408)
 
 [node name="Tree9" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(1507, 877)
@@ -1695,4 +1699,47 @@ position = Vector2(1507, 877)
 position = Vector2(235, 92)
 
 [node name="Tree11" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(510, 414)
+position = Vector2(531, 461)
+
+[node name="01" type="Sprite2D" parent="."]
+position = Vector2(693, 407)
+texture = ExtResource("8_lfjhb")
+
+[node name="03" type="Sprite2D" parent="."]
+position = Vector2(730, 446)
+texture = ExtResource("8_lfjhb")
+
+[node name="02" type="Sprite2D" parent="."]
+position = Vector2(598, 475)
+texture = ExtResource("8_lfjhb")
+
+[node name="04" type="Sprite2D" parent="."]
+position = Vector2(610, 415)
+texture = ExtResource("9_1f1uy")
+
+[node name="05" type="Sprite2D" parent="."]
+position = Vector2(686, 481)
+texture = ExtResource("10_tyu68")
+
+[node name="07" type="Sprite2D" parent="."]
+position = Vector2(57, 892)
+texture = ExtResource("8_lfjhb")
+
+[node name="06" type="Sprite2D" parent="07"]
+position = Vector2(26, -49)
+texture = ExtResource("9_1f1uy")
+
+[node name="03" type="Sprite2D" parent="07"]
+position = Vector2(85, -2)
+texture = ExtResource("10_tyu68")
+
+[node name="01" type="Sprite2D" parent="07"]
+position = Vector2(133, -48)
+texture = ExtResource("8_lfjhb")
+
+[node name="02" type="Sprite2D" parent="07"]
+position = Vector2(59, -86)
+texture = ExtResource("9_1f1uy")
+
+[node name="ShopBuilding" parent="." instance=ExtResource("7_shop")]
+position = Vector2(346, 106)
