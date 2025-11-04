@@ -32,9 +32,9 @@ const xp_per_enemy_kill: int = 25
 
 var is_firing: bool = false
 var can_fire: bool = true
-var rapid_fire_count: int = 0  # Track number of arrows fired in rapid succession
-const max_rapid_fire: int = 2  # Maximum arrows that can be fired rapidly
-const fire_cooldown: float = .5  # Cooldown time after rapid fire
+var is_fire_button_held: bool = false  # Track if fire button is held
+var fire_timer: float = 0.0  # Timer for automatic fire when holding
+const fire_cooldown: float = 1.0  # Cooldown time between shots (1 shot per second max)
 
 # Weapon System
 var equipped_weapon: String = "bow"  # Default to bow, can be set from lobby
@@ -164,12 +164,14 @@ func _input(event: InputEvent) -> void:
 			print("ERROR: ChatUI not found for player ", name)
 		return
 
-	# Handle fire animation on left mouse click
+	# Handle fire button state (left mouse button)
 	if event is InputEventMouseButton:
 		var mouse_event = event as InputEventMouseButton
-		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			# Already checked peer_id at top of function
-			handle_fire_action(mouse_event.position)
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			is_fire_button_held = mouse_event.pressed
+			if mouse_event.pressed:
+				# Fire immediately on button press
+				handle_fire_action(mouse_event.position)
 
 
 func _physics_process(_delta: float) -> void:
@@ -184,13 +186,23 @@ func _physics_process(_delta: float) -> void:
 		move_and_slide()
 		return
 
-	# Check if chat is active - if so, don't process movement
+	# Check if chat is active - if so, don't process movement or combat
 	var chat_ui = get_node("ChatUI")
 	if chat_ui and chat_ui.is_chat_active:
-		# Chat is active, don't process movement
+		# Chat is active, don't process movement or combat
+		is_fire_button_held = false  # Reset fire button when chat is active
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
+	
+	# Handle automatic firing when fire button is held
+	if is_fire_button_held and can_fire:
+		fire_timer += _delta
+		# Fire automatically based on fire_cooldown
+		if fire_timer >= weapon_stats.fire_cooldown:
+			fire_timer = 0.0
+			var mouse_pos = get_viewport().get_mouse_position()
+			handle_fire_action(mouse_pos)
 
 	# Use direct key input instead of input actions
 	var direction = Vector2()
@@ -272,24 +284,14 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 func handle_fire_action(_mouse_position: Vector2) -> void:
 	# Check if player can fire (not on cooldown)
 	if not can_fire:
-		print("Player ", name, " cannot attack yet - on cooldown")
 		return
 
-	# For melee, ignore rapid fire system - one attack per click
+	# For melee, use one attack per click
 	if combat_type == "melee":
 		handle_melee_attack(_mouse_position)
 		return
 
-	# Ranged weapons use rapid fire system
-	# Check rapid fire limit
-	if rapid_fire_count >= max_rapid_fire:
-		print("Player ", name, " rapid attack limit reached, must wait")
-		return
-
-	# Don't allow firing if already in fire animation and at rapid fire limit
-	if is_firing and rapid_fire_count >= max_rapid_fire:
-		return
-
+	# Ranged weapons use cooldown system
 	handle_ranged_attack(_mouse_position)
 
 
@@ -297,10 +299,9 @@ func handle_ranged_attack(_mouse_position: Vector2) -> void:
 	# Trigger the fire animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
-		print("Player ", name, " firing!")
-
-		# Increment rapid fire count
-		rapid_fire_count += 1
+		# Set cooldown immediately - can't fire again until cooldown expires
+		can_fire = false
+		fire_timer = 0.0  # Reset fire timer
 
 		# Convert mouse position to world coordinates for network sync
 		var camera = get_viewport().get_camera_2d()
@@ -322,28 +323,19 @@ func handle_ranged_attack(_mouse_position: Vector2) -> void:
 			play_bow_sound(self)
 
 			# Wait for animation to play before firing arrow (about halfway through fire animation)
-			await get_tree().create_timer(0.5).timeout
+			await get_tree().create_timer(0.3).timeout
 			# Spawn arrow locally immediately
 			spawn_arrow_for_player(self, world_target)
 			# Send RPC to network to spawn arrow on other clients
 			rpc("spawn_arrow_network", world_target)
 
 		# After remaining animation time, return to normal animation
-		await get_tree().create_timer(0.4).timeout
+		await get_tree().create_timer(0.3).timeout
 		is_firing = false
-		print("Player ", name, " finished firing")
 
-		# Allow immediate refire if under rapid fire limit, otherwise wait for cooldown
-		if rapid_fire_count < max_rapid_fire:
-			# Allow rapid fire - can fire again immediately
-			print("Player ", name, " rapid fire available: ", rapid_fire_count, "/", max_rapid_fire)
-		else:
-			# Rapid fire limit reached, wait for cooldown (use upgraded fire_cooldown)
-			can_fire = false
-			await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
-			can_fire = true
-			rapid_fire_count = 0  # Reset rapid fire counter
-			print("Player ", name, " can fire again")
+		# Wait for cooldown before allowing next shot (use upgraded fire_cooldown)
+		await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
+		can_fire = true
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
 
@@ -1062,10 +1054,10 @@ func apply_upgrade(upgrade_id: String) -> void:
 			print("Lifesteal: ", weapon_stats.lifesteal, " HP")
 
 		"rapid_fire_capacity":
-			# Modify max_rapid_fire constant through instance variable
-			# Note: We'll need to track this separately since max_rapid_fire is const
-			print("Rapid fire capacity increased")
-			# TODO: Implement once we refactor rapid fire system
+			# This upgrade is now deprecated with the new fire cooldown system
+			# Instead, it provides additional fire rate bonus
+			weapon_stats.fire_cooldown *= 0.9  # 10% faster fire rate
+			print("Fire cooldown reduced to: ", weapon_stats.fire_cooldown)
 
 		"poison_arrows":
 			# Enable poison effect
