@@ -560,27 +560,43 @@ func attack_target(target: Node2D) -> void:
 	is_attacking = true
 	can_attack = false  # Prevent multiple attacks
 
-	# Deal damage to the target immediately (or after a brief delay for visual timing)
-	if target.has_method("take_damage"):
-		# Small delay before dealing damage for better visual feedback
-		await get_tree().create_timer(0.3).timeout
-		if target and is_instance_valid(target):
-			target.take_damage(attack_damage, self)
-			
-			# Play mushroom hit sound when damage is dealt
-			play_mushroom_hit_sound()
-
-	# Play attack animation
+	# Play attack animation immediately (telegraph)
 	rpc("play_attack_animation")
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("attack"):
 		# Ensure attack animation doesn't loop
 		sprite.sprite_frames.set_animation_loop("attack", false)
 		sprite.play("attack")
+	
+	# Visual telegraph - flash red to warn player
+	if sprite:
+		var original_modulate = sprite.modulate
+		sprite.modulate = Color(1.5, 0.7, 0.7)  # Red tint
+		await get_tree().create_timer(0.1).timeout
+		if sprite:
+			sprite.modulate = original_modulate
 
-	# Wait for attack animation to finish (use a fixed duration to prevent getting stuck)
-	# Attack animations are typically short, so wait for a reasonable duration
-	await get_tree().create_timer(0.8).timeout  # Wait for attack animation
+	# Telegraph/windup delay - gives player time to react and move away
+	const ATTACK_TELEGRAPH_DURATION = 0.3  # 0.3 seconds to react
+	await get_tree().create_timer(ATTACK_TELEGRAPH_DURATION).timeout
+	
+	# Check if target is STILL in range and valid before dealing damage
+	if target and is_instance_valid(target) and target.has_method("take_damage"):
+		var distance_to_target = global_position.distance_to(target.global_position)
+		
+		if distance_to_target <= attack_range:
+			# Player is still in range - hit them!
+			target.take_damage(attack_damage, self)
+			
+			# Play mushroom hit sound when damage is dealt
+			play_mushroom_hit_sound()
+		else:
+			# Player moved out of range - attack missed!
+			print("Enemy ", name, " attack MISSED! Target moved out of range (", distance_to_target, " > ", attack_range, ")")
+			spawn_miss_text()
+
+	# Wait for remaining attack animation to finish
+	await get_tree().create_timer(0.4).timeout  # Wait for remaining animation
 
 	# Reset attacking state
 	is_attacking = false
@@ -588,6 +604,28 @@ func attack_target(target: Node2D) -> void:
 	# Start attack cooldown
 	await get_tree().create_timer(attack_cooldown).timeout
 	can_attack = true
+
+
+func spawn_miss_text() -> void:
+	# Spawn "MISS!" text above enemy when attack misses
+	var damage_scene = load("res://coop/scenes/damage_number.tscn")
+	if damage_scene:
+		var miss_instance = damage_scene.instantiate()
+		miss_instance.global_position = global_position + Vector2(0, -40)
+		
+		# Add to scene
+		get_tree().current_scene.add_child(miss_instance)
+		
+		# Set as miss text
+		if miss_instance.has_method("set_miss_text"):
+			miss_instance.set_miss_text()
+		elif miss_instance.has_method("set_damage"):
+			# Fallback: use damage text with special flag
+			var label = miss_instance.get_node_or_null("Label")
+			if label:
+				label.text = "MISS!"
+				label.add_theme_font_size_override("font_size", 18)
+				label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))  # Gray
 
 
 @rpc("any_peer", "reliable", "call_local")

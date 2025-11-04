@@ -34,22 +34,43 @@ func _process(delta: float) -> void:
 
 
 # Set damage text and optional styling
-func set_damage(damage: float, is_crit: bool = false, is_poison: bool = false) -> void:
+func set_damage(damage: float, is_crit: bool = false, is_poison: bool = false, is_evade: bool = false) -> void:
 	if label:
 		var damage_int = int(damage)
-		label.text = str(damage_int)
-
-		if is_crit:
+		
+		if is_evade:
+			# Evaded attacks: cyan/blue, larger text
+			label.text = "EVADED!"
+			label.add_theme_font_size_override("font_size", 20)
+			label.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))  # Cyan
+		elif is_crit:
 			# Critical hits: bigger, yellow
+			label.text = "CRIT! " + str(damage_int)
 			label.add_theme_font_size_override("font_size", 24)
 			label.add_theme_color_override("font_color", Color.YELLOW)
-			label.text = "CRIT! " + label.text
 		elif is_poison:
 			# Poison damage: green/purple for passive damage
+			label.text = "☠ " + str(damage_int)
 			label.add_theme_font_size_override("font_size", 14)
 			label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.3))  # Bright green for poison
-			label.text = "☠ " + label.text
 		else:
 			# Normal hits: white
+			label.text = str(damage_int)
 			label.add_theme_font_size_override("font_size", 16)
 			label.add_theme_color_override("font_color", Color.WHITE)
+
+
+# Set evade text styling
+func set_evade_text() -> void:
+	if label:
+		label.text = "EVADED!"
+		label.add_theme_font_size_override("font_size", 20)
+		label.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))  # Cyan
+
+
+# Set miss text styling (for when enemy attacks miss)
+func set_miss_text() -> void:
+	if label:
+		label.text = "MISS!"
+		label.add_theme_font_size_override("font_size", 18)
+		label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))  # Gray
