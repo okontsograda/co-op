@@ -1,7 +1,6 @@
 extends RefCounted
 class_name PlayerClass
 
-
 # Static class definitions for different player types
 static func get_class_by_name(class_id: String) -> Dictionary:
 	var classes = get_all_classes()

@@ -6,6 +6,7 @@ signal player_left(peer_id: int)
 signal player_ready_changed(peer_id: int, is_ready: bool)
 signal player_class_changed(peer_id: int, selected_class: String)
 signal player_weapon_changed(peer_id: int, selected_weapon: String)
+signal player_name_changed(peer_id: int, player_name: String)
 signal all_players_ready
 signal game_starting
 
@@ -71,7 +72,13 @@ func _on_peer_disconnected(peer_id: int):
 func register_player(peer_id: int, is_host: bool = false):
 	print("register_player called: peer_id=", peer_id, " is_host=", is_host)
 	if not players.has(peer_id):
-		players[peer_id] = {"class": "archer", "weapon": "bow", "ready": false, "is_host": is_host}  # Defaults
+		players[peer_id] = {
+			"class": "archer", 
+			"weapon": "bow", 
+			"ready": false, 
+			"is_host": is_host,
+			"player_name": "Player " + str(peer_id)  # Default name
+		}
 		print("Added player ", peer_id, " to players dict: ", players[peer_id])
 		print("Emitting player_joined signal for peer ", peer_id)
 		player_joined.emit(peer_id, players[peer_id])
@@ -134,6 +141,33 @@ func _broadcast_weapon_change(peer_id: int, selected_weapon: String):
 	if players.has(peer_id):
 		players[peer_id]["weapon"] = selected_weapon
 		player_weapon_changed.emit(peer_id, selected_weapon)
+
+
+# Set player's name
+func set_player_name(player_name: String):
+	var local_id = multiplayer.get_unique_id()
+	if players.has(local_id):
+		players[local_id]["player_name"] = player_name
+		player_name_changed.emit(local_id, player_name)
+		print("[LobbyManager] Set local player name to: ", player_name)
+
+		# Broadcast to all clients
+		_broadcast_name_change.rpc(local_id, player_name)
+
+
+@rpc("any_peer", "reliable")
+func _broadcast_name_change(peer_id: int, player_name: String):
+	if players.has(peer_id):
+		players[peer_id]["player_name"] = player_name
+		player_name_changed.emit(peer_id, player_name)
+		print("[LobbyManager] Updated player ", peer_id, " name to: ", player_name)
+
+
+# Get player's name
+func get_player_name(peer_id: int) -> String:
+	if players.has(peer_id):
+		return players[peer_id]["player_name"]
+	return "Player " + str(peer_id)
 
 
 # Toggle ready status

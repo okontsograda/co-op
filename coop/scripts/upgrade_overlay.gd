@@ -99,10 +99,13 @@ func _input(event: InputEvent) -> void:
 		var key = event.keycode
 		if key == KEY_1 and available_upgrades.size() > 0:
 			select_upgrade(0)
+			get_viewport().set_input_as_handled()
 		elif key == KEY_2 and available_upgrades.size() > 1:
 			select_upgrade(1)
+			get_viewport().set_input_as_handled()
 		elif key == KEY_3 and available_upgrades.size() > 2:
 			select_upgrade(2)
+			get_viewport().set_input_as_handled()
 
 	# Handle mouse clicks on cards to SELECT upgrade
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -113,6 +116,7 @@ func _input(event: InputEvent) -> void:
 				var card_rect = card.get_global_rect()
 				if card_rect.has_point(event.position):
 					select_upgrade(i)
+					get_viewport().set_input_as_handled()
 					break
 
 

@@ -1,0 +1,34 @@
+[gd_scene load_steps=5 format=3 uid="uid://dmgj3bp71xovy"]
+
+[ext_resource type="Script" uid="uid://xsi087ae2ir8" path="res://coop/scripts/shop_building.gd" id="1_shop_building"]
+[ext_resource type="Texture2D" uid="uid://bysl1wj7pfgx" path="res://assets/Building/Barracks.png" id="2_barracks"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_shop"]
+size = Vector2(150, 150)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_collision"]
+size = Vector2(80, 60)
+
+[node name="ShopBuilding" type="Node2D"]
+script = ExtResource("1_shop_building")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(1, 0.99999905)
+scale = Vector2(0.87499994, 0.875)
+texture = ExtResource("2_barracks")
+
+[node name="Area2D" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(0, 20)
+shape = SubResource("RectangleShape2D_shop")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+position = Vector2(0, 15)
+shape = SubResource("RectangleShape2D_collision")

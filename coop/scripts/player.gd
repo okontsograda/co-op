@@ -1,5 +1,6 @@
 extends CharacterBody2D
 
+
 # Movement speeds
 const walk_speed: float = 100.0  # Default walking speed
 const run_speed: float = 135.0  # Running speed (when holding Shift)
@@ -19,6 +20,7 @@ var attack_damage: int = 15  # Base arrow damage
 
 # Player state
 var is_alive: bool = true  # Track if player is alive for enemy targeting
+var player_name: String = "Player"  # Player's name loaded from save system
 
 # Currency System
 var coins: int = 0  # Currency collected by the player
@@ -32,9 +34,20 @@ const xp_per_enemy_kill: int = 25
 
 var is_firing: bool = false
 var can_fire: bool = true
-var rapid_fire_count: int = 0  # Track number of arrows fired in rapid succession
-const max_rapid_fire: int = 2  # Maximum arrows that can be fired rapidly
-const fire_cooldown: float = .5  # Cooldown time after rapid fire
+var is_fire_button_held: bool = false  # Track if fire button is held
+var fire_timer: float = 0.0  # Timer for automatic fire when holding
+const fire_cooldown: float = 1.0  # Cooldown time between shots (1 shot per second max)
+
+# Dodge/Evade System
+var is_dodging: bool = false  # Currently performing a dodge roll
+var dodge_invincible: bool = false  # Invincibility frames during dodge
+var can_dodge: bool = true  # Dodge cooldown
+var dodge_direction: Vector2 = Vector2.ZERO  # Direction of dodge roll
+const dodge_duration: float = 0.25  # How long the dodge roll lasts
+const dodge_distance: float = 120.0  # How far the dodge roll travels
+const dodge_cooldown: float = 1.8  # Cooldown between dodges
+const dodge_iframe_duration: float = 0.25  # Duration of invincibility frames (only during roll)
+const dodge_stamina_cost: float = 35.0  # Stamina cost to perform a dodge
 
 # Weapon System
 var equipped_weapon: String = "bow"  # Default to bow, can be set from lobby
@@ -43,6 +56,17 @@ var current_weapon_config: WeaponData.WeaponConfig = null
 # Combat System
 var combat_type: String = "ranged"  # "ranged" or "melee"
 var melee_attack_range: float = 60.0  # Range for melee attacks
+
+# Combo System (for melee knight)
+var last_attack_time: float = 0.0  # When the last attack was initiated
+var combo_count: int = 0  # Current combo count (0, 1, 2...)
+const combo_window: float = 0.8  # Time window to continue combo (seconds)
+var is_performing_combo: bool = false  # Currently performing combo dash
+const combo_dash_distance: float = 150.0  # How far to dash during combo
+const combo_dash_duration: float = 1.0  # Duration of combo dash (increased for visibility)
+var combo_cooldown_ready: bool = true  # Whether combo attack is off cooldown
+var combo_cooldown_time: float = 0.0  # Current cooldown remaining
+const combo_cooldown_duration: float = 5.0  # Cooldown time for combo attack
 
 # Preload weapon scenes for network compatibility
 const ARROW_SCENE = preload("res://coop/scenes/arrow.tscn")
@@ -91,6 +115,10 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	var peer_id = name.to_int()
 	
+	# Load player name from save system (only for local player)
+	if is_multiplayer_authority():
+		_load_player_name()
+	
 	# Enable Y-sort for proper depth sorting
 	# Characters with higher Y position (lower on screen) will render in front
 	y_sort_enabled = true
@@ -116,12 +144,13 @@ func _ready() -> void:
 	# Add to players group so it can be found by other players
 	add_to_group("players")
 
-	# Initialize health bar, XP display, stamina bar, coin display, and wave display
+	# Initialize health bar, XP display, stamina bar, coin display, wave display, and combo UI
 	update_health_display()
 	update_xp_display()
 	update_stamina_display()
 	setup_coin_display()
 	setup_wave_display()
+	setup_combo_ui()
 
 	# Set up camera to follow this player if this is the local player
 	setup_camera()
@@ -154,13 +183,28 @@ func _input(event: InputEvent) -> void:
 	if current_health <= 0:
 		return
 
+	# Handle dodge roll (Spacebar only, not Enter)
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		if event.keycode == KEY_SPACE:
+			if can_dodge and not is_dodging:
+				perform_dodge_roll()
+			return
+	
 	# Handle stats screen toggle
 	if event.is_action_pressed("stats_toggle") and not event.is_echo():
 		toggle_stats_screen()
 		return
 
-	# Handle chat input for the player whose peer ID matches the current multiplayer peer
-	if event.is_action_pressed("chat_toggle") and not event.is_echo():
+	# Handle chat input (Enter key or chat_toggle action)
+	var should_toggle_chat = false
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		# Enter key opens/closes chat
+		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			should_toggle_chat = true
+	elif event.is_action_pressed("chat_toggle") and not event.is_echo():
+		should_toggle_chat = true
+	
+	if should_toggle_chat:
 		print("Player ", name, " (peer ", peer_id, ") handling chat input")
 		var chat_ui = get_node("ChatUI")
 		if chat_ui:
@@ -171,12 +215,19 @@ func _input(event: InputEvent) -> void:
 			print("ERROR: ChatUI not found for player ", name)
 		return
 
-	# Handle fire animation on left mouse click
+	# Handle fire button state (left mouse button)
 	if event is InputEventMouseButton:
 		var mouse_event = event as InputEventMouseButton
-		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			# Already checked peer_id at top of function
-			handle_fire_action(mouse_event.position)
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			# Check if any UI is blocking combat
+			if is_ui_blocking_combat():
+				is_fire_button_held = false
+				return
+			
+			is_fire_button_held = mouse_event.pressed
+			if mouse_event.pressed:
+				# Fire immediately on button press
+				handle_fire_action(mouse_event.position)
 
 
 func _physics_process(_delta: float) -> void:
@@ -191,13 +242,53 @@ func _physics_process(_delta: float) -> void:
 		move_and_slide()
 		return
 
-	# Check if chat is active - if so, don't process movement
+	# Check if chat is active - if so, don't process movement or combat
 	var chat_ui = get_node("ChatUI")
 	if chat_ui and chat_ui.is_chat_active:
-		# Chat is active, don't process movement
+		# Chat is active, don't process movement or combat
+		is_fire_button_held = false  # Reset fire button when chat is active
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
+	
+	# Check if any UI is blocking movement (shop blocks movement, upgrade overlay doesn't)
+	if is_ui_blocking_movement():
+		is_fire_button_held = false  # Reset fire button when UI is active
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+	
+	# Check if UI is blocking combat (both shop and upgrade overlay block combat)
+	if is_ui_blocking_combat():
+		is_fire_button_held = false  # Reset fire button when UI is active
+		# Don't return here - allow movement to continue
+	
+	# Handle combo dash (takes priority over normal movement and ALL blocking)
+	if is_performing_combo:
+		# During combo dash, movement is handled by perform_dash_combo
+		# Just update z_index
+		# IGNORE all UI/shop blocking during combo - nothing stops the combo!
+		z_index = int(global_position.y)
+		return
+	
+	# Handle dodge roll movement
+	if is_dodging:
+		# During dodge, move in dodge direction at high speed
+		var dodge_speed = dodge_distance / dodge_duration
+		velocity = dodge_direction * dodge_speed
+		move_and_slide()
+		# Update z_index even while dodging
+		z_index = int(global_position.y)
+		return
+	
+	# Handle automatic firing when fire button is held
+	if is_fire_button_held and can_fire:
+		fire_timer += _delta
+		# Fire automatically based on fire_cooldown
+		if fire_timer >= weapon_stats.fire_cooldown:
+			fire_timer = 0.0
+			var mouse_pos = get_viewport().get_mouse_position()
+			handle_fire_action(mouse_pos)
 
 	# Use direct key input instead of input actions
 	var direction = Vector2()
@@ -238,6 +329,14 @@ func _physics_process(_delta: float) -> void:
 
 	# Update stamina display
 	update_stamina_display()
+	
+	# Update combo cooldown
+	if not combo_cooldown_ready and combo_cooldown_time > 0:
+		combo_cooldown_time -= _delta
+		if combo_cooldown_time <= 0:
+			combo_cooldown_time = 0
+			combo_cooldown_ready = true
+		update_combo_ui()
 
 	# Debug input detection (removed spam)
 	#if direction != Vector2.ZERO:
@@ -276,27 +375,63 @@ func _on_chat_message_received(player_name: String, message: String) -> void:
 			print("ERROR: Sender player not found!")
 
 
+func is_ui_blocking_combat() -> bool:
+	# Check if shop UI is open
+	var shop_ui = get_tree().root.get_node_or_null("ShopUI")
+	if shop_ui and shop_ui.visible:
+		return true
+	
+	# Check if upgrade overlay is open
+	var upgrade_overlay = get_tree().root.get_node_or_null("UpgradeOverlay")
+	if upgrade_overlay and upgrade_overlay.visible:
+		return true
+	
+	# Check for any CanvasLayer with ShopUI or UpgradeOverlay
+	for node in get_tree().get_nodes_in_group("ui"):
+		if node is CanvasLayer and node.visible:
+			if "ShopUI" in node.name or "UpgradeOverlay" in node.name:
+				return true
+	
+	return false
+
+
+func is_ui_blocking_movement() -> bool:
+	# Only shop UI blocks movement, upgrade overlay allows movement
+	var shop_ui = get_tree().root.get_node_or_null("ShopUI")
+	if shop_ui and shop_ui.visible:
+		return true
+	
+	# Check for any CanvasLayer with ShopUI (but NOT UpgradeOverlay)
+	for node in get_tree().get_nodes_in_group("ui"):
+		if node is CanvasLayer and node.visible:
+			if "ShopUI" in node.name:
+				return true
+	
+	return false
+
+
 func handle_fire_action(_mouse_position: Vector2) -> void:
-	# Check if player can fire (not on cooldown)
-	if not can_fire:
-		print("Player ", name, " cannot attack yet - on cooldown")
+	# Don't fire while dodging
+	if is_dodging:
 		return
-
-	# For melee, ignore rapid fire system - one attack per click
+	
+	# For melee combat, check if this could be a combo attack
 	if combat_type == "melee":
-		handle_melee_attack(_mouse_position)
+		var current_time = Time.get_ticks_msec() / 1000.0
+		var time_since_last_attack = current_time - last_attack_time
+		
+		# Allow click if:
+		# 1. Can fire normally, OR
+		# 2. Within combo window (for combo chaining)
+		if can_fire or (time_since_last_attack <= combo_window and combo_count > 0):
+			handle_melee_attack(_mouse_position)
+		return
+	
+	# Ranged weapons require cooldown to be ready
+	if not can_fire:
 		return
 
-	# Ranged weapons use rapid fire system
-	# Check rapid fire limit
-	if rapid_fire_count >= max_rapid_fire:
-		print("Player ", name, " rapid attack limit reached, must wait")
-		return
-
-	# Don't allow firing if already in fire animation and at rapid fire limit
-	if is_firing and rapid_fire_count >= max_rapid_fire:
-		return
-
+	# Ranged weapons use cooldown system
 	handle_ranged_attack(_mouse_position)
 
 
@@ -304,10 +439,9 @@ func handle_ranged_attack(_mouse_position: Vector2) -> void:
 	# Trigger the fire animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
-		print("Player ", name, " firing!")
-
-		# Increment rapid fire count
-		rapid_fire_count += 1
+		# Set cooldown immediately - can't fire again until cooldown expires
+		can_fire = false
+		fire_timer = 0.0  # Reset fire timer
 
 		# Convert mouse position to world coordinates for network sync
 		var camera = get_viewport().get_camera_2d()
@@ -329,46 +463,101 @@ func handle_ranged_attack(_mouse_position: Vector2) -> void:
 			play_bow_sound(self)
 
 			# Wait for animation to play before firing arrow (about halfway through fire animation)
-			await get_tree().create_timer(0.5).timeout
+			await get_tree().create_timer(0.3).timeout
 			# Spawn arrow locally immediately
 			spawn_arrow_for_player(self, world_target)
 			# Send RPC to network to spawn arrow on other clients
 			rpc("spawn_arrow_network", world_target)
 
 		# After remaining animation time, return to normal animation
-		await get_tree().create_timer(0.4).timeout
+		await get_tree().create_timer(0.3).timeout
 		is_firing = false
-		print("Player ", name, " finished firing")
 
-		# Allow immediate refire if under rapid fire limit, otherwise wait for cooldown
-		if rapid_fire_count < max_rapid_fire:
-			# Allow rapid fire - can fire again immediately
-			print("Player ", name, " rapid fire available: ", rapid_fire_count, "/", max_rapid_fire)
-		else:
-			# Rapid fire limit reached, wait for cooldown (use upgraded fire_cooldown)
-			can_fire = false
-			await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
-			can_fire = true
-			rapid_fire_count = 0  # Reset rapid fire counter
-			print("Player ", name, " can fire again")
+		# Wait for cooldown before allowing next shot (use upgraded fire_cooldown)
+		await get_tree().create_timer(weapon_stats.fire_cooldown).timeout
+		can_fire = true
 	else:
 		print("ERROR: AnimatedSprite2D not found!")
 
 
 func handle_melee_attack(_mouse_position: Vector2) -> void:
+	# Don't attack if already performing combo dash
+	if is_performing_combo:
+		return
+	
 	# Trigger the melee attack animation
 	var animated_sprite = get_node("AnimatedSprite2D")
 	if animated_sprite:
-		# Set cooldown immediately - one attack per click
-		can_fire = false
-
 		# Convert mouse position to world coordinates
 		var camera = get_viewport().get_camera_2d()
 		if camera:
 			var world_target = camera.get_global_mouse_position()
+			var direction_to_target = (world_target - global_position).normalized()
+
+			# Check if this is a combo attack (within combo window)
+			var current_time = Time.get_ticks_msec() / 1000.0
+			var time_since_last_attack = current_time - last_attack_time
+			
+			if time_since_last_attack <= combo_window and combo_count > 0 and not can_fire:
+				# This is a combo click during the first attack!
+				combo_count += 1
+				print("Combo attack #", combo_count)
+				
+				# Update last attack time
+				last_attack_time = current_time
+				
+				# Check if combo cooldown is ready
+				if combo_count >= 2 and combo_cooldown_ready:
+					print("DASH COMBO ACTIVATED!")
+					
+					# Stop current animation and reset state
+					is_firing = false
+					
+					# Start combo cooldown
+					combo_cooldown_ready = false
+					combo_cooldown_time = combo_cooldown_duration
+					update_combo_ui()
+					
+					# Start dash combo
+					perform_dash_combo(world_target, direction_to_target)
+					return
+				elif combo_count >= 2 and not combo_cooldown_ready:
+					print("Combo attack on cooldown! ", combo_cooldown_time, "s remaining")
+					# Reset combo since it failed
+					combo_count = 0
+					return
+			elif time_since_last_attack <= combo_window and combo_count > 0:
+				# Continue combo on a completed attack
+				combo_count += 1
+				print("Combo attack #", combo_count)
+			else:
+				# Start new combo chain
+				combo_count = 1
+				print("Starting new combo chain")
+			
+			last_attack_time = current_time
+			
+			# Check if we should trigger dash combo (2 consecutive attacks when cooldown ready)
+			if combo_count >= 2 and combat_type == "melee" and can_fire:
+				if combo_cooldown_ready:
+					print("DASH COMBO ACTIVATED!")
+					
+					# Start combo cooldown
+					combo_cooldown_ready = false
+					combo_cooldown_time = combo_cooldown_duration
+					update_combo_ui()
+					
+					perform_dash_combo(world_target, direction_to_target)
+					return
+				else:
+					print("Combo attack on cooldown! ", combo_cooldown_time, "s remaining")
+					# Reset combo since it failed
+					combo_count = 0
+			
+			# Set cooldown for normal attack
+			can_fire = false
 
 			# Turn player to face the attack direction
-			var direction_to_target = (world_target - global_position).normalized()
 			if direction_to_target.x > 0:
 				animated_sprite.flip_h = false  # Face right
 			elif direction_to_target.x < 0:
@@ -377,17 +566,14 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 			# Play attack animation - check which animation exists
 			is_firing = true
 			var sprite_frames = animated_sprite.sprite_frames
-			var attack_anim_name = ""
 			
 			if sprite_frames and sprite_frames.has_animation("attack"):
 				# Make sure attack animation doesn't loop
 				sprite_frames.set_animation_loop("attack", false)
-				attack_anim_name = "attack"
 				animated_sprite.play("attack")
 			elif sprite_frames and sprite_frames.has_animation("fire"):
 				# Make sure fire animation doesn't loop for melee
 				sprite_frames.set_animation_loop("fire", false)
-				attack_anim_name = "fire"
 				animated_sprite.play("fire")
 			else:
 				print("WARNING: No attack or fire animation found!")
@@ -429,6 +615,229 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 		print("ERROR: AnimatedSprite2D not found!")
 
 
+func perform_dash_combo(world_target: Vector2, dash_direction: Vector2) -> void:
+	# Perform a dash forward with multiple strikes
+	is_performing_combo = true
+	is_firing = true
+	var animated_sprite = get_node("AnimatedSprite2D")
+	
+	if animated_sprite:
+		# Turn player to face the dash direction
+		if dash_direction.x > 0:
+			animated_sprite.flip_h = false  # Face right
+		elif dash_direction.x < 0:
+			animated_sprite.flip_h = true  # Face left
+		
+		# Set up attack animation properties (will be played manually for each strike)
+		var sprite_frames = animated_sprite.sprite_frames
+		if sprite_frames:
+			if sprite_frames.has_animation("attack"):
+				sprite_frames.set_animation_loop("attack", false)  # Don't loop, we control it
+			if sprite_frames.has_animation("fire"):
+				sprite_frames.set_animation_loop("fire", false)  # Don't loop, we control it
+		
+		# Visual feedback - add dash trail effect
+		animated_sprite.modulate = Color(1.5, 1.5, 1.8)  # Slight blue tint for dash
+	
+	# Store original position for dash
+	var start_pos = global_position
+	var target_pos = start_pos + (dash_direction * combo_dash_distance)
+	
+	# Dash forward quickly
+	var start_time = Time.get_ticks_msec() / 1000.0  # Get current time in seconds
+	var dash_timer = 0.0
+	var strikes_performed = 0
+	var strike_interval = combo_dash_duration / 3  # 3 strikes during dash (0.333s each)
+	
+	print("Starting dash combo from ", start_pos, " to ", target_pos)
+	print("Strike interval: ", strike_interval, " seconds")
+	print("Start time: ", start_time)
+	
+	# Perform dash with multiple strikes
+	var loop_iterations = 0
+	while is_performing_combo:
+		loop_iterations += 1
+		# Use real time instead of delta accumulation
+		var current_time = Time.get_ticks_msec() / 1000.0
+		dash_timer = current_time - start_time
+		
+		# Exit when duration is complete
+		if dash_timer > combo_dash_duration:
+			print("Dash duration complete, exiting loop")
+			break
+		
+		# Interpolate position during dash
+		var progress = min(dash_timer / combo_dash_duration, 1.0)
+		global_position = start_pos.lerp(target_pos, progress)
+		
+		# Debug: log every 10th iteration
+		if loop_iterations % 30 == 0:
+			print("Loop running... timer: ", dash_timer, "/", combo_dash_duration, " strikes: ", strikes_performed)
+		
+		# Perform strikes at intervals during dash
+		# Check if it's time for the next strike (haven't done this strike number yet)
+		var current_strike_number = int(dash_timer / strike_interval) + 1
+		if current_strike_number > strikes_performed and strikes_performed < 3:
+			print("Triggering strike at dash_timer: ", dash_timer, " strike number: ", current_strike_number)
+			strikes_performed = current_strike_number
+			print("Dash strike #", strikes_performed)
+			
+			# Alternate animation direction for each strike
+			if animated_sprite:
+				var sprite_frames = animated_sprite.sprite_frames
+				var anim_name = "attack" if sprite_frames and sprite_frames.has_animation("attack") else "fire"
+				
+				print("Animation setup - anim_name: ", anim_name, " is_playing: ", animated_sprite.is_playing())
+				
+				if strikes_performed == 1:
+					# First strike: play forward from start
+					animated_sprite.speed_scale = 1.5
+					animated_sprite.play(anim_name)
+					animated_sprite.frame = 0  # Set frame AFTER play
+					print("Strike 1: Forward - speed 1.5, frame 0")
+				elif strikes_performed == 2:
+					# Second strike: play in reverse from end
+					if sprite_frames:
+						var frame_count = sprite_frames.get_frame_count(anim_name)
+						animated_sprite.speed_scale = -1.5
+						animated_sprite.play(anim_name)  # MUST call play() to restart animation
+						animated_sprite.frame = frame_count - 1  # Jump to end
+						print("Strike 2: Reverse - speed -1.5, frame ", frame_count - 1)
+				elif strikes_performed == 3:
+					# Third strike: play forward from start
+					animated_sprite.speed_scale = 1.5
+					animated_sprite.play(anim_name)  # MUST call play() to restart animation
+					animated_sprite.frame = 0  # Jump back to start
+					print("Strike 3: Forward - speed 1.5, frame 0")
+			
+			# Play attack sound
+			play_weapon_sound(self)
+			print("Sound played for strike #", strikes_performed)
+			
+			# Perform damage in a wider area during dash
+			var strike_range = melee_attack_range * 1.2  # 20% wider range during dash
+			perform_dash_strike_damage(world_target, strike_range)
+			
+			# Send RPC for network sync
+			rpc("perform_dash_strike_network", world_target, strike_range)
+		
+		await get_tree().process_frame
+	
+	print("Loop exited. Final dash_timer: ", dash_timer, " loop_iterations: ", loop_iterations)
+	print("is_performing_combo: ", is_performing_combo)
+	
+	# Ensure we end at target position
+	global_position = target_pos
+	
+	print("Combo complete! Total strikes performed: ", strikes_performed)
+	
+	# Reset visual effects and animation
+	if animated_sprite:
+		animated_sprite.modulate = Color(1.0, 1.0, 1.0)
+		
+		# Reset animation speed to normal
+		animated_sprite.speed_scale = 1.0
+		
+		# Stop looping attack animation and return to idle
+		var sprite_frames = animated_sprite.sprite_frames
+		if sprite_frames:
+			if sprite_frames.has_animation("attack"):
+				sprite_frames.set_animation_loop("attack", false)
+			if sprite_frames.has_animation("fire"):
+				sprite_frames.set_animation_loop("fire", false)
+			if sprite_frames.has_animation("idle"):
+				sprite_frames.set_animation_loop("idle", true)
+				animated_sprite.play("idle")
+	
+	# Reset combo after successful dash
+	combo_count = 0
+	is_firing = false
+	is_performing_combo = false
+	
+	# Cooldown after combo before next normal attack
+	await get_tree().create_timer(0.3).timeout
+	can_fire = true
+	
+	print("Dash combo complete!")
+
+
+func perform_dash_strike_damage(target_pos: Vector2, strike_range: float) -> void:
+	# Similar to perform_melee_damage but with custom range
+	var attack_direction = (target_pos - global_position).normalized()
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	
+	# Calculate final damage (slightly boosted for combo)
+	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier * 1.15
+	
+	# Check for critical hit
+	var is_crit = randf() < weapon_stats.crit_chance
+	if is_crit:
+		final_damage *= weapon_stats.crit_multiplier
+	
+	const KNOCKBACK_FORCE = 150.0  # Slightly less knockback during rapid strikes
+	
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+			
+		# Check if enemy is within range
+		var distance = global_position.distance_to(enemy.global_position)
+		if distance > strike_range:
+			continue
+		
+		# Check if enemy is roughly in the direction of attack (wider cone for dash)
+		var direction_to_enemy = (enemy.global_position - global_position).normalized()
+		var dot_product = attack_direction.dot(direction_to_enemy)
+		
+		# Wider attack cone during dash (from 0.3 to 0.15)
+		var in_attack_direction = "whirlwind" in active_abilities or dot_product > 0.15
+		
+		if in_attack_direction:
+			# Damage the enemy
+			if enemy.has_method("take_damage"):
+				enemy.take_damage(int(final_damage), self)
+				
+				# Apply knockback to enemy
+				if enemy.has_method("apply_knockback"):
+					var knockback_direction = direction_to_enemy
+					var knockback_velocity = knockback_direction * KNOCKBACK_FORCE
+					enemy.apply_knockback(knockback_velocity)
+				
+			# Apply lifesteal
+			if weapon_stats.lifesteal > 0:
+				heal(weapon_stats.lifesteal)
+			
+			# Track damage dealt
+			if GameStats:
+				GameStats.record_damage_dealt(int(final_damage))
+			
+			# Spawn damage number
+			spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
+
+
+@rpc("any_peer", "reliable")
+func perform_dash_strike_network(target_pos: Vector2, strike_range: float) -> void:
+	# Get the player who sent this RPC
+	var attacker_peer_id = multiplayer.get_remote_sender_id()
+	
+	# Don't process on the client that sent it (they already did it locally)
+	if attacker_peer_id == multiplayer.get_unique_id():
+		return
+	
+	# Find the attacker player
+	var attacker = null
+	for player in get_tree().get_nodes_in_group("players"):
+		if player.name.to_int() == attacker_peer_id:
+			attacker = player
+			break
+	
+	if attacker:
+		# Play attack sound for remote clients
+		play_weapon_sound(attacker)
+		# Perform dash strike damage from attacker's position
+		attacker.perform_dash_strike_damage(target_pos, strike_range)
+
+
 func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> void:
 	# Find enemies within melee range and damage them
 	var attack_direction = (target_pos - global_position).normalized()
@@ -442,7 +851,6 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 	if is_crit:
 		final_damage *= weapon_stats.crit_multiplier
 	
-	var enemies_hit = 0
 	const KNOCKBACK_FORCE = 200.0  # Knockback strength
 	
 	for enemy in enemies:
@@ -466,7 +874,6 @@ func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> 
 			# Damage the enemy
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(int(final_damage), self)
-				enemies_hit += 1
 				
 				# Apply knockback to enemy
 				if apply_knockback and enemy.has_method("apply_knockback"):
@@ -645,7 +1052,46 @@ func update_stamina_display() -> void:
 		stamina_bar.update_stamina(current_stamina, max_stamina)
 
 
+func update_combo_ui() -> void:
+	# Update the combo attack UI display (now in root, not child of player)
+	var combo_ui = get_tree().root.get_node_or_null("ComboAttackUI")
+	if combo_ui and combo_ui.has_method("update_cooldown"):
+		combo_ui.update_cooldown(combo_cooldown_ready, combo_cooldown_time, combo_cooldown_duration)
+
+
+func setup_combo_ui() -> void:
+	# Create combo UI if it doesn't exist (only for local player and only for melee)
+	var peer_id = name.to_int()
+	if peer_id == multiplayer.get_unique_id() and combat_type == "melee":
+		# Check if UI already exists in the scene tree (not as child of player)
+		var existing_ui = get_tree().root.get_node_or_null("ComboAttackUI")
+		if not existing_ui:
+			var combo_ui_scene = load("res://coop/scenes/combo_attack_ui.tscn")
+			if combo_ui_scene:
+				var combo_ui = combo_ui_scene.instantiate()
+				combo_ui.name = "ComboAttackUI"
+				# Add to root instead of player so it doesn't move with player
+				get_tree().root.add_child(combo_ui)
+				# Initialize the display
+				update_combo_ui()
+			else:
+				print("WARNING: Could not load combo_attack_ui.tscn")
+	
+	# Hide combo UI for ranged classes
+	if combat_type != "melee":
+		var combo_ui = get_tree().root.get_node_or_null("ComboAttackUI")
+		if combo_ui:
+			combo_ui.queue_free()
+
+
 func take_damage(amount: int, attacker: Node2D) -> void:
+	# Check if player is invincible from dodge roll
+	if dodge_invincible:
+		# Spawn visual feedback that damage was evaded
+		spawn_evade_text()
+		print("Player ", name, " evaded attack!")
+		return
+	
 	# Apply damage locally
 	# Reduce health
 	current_health -= amount
@@ -671,6 +1117,106 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 		# Sync death to all clients
 		rpc("handle_death_rpc")
 		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
+
+
+func perform_dodge_roll() -> void:
+	# Don't dodge if already dodging, performing combo, or if dead
+	if is_dodging or is_performing_combo or current_health <= 0:
+		return
+	
+	# Check if player has enough stamina
+	if current_stamina < dodge_stamina_cost:
+		print("Player ", name, " not enough stamina to dodge (", current_stamina, "/", dodge_stamina_cost, ")")
+		return
+	
+	# Consume stamina
+	current_stamina -= dodge_stamina_cost
+	if current_stamina < 0:
+		current_stamina = 0
+	update_stamina_display()
+	
+	# Determine dodge direction based on movement input or facing direction
+	var direction = Vector2()
+	
+	# Check for WASD keys for dodge direction
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		direction.y -= 1
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		direction.y += 1
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		direction.x -= 1
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		direction.x += 1
+	
+	# If no direction input, dodge away from mouse (backwards)
+	if direction == Vector2.ZERO:
+		var camera = get_viewport().get_camera_2d()
+		if camera:
+			var mouse_pos = camera.get_global_mouse_position()
+			direction = (global_position - mouse_pos).normalized()
+		else:
+			# Fallback: dodge downward
+			direction = Vector2(0, 1)
+	else:
+		direction = direction.normalized()
+	
+	# Start dodge roll
+	is_dodging = true
+	dodge_invincible = true
+	can_dodge = false
+	dodge_direction = direction
+	
+	# Visual feedback - make player semi-transparent during dodge
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.modulate.a = 0.5  # 50% opacity
+	
+	# Broadcast dodge to all clients for visual sync
+	rpc("sync_dodge_visual", true)
+	
+	print("Player ", name, " dodge rolling in direction: ", direction)
+	
+	# End dodge roll after duration
+	await get_tree().create_timer(dodge_duration).timeout
+	is_dodging = false
+	dodge_invincible = false  # End invincibility when dodge ends
+	
+	# Restore visual appearance
+	if sprite:
+		sprite.modulate.a = 1.0  # Full opacity
+	rpc("sync_dodge_visual", false)
+	
+	# Start cooldown before next dodge
+	await get_tree().create_timer(dodge_cooldown).timeout
+	can_dodge = true
+	print("Player ", name, " can dodge again")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_dodge_visual(is_dodging_state: bool) -> void:
+	# Sync dodge visual effect across all clients
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.modulate.a = 0.5 if is_dodging_state else 1.0
+
+
+func spawn_evade_text() -> void:
+	# Spawn "EVADED!" text visual effect using damage number system
+	var damage_scene = load("res://coop/scenes/damage_number.tscn")
+	if damage_scene:
+		var evade_instance = damage_scene.instantiate()
+		evade_instance.global_position = global_position + Vector2(0, -30)
+		
+		# Add to scene FIRST
+		get_tree().current_scene.add_child(evade_instance)
+		
+		# Set as evade text (special styling)
+		if evade_instance.has_method("set_evade_text"):
+			evade_instance.set_evade_text()
+		else:
+			# Fallback: use damage text with 0 damage
+			if evade_instance.has_method("set_damage"):
+				evade_instance.set_damage(0, false, true)  # Pass true for "is_evade"
 
 
 @rpc("any_peer", "reliable", "call_local")
@@ -834,10 +1380,10 @@ func show_game_over_screen_rpc() -> void:
 
 
 @rpc("any_peer", "reliable")
-func sync_stats_from_server(enemies: int, coins: int, wave: int, damage_dealt: int, damage_taken: int, bosses: int) -> void:
+func sync_stats_from_server(enemies: int, total_coins: int, wave: int, damage_dealt: int, damage_taken: int, bosses: int) -> void:
 	# Receive synced stats from server
 	if GameStats:
-		GameStats.sync_all_stats(enemies, coins, wave, damage_dealt, damage_taken, bosses)
+		GameStats.sync_all_stats(enemies, total_coins, wave, damage_dealt, damage_taken, bosses)
 
 
 func hide_player_ui() -> void:
@@ -865,6 +1411,10 @@ func hide_player_ui() -> void:
 	var wave_display = get_node_or_null("WaveDisplay")
 	if wave_display:
 		wave_display.visible = false
+	
+	var combo_ui = get_tree().root.get_node_or_null("ComboAttackUI")
+	if combo_ui:
+		combo_ui.visible = false
 	
 	# Hide stats screen if open
 	var stats_screen = get_node_or_null("StatsScreen")
@@ -1101,10 +1651,10 @@ func apply_upgrade(upgrade_id: String) -> void:
 			print("Lifesteal: ", weapon_stats.lifesteal, " HP")
 
 		"rapid_fire_capacity":
-			# Modify max_rapid_fire constant through instance variable
-			# Note: We'll need to track this separately since max_rapid_fire is const
-			print("Rapid fire capacity increased")
-			# TODO: Implement once we refactor rapid fire system
+			# This upgrade is now deprecated with the new fire cooldown system
+			# Instead, it provides additional fire rate bonus
+			weapon_stats.fire_cooldown *= 0.9  # 10% faster fire rate
+			print("Fire cooldown reduced to: ", weapon_stats.fire_cooldown)
 
 		"poison_arrows":
 			# Enable poison effect
@@ -1537,3 +2087,13 @@ func apply_class_modifiers(selected_class: String) -> void:
 	# Update displays
 	update_health_display()
 	update_xp_display()
+
+
+# Load player name from save system
+func _load_player_name() -> void:
+	# Wait for SaveSystem to load if it hasn't yet
+	if not SaveSystem.is_loaded:
+		await SaveSystem.data_loaded
+	
+	player_name = SaveSystem.get_player_name()
+	print("[Player] Loaded player name: ", player_name)
