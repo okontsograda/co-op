@@ -1,0 +1,67 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://coop/scripts/rest_wave_overlay.gd" id="1"]
+
+[node name="RestWaveOverlay" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1")
+
+[node name="TopCenterMessage" type="MarginContainer" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TopCenterMessage"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="TitleLabel" type="Label" parent="TopCenterMessage/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "REST WAVE"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="TopCenterMessage/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Visit the shop or apply level-ups - Press Ready when done"
+horizontal_alignment = 1
+
+[node name="ReadyStatusLabel" type="Label" parent="TopCenterMessage/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Ready: 0 / 0"
+horizontal_alignment = 1
+
+[node name="LeftSidePanel" type="MarginContainer" parent="."]
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 250.0
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 150
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="LeftSidePanel"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="LevelUpButton" type="Button" parent="LeftSidePanel/VBoxContainer"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "LEVEL UP (0)"
+
+[node name="VSpacer" type="Control" parent="LeftSidePanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="ReadyButton" type="Button" parent="LeftSidePanel/VBoxContainer"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "READY UP"

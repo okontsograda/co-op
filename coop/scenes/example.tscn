@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=4 uid="uid://c66m8oem8ehsl"]
+[gd_scene load_steps=23 format=4 uid="uid://c66m8oem8ehsl"]
 
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="1_ewl3q"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="1_ta1gp"]
@@ -7,11 +7,13 @@
 [ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/Characters/player.tscn" id="3_cs02y"]
 [ext_resource type="Texture2D" uid="uid://dqu0c522j04i6" path="res://tileset/Bridge_All.png" id="6_mnf6x"]
 [ext_resource type="PackedScene" uid="uid://c28e7e3l0hneh" path="res://coop/scenes/tree_1.tscn" id="6_ydsdc"]
-[ext_resource type="PackedScene" uid="uid://debug_overlay_001" path="res://coop/scenes/debug_overlay.tscn" id="7_debug"]
+[ext_resource type="PackedScene" path="res://coop/scenes/debug_overlay.tscn" id="7_debug"]
 [ext_resource type="PackedScene" uid="uid://c7y8qm5jh3dpb" path="res://coop/scenes/shop_building.tscn" id="7_shop"]
 [ext_resource type="Texture2D" uid="uid://dw5wdxd2wki68" path="res://tileset/01.png" id="8_lfjhb"]
 [ext_resource type="Texture2D" uid="uid://d2jx20a5b8cwr" path="res://tileset/02.png" id="9_1f1uy"]
 [ext_resource type="Texture2D" uid="uid://dmyfxyhhw8kfx" path="res://tileset/03.png" id="10_tyu68"]
+[ext_resource type="PackedScene" path="res://coop/scenes/ui/rest_wave_overlay.tscn" id="13_rh1hg"]
+[ext_resource type="PackedScene" path="res://coop/scenes/ui/wave_notification.tscn" id="14_q1hcx"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ydsdc"]
 texture = ExtResource("1_ewl3q")
@@ -1746,3 +1748,7 @@ position = Vector2(128, -15)
 
 [node name="Tree10" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(208, 103)
+
+[node name="RestWaveOverlay" parent="." instance=ExtResource("13_rh1hg")]
+
+[node name="WaveNotification" parent="." instance=ExtResource("14_q1hcx")]

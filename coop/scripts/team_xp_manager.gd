@@ -14,6 +14,9 @@ var team_xp: int = 0
 var team_level: int = 1
 var xp_to_next_level: int = 100
 
+# Level up queuing (for rest waves)
+var pending_level_ups: int = 0  # Number of queued level ups
+
 # Constants
 const BASE_XP_PER_LEVEL: int = 100
 const XP_PER_ENEMY_KILL: int = 25
@@ -127,9 +130,12 @@ func broadcast_level_up(new_level: int) -> void:
 	if level_up_sound and level_up_sound.stream:
 		level_up_sound.play()
 
-	# Emit signals
+	# Emit level changed signal
 	level_changed.emit(team_level)
-	level_up_ready.emit()
+
+	# Always queue level ups - they'll be manually triggered during rest wave
+	pending_level_ups += 1
+	print("[TeamXP] Level up queued - Total pending: ", pending_level_ups)
 
 
 ## Get current team level
@@ -147,10 +153,37 @@ func get_xp_to_next_level() -> int:
 	return xp_to_next_level
 
 
+## Trigger one pending level up (call manually during rest wave)
+func trigger_single_level_up() -> bool:
+	if pending_level_ups > 0:
+		print("[TeamXP] Triggering level up - Remaining: ", pending_level_ups - 1)
+		pending_level_ups -= 1
+		level_up_ready.emit()
+		return true
+	return false
+
+
+## Get number of pending level ups
+func get_pending_level_ups() -> int:
+	return pending_level_ups
+
+
+## Check if there are pending level ups
+func has_pending_level_ups() -> bool:
+	return pending_level_ups > 0
+
+
+## Clear pending level ups (used when rest wave starts)
+func clear_pending_level_ups() -> void:
+	pending_level_ups = 0
+	print("[TeamXP] Cleared all pending level ups")
+
+
 ## Reset team XP (for testing or new game)
 func reset() -> void:
 	if multiplayer.is_server():
 		team_xp = 0
 		team_level = 1
+		pending_level_ups = 0
 		update_xp_requirement()
 		rpc("sync_team_xp", team_xp, team_level, xp_to_next_level)

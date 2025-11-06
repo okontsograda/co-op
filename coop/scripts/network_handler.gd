@@ -23,6 +23,10 @@ var wave_start_timer: Timer = null
 var max_waves: int = 3
 var total_enemies_killed: int = 0  # Track total across all waves
 
+# Rest wave system variables
+var is_rest_wave: bool = false
+var player_ready_states: Dictionary = {}  # peer_id -> bool
+
 # Boss system variables
 var boss_min_health: int = 200
 var boss_max_health: int = 500
@@ -151,6 +155,14 @@ func _on_peer_disconnected(peer_id: int) -> void:
 
 	# Unregister player from GameDirector
 	GameDirector.unregister_player(peer_id)
+
+	# If in rest wave, mark player as ready and remove from tracking
+	if is_rest_wave and player_ready_states.has(peer_id):
+		player_ready_states.erase(peer_id)
+		print("Removed disconnected player from rest wave ready states")
+		# Check if all remaining players are ready
+		rpc("sync_ready_states", player_ready_states)
+		check_all_players_ready()
 
 	# Find and remove the player node with this peer ID
 	var player_node_name = str(peer_id)
@@ -316,8 +328,14 @@ func check_wave_completion() -> void:
 		# Show wave completion message
 		rpc("show_wave_completion", current_wave)
 
-		# Start countdown to next wave (waves are unlimited)
-		start_wave_countdown()
+		# Check if next wave should be a rest wave
+		var next_wave_type = GameDirector.next_wave_type
+		if next_wave_type == GameDirector.WaveType.REST:
+			# Start rest wave
+			start_rest_wave()
+		else:
+			# Start countdown to next wave (waves are unlimited)
+			start_wave_countdown()
 
 
 func start_next_wave() -> void:
@@ -346,19 +364,233 @@ func start_wave_countdown() -> void:
 	start_next_wave()
 
 
+# ============================================================================
+# REST WAVE SYSTEM
+# ============================================================================
+
+func start_rest_wave() -> void:
+	# Only run on server
+	if not multiplayer.is_server():
+		return
+
+	print("[NetworkHandler] Starting rest wave")
+	is_rest_wave = true
+
+	# Reset rest wave counter in GameDirector
+	GameDirector.reset_rest_wave_counter()
+
+	# Initialize all players as not ready
+	# Get players from scene instead of LobbyManager for better reliability
+	player_ready_states.clear()
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		# Get peer ID from player name
+		var peer_id = player.name.to_int()
+		if peer_id > 0:
+			player_ready_states[peer_id] = false
+			print("[NetworkHandler] Added player %d to ready states" % peer_id)
+
+	print("[NetworkHandler] Initialized ready states for %d players" % player_ready_states.size())
+
+	# Broadcast rest wave start to all clients
+	rpc("on_rest_wave_started")
+
+	# Sync initial ready states to all clients
+	rpc("sync_ready_states", player_ready_states)
+
+
+@rpc("authority", "reliable", "call_local")
+func on_rest_wave_started() -> void:
+	# Called on all clients when rest wave starts
+	print("[NetworkHandler] Rest wave started on client")
+	is_rest_wave = true
+
+	# Update wave display
+	update_wave_display_rest_wave(true)
+
+	# Show rest wave UI
+	show_rest_wave_ui()
+
+
+@rpc("any_peer", "reliable")
+func request_ready_up() -> void:
+	# Only server processes ready requests
+	if not multiplayer.is_server():
+		return
+
+	var peer_id = multiplayer.get_remote_sender_id()
+	if peer_id == 0:  # Server/host calling locally
+		peer_id = multiplayer.get_unique_id()
+
+	print("[NetworkHandler] Player %d requesting ready up" % peer_id)
+	print("[NetworkHandler] Current ready states: ", player_ready_states)
+
+	# Mark player as ready
+	if player_ready_states.has(peer_id):
+		player_ready_states[peer_id] = true
+		print("[NetworkHandler] Player %d marked ready successfully" % peer_id)
+	else:
+		print("[NetworkHandler] WARNING: Player %d not found in ready states!" % peer_id)
+		print("[NetworkHandler] Available peer IDs: ", player_ready_states.keys())
+
+	# Broadcast updated ready states to all clients
+	rpc("sync_ready_states", player_ready_states)
+
+	# Check if all players are ready
+	check_all_players_ready()
+
+
+@rpc("authority", "reliable", "call_local")
+func sync_ready_states(ready_states: Dictionary) -> void:
+	# Sync ready states to all clients (including server in solo play)
+	player_ready_states = ready_states
+	print("[NetworkHandler] Ready states synced: ", ready_states)
+
+	# Count ready players
+	var ready_count = 0
+	for peer_id in ready_states:
+		if ready_states[peer_id]:
+			ready_count += 1
+
+	# Update wave display with ready count
+	update_wave_display_ready_count(ready_count, ready_states.size())
+
+	# Update rest wave UI with ready states
+	update_rest_wave_ui()
+
+
+func check_all_players_ready() -> void:
+	# Check if all players are ready
+	var all_ready = true
+	var ready_count = 0
+
+	for peer_id in player_ready_states:
+		if player_ready_states[peer_id]:
+			ready_count += 1
+		else:
+			all_ready = false
+
+	print("[NetworkHandler] Ready check: %d/%d players ready" % [ready_count, player_ready_states.size()])
+
+	if all_ready and player_ready_states.size() > 0:
+		print("[NetworkHandler] All players ready, ending rest wave")
+		# Small delay before starting next wave
+		await get_tree().create_timer(1.0).timeout
+		end_rest_wave()
+	else:
+		print("[NetworkHandler] Waiting for more players to ready up")
+
+
+func end_rest_wave() -> void:
+	# Only run on server
+	if not multiplayer.is_server():
+		return
+
+	print("[NetworkHandler] Ending rest wave")
+	is_rest_wave = false
+
+	# Broadcast rest wave end to all clients
+	rpc("on_rest_wave_ended")
+
+	# Small delay before wave countdown
+	await get_tree().create_timer(1.0).timeout
+
+	# Start countdown to next wave
+	start_wave_countdown()
+
+
+@rpc("authority", "reliable", "call_local")
+func on_rest_wave_ended() -> void:
+	# Called on all clients when rest wave ends
+	print("[NetworkHandler] Rest wave ended on client")
+	is_rest_wave = false
+
+	# Update wave display
+	update_wave_display_rest_wave(false)
+
+	# Hide rest wave UI
+	hide_rest_wave_ui()
+
+
+func show_rest_wave_ui() -> void:
+	# Show rest wave overlay on local client
+	# This will be handled by the rest_wave_overlay scene
+	var rest_wave_overlay = get_tree().current_scene.get_node_or_null("RestWaveOverlay")
+	if rest_wave_overlay and rest_wave_overlay.has_method("show_overlay"):
+		rest_wave_overlay.show_overlay()
+
+
+func hide_rest_wave_ui() -> void:
+	# Hide rest wave overlay on local client
+	var rest_wave_overlay = get_tree().current_scene.get_node_or_null("RestWaveOverlay")
+	if rest_wave_overlay and rest_wave_overlay.has_method("hide_overlay"):
+		rest_wave_overlay.hide_overlay()
+
+
+func update_rest_wave_ui() -> void:
+	# Update rest wave UI with current ready states
+	var rest_wave_overlay = get_tree().current_scene.get_node_or_null("RestWaveOverlay")
+	if rest_wave_overlay:
+		if rest_wave_overlay.has_method("update_ready_states"):
+			print("[NetworkHandler] Calling update_ready_states on overlay with: ", player_ready_states)
+			rest_wave_overlay.update_ready_states(player_ready_states)
+		else:
+			print("[NetworkHandler] ERROR: RestWaveOverlay doesn't have update_ready_states method!")
+	else:
+		print("[NetworkHandler] ERROR: RestWaveOverlay node not found in scene!")
+
+
+func update_wave_display_rest_wave(is_rest: bool) -> void:
+	# Update wave display to show/hide rest wave
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		# Only update the local player's wave display
+		if player.name.to_int() == multiplayer.get_unique_id():
+			var wave_display = player.get_node_or_null("WaveDisplay")
+			if wave_display:
+				if is_rest:
+					if wave_display.has_method("show_rest_wave"):
+						wave_display.show_rest_wave()
+				else:
+					if wave_display.has_method("hide_rest_wave"):
+						wave_display.hide_rest_wave()
+			break
+
+
+func update_wave_display_ready_count(ready: int, total: int) -> void:
+	# Update wave display with ready count
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		# Only update the local player's wave display
+		if player.name.to_int() == multiplayer.get_unique_id():
+			var wave_display = player.get_node_or_null("WaveDisplay")
+			if wave_display and wave_display.has_method("update_ready_count"):
+				wave_display.update_ready_count(ready, total)
+			break
+
+
 @rpc("any_peer", "reliable", "call_local")
 func show_wave_completion(wave_number: int) -> void:
-	pass  # TODO: Add UI display for wave completion
+	# Show wave completion notification on all clients
+	var wave_notification = get_tree().current_scene.get_node_or_null("WaveNotification")
+	if wave_notification and wave_notification.has_method("show_wave_completed"):
+		wave_notification.show_wave_completed(wave_number)
 
 
 @rpc("any_peer", "reliable", "call_local")
 func show_countdown(seconds: int) -> void:
-	pass  # TODO: Add UI display for countdown
+	# Show countdown notification on all clients
+	var wave_notification = get_tree().current_scene.get_node_or_null("WaveNotification")
+	if wave_notification and wave_notification.has_method("show_countdown"):
+		wave_notification.show_countdown(seconds)
 
 
 @rpc("any_peer", "reliable", "call_local")
 func show_wave_start(wave_number: int) -> void:
-	pass  # TODO: Add UI display for wave start
+	# Show wave start notification on all clients
+	var wave_notification = get_tree().current_scene.get_node_or_null("WaveNotification")
+	if wave_notification and wave_notification.has_method("show_wave_starting"):
+		wave_notification.show_wave_starting(wave_number)
 
 
 @rpc("any_peer", "reliable", "call_local")
