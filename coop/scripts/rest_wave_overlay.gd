@@ -3,12 +3,11 @@ extends CanvasLayer
 ## Rest Wave Overlay - Shows when players can shop and apply upgrades
 
 # UI References
-@onready var overlay_panel = $CenterContainer/Panel
-@onready var title_label = $CenterContainer/Panel/VBoxContainer/TitleLabel
-@onready var subtitle_label = $CenterContainer/Panel/VBoxContainer/SubtitleLabel
-@onready var ready_status_container = $CenterContainer/Panel/VBoxContainer/ReadyStatusContainer
-@onready var ready_button = $CenterContainer/Panel/VBoxContainer/ReadyButton
-@onready var timer_label = $CenterContainer/Panel/VBoxContainer/TimerLabel
+@onready var title_label = $TopCenterMessage/VBoxContainer/TitleLabel
+@onready var subtitle_label = $TopCenterMessage/VBoxContainer/SubtitleLabel
+@onready var ready_status_label = $TopCenterMessage/VBoxContainer/ReadyStatusLabel
+@onready var level_up_button = $LeftSidePanel/VBoxContainer/LevelUpButton
+@onready var ready_button = $LeftSidePanel/VBoxContainer/ReadyButton
 
 # State
 var is_local_player_ready: bool = false
@@ -19,31 +18,32 @@ func _ready():
 	# Start hidden
 	hide()
 
-	# Connect ready button
+	# Connect buttons
 	if ready_button and not ready_button.pressed.is_connected(_on_ready_button_pressed):
 		ready_button.pressed.connect(_on_ready_button_pressed)
+
+	if level_up_button and not level_up_button.pressed.is_connected(_on_level_up_button_pressed):
+		level_up_button.pressed.connect(_on_level_up_button_pressed)
+
+
+func _process(_delta):
+	# Update level up button text with pending count
+	if visible and level_up_button:
+		var team_xp = get_node_or_null("/root/TeamXP")
+		if team_xp:
+			var pending = team_xp.get_pending_level_ups()
+			level_up_button.text = "LEVEL UP (%d)" % pending
+			level_up_button.disabled = pending <= 0
 
 
 func show_overlay() -> void:
 	print("[RestWaveOverlay] Showing overlay")
 	is_local_player_ready = false
 
-	# Reset UI
-	if title_label:
-		title_label.text = "REST WAVE"
-
-	if subtitle_label:
-		subtitle_label.text = "Visit the shop or apply level-ups\nPress Ready when done"
-
+	# Reset ready button
 	if ready_button:
 		ready_button.disabled = false
 		ready_button.text = "READY UP"
-
-	if timer_label:
-		timer_label.text = ""
-
-	# Clear ready status
-	clear_ready_status()
 
 	# Show the overlay
 	show()
@@ -66,7 +66,7 @@ func _on_ready_button_pressed() -> void:
 	# Disable button
 	if ready_button:
 		ready_button.disabled = true
-		ready_button.text = "WAITING FOR OTHERS..."
+		ready_button.text = "WAITING..."
 
 	# Send ready request to server
 	var network_handler = get_node("/root/NetworkHandler")
@@ -74,74 +74,35 @@ func _on_ready_button_pressed() -> void:
 		network_handler.request_ready_up.rpc()
 
 
+func _on_level_up_button_pressed() -> void:
+	# Trigger one level up from the queue
+	var team_xp = get_node_or_null("/root/TeamXP")
+	if team_xp and team_xp.has_method("trigger_single_level_up"):
+		var triggered = team_xp.trigger_single_level_up()
+		if triggered:
+			print("[RestWaveOverlay] Triggered level up from button")
+
+
 func update_ready_states(ready_states: Dictionary) -> void:
 	print("[RestWaveOverlay] Updating ready states: ", ready_states)
 	player_ready_states = ready_states
 
-	# Update UI
-	refresh_ready_status()
-
-
-func clear_ready_status() -> void:
-	# Clear all ready status labels
-	if not ready_status_container:
-		return
-
-	for child in ready_status_container.get_children():
-		child.queue_free()
-
-
-func refresh_ready_status() -> void:
-	# Clear existing labels
-	clear_ready_status()
-
-	if not ready_status_container:
-		return
-
-	# Create labels for each player
+	# Count ready players
 	var ready_count = 0
 	var total_count = player_ready_states.size()
 
 	for peer_id in player_ready_states:
-		var is_ready = player_ready_states[peer_id]
-		if is_ready:
+		if player_ready_states[peer_id]:
 			ready_count += 1
 
-		# Create a label for this player
-		var label = Label.new()
-		label.text = "Player %d: %s" % [peer_id, "✓ Ready" if is_ready else "⏳ Not Ready"]
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Update status label
+	if ready_status_label:
+		ready_status_label.text = "Ready: %d / %d" % [ready_count, total_count]
 
-		# Color based on ready state
-		if is_ready:
-			label.modulate = Color(0.3, 1.0, 0.3)  # Green
+		# Color based on readiness
+		if ready_count == total_count and total_count > 0:
+			ready_status_label.modulate = Color(0.3, 1.0, 0.3)  # Green - all ready
+		elif ready_count > 0:
+			ready_status_label.modulate = Color(1.0, 0.7, 0.3)  # Orange - some ready
 		else:
-			label.modulate = Color(1.0, 0.7, 0.3)  # Orange
-
-		ready_status_container.add_child(label)
-
-	# Update subtitle with count
-	if subtitle_label:
-		subtitle_label.text = "Ready: %d / %d\nVisit shop or apply upgrades" % [ready_count, total_count]
-
-
-func update_timer(time_elapsed: float, max_time: float) -> void:
-	if not timer_label:
-		return
-
-	var remaining = max_time - time_elapsed
-	if remaining > 0:
-		var minutes = int(remaining) / 60
-		var seconds = int(remaining) % 60
-		timer_label.text = "Time remaining: %d:%02d" % [minutes, seconds]
-
-		# Change color when time is running out
-		if remaining < 30:
-			timer_label.modulate = Color(1.0, 0.3, 0.3)  # Red
-		elif remaining < 60:
-			timer_label.modulate = Color(1.0, 0.7, 0.3)  # Orange
-		else:
-			timer_label.modulate = Color(1.0, 1.0, 1.0)  # White
-	else:
-		timer_label.text = "Starting soon..."
-		timer_label.modulate = Color(1.0, 0.3, 0.3)  # Red
+			ready_status_label.modulate = Color(1.0, 1.0, 1.0)  # White - none ready

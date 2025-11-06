@@ -26,8 +26,6 @@ var total_enemies_killed: int = 0  # Track total across all waves
 # Rest wave system variables
 var is_rest_wave: bool = false
 var player_ready_states: Dictionary = {}  # peer_id -> bool
-var rest_wave_timeout: float = 120.0  # 2 minutes max timeout
-var rest_wave_timer: float = 0.0
 
 # Boss system variables
 var boss_min_health: int = 200
@@ -377,28 +375,28 @@ func start_rest_wave() -> void:
 
 	print("[NetworkHandler] Starting rest wave")
 	is_rest_wave = true
-	rest_wave_timer = 0.0
 
 	# Reset rest wave counter in GameDirector
 	GameDirector.reset_rest_wave_counter()
 
 	# Initialize all players as not ready
+	# Get players from scene instead of LobbyManager for better reliability
 	player_ready_states.clear()
-	for peer_id in LobbyManager.players:
-		player_ready_states[peer_id] = false
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		# Get peer ID from player name
+		var peer_id = player.name.to_int()
+		if peer_id > 0:
+			player_ready_states[peer_id] = false
+			print("[NetworkHandler] Added player %d to ready states" % peer_id)
+
+	print("[NetworkHandler] Initialized ready states for %d players" % player_ready_states.size())
 
 	# Broadcast rest wave start to all clients
 	rpc("on_rest_wave_started")
 
-	# Process any pending level ups from combat
-	var team_xp_manager = get_node_or_null("/root/TeamXP")
-	if team_xp_manager and team_xp_manager.has_method("process_pending_level_ups"):
-		# Give players a moment to see the rest wave UI
-		await get_tree().create_timer(1.0).timeout
-		team_xp_manager.process_pending_level_ups()
-
-	# Start timeout monitoring (optional)
-	start_rest_wave_timeout_monitor()
+	# Sync initial ready states to all clients
+	rpc("sync_ready_states", player_ready_states)
 
 
 @rpc("authority", "reliable", "call_local")
@@ -414,27 +412,6 @@ func on_rest_wave_started() -> void:
 	show_rest_wave_ui()
 
 
-func start_rest_wave_timeout_monitor() -> void:
-	# Monitor timeout in background
-	while is_rest_wave and rest_wave_timer < rest_wave_timeout:
-		await get_tree().create_timer(1.0).timeout
-		rest_wave_timer += 1.0
-
-		# Broadcast timer update
-		rpc("update_rest_wave_timer", rest_wave_timer)
-
-	# If timeout reached, force start next wave
-	if is_rest_wave and rest_wave_timer >= rest_wave_timeout:
-		print("[NetworkHandler] Rest wave timeout reached, forcing wave start")
-		end_rest_wave()
-
-
-@rpc("authority", "reliable")
-func update_rest_wave_timer(time_elapsed: float) -> void:
-	# Update timer on clients
-	rest_wave_timer = time_elapsed
-
-
 @rpc("any_peer", "reliable")
 func request_ready_up() -> void:
 	# Only server processes ready requests
@@ -445,11 +422,16 @@ func request_ready_up() -> void:
 	if peer_id == 0:  # Server/host calling locally
 		peer_id = multiplayer.get_unique_id()
 
-	print("[NetworkHandler] Player %d marked ready" % peer_id)
+	print("[NetworkHandler] Player %d requesting ready up" % peer_id)
+	print("[NetworkHandler] Current ready states: ", player_ready_states)
 
 	# Mark player as ready
 	if player_ready_states.has(peer_id):
 		player_ready_states[peer_id] = true
+		print("[NetworkHandler] Player %d marked ready successfully" % peer_id)
+	else:
+		print("[NetworkHandler] WARNING: Player %d not found in ready states!" % peer_id)
+		print("[NetworkHandler] Available peer IDs: ", player_ready_states.keys())
 
 	# Broadcast updated ready states to all clients
 	rpc("sync_ready_states", player_ready_states)
@@ -480,16 +462,23 @@ func sync_ready_states(ready_states: Dictionary) -> void:
 func check_all_players_ready() -> void:
 	# Check if all players are ready
 	var all_ready = true
+	var ready_count = 0
+
 	for peer_id in player_ready_states:
-		if not player_ready_states[peer_id]:
+		if player_ready_states[peer_id]:
+			ready_count += 1
+		else:
 			all_ready = false
-			break
+
+	print("[NetworkHandler] Ready check: %d/%d players ready" % [ready_count, player_ready_states.size()])
 
 	if all_ready and player_ready_states.size() > 0:
 		print("[NetworkHandler] All players ready, ending rest wave")
 		# Small delay before starting next wave
 		await get_tree().create_timer(1.0).timeout
 		end_rest_wave()
+	else:
+		print("[NetworkHandler] Waiting for more players to ready up")
 
 
 func end_rest_wave() -> void:
@@ -576,17 +565,26 @@ func update_wave_display_ready_count(ready: int, total: int) -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func show_wave_completion(wave_number: int) -> void:
-	pass  # TODO: Add UI display for wave completion
+	# Show wave completion notification on all clients
+	var wave_notification = get_tree().current_scene.get_node_or_null("WaveNotification")
+	if wave_notification and wave_notification.has_method("show_wave_completed"):
+		wave_notification.show_wave_completed(wave_number)
 
 
 @rpc("any_peer", "reliable", "call_local")
 func show_countdown(seconds: int) -> void:
-	pass  # TODO: Add UI display for countdown
+	# Show countdown notification on all clients
+	var wave_notification = get_tree().current_scene.get_node_or_null("WaveNotification")
+	if wave_notification and wave_notification.has_method("show_countdown"):
+		wave_notification.show_countdown(seconds)
 
 
 @rpc("any_peer", "reliable", "call_local")
 func show_wave_start(wave_number: int) -> void:
-	pass  # TODO: Add UI display for wave start
+	# Show wave start notification on all clients
+	var wave_notification = get_tree().current_scene.get_node_or_null("WaveNotification")
+	if wave_notification and wave_notification.has_method("show_wave_starting"):
+		wave_notification.show_wave_starting(wave_number)
 
 
 @rpc("any_peer", "reliable", "call_local")

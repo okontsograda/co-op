@@ -133,17 +133,9 @@ func broadcast_level_up(new_level: int) -> void:
 	# Emit level changed signal
 	level_changed.emit(team_level)
 
-	# Check if we're in a rest wave
-	var network_handler = get_node_or_null("/root/NetworkHandler")
-	var is_rest_wave = network_handler and network_handler.is_rest_wave
-
-	if is_rest_wave:
-		# During rest wave: emit level up ready immediately
-		level_up_ready.emit()
-	else:
-		# During combat: queue the level up for rest wave
-		pending_level_ups += 1
-		print("[TeamXP] Level up queued - Total pending: ", pending_level_ups)
+	# Always queue level ups - they'll be manually triggered during rest wave
+	pending_level_ups += 1
+	print("[TeamXP] Level up queued - Total pending: ", pending_level_ups)
 
 
 ## Get current team level
@@ -161,22 +153,24 @@ func get_xp_to_next_level() -> int:
 	return xp_to_next_level
 
 
-## Process pending level ups (call during rest wave)
-func process_pending_level_ups() -> void:
-	print("[TeamXP] Processing ", pending_level_ups, " pending level ups")
-
-	while pending_level_ups > 0:
-		# Emit level up ready signal
-		level_up_ready.emit()
+## Trigger one pending level up (call manually during rest wave)
+func trigger_single_level_up() -> bool:
+	if pending_level_ups > 0:
+		print("[TeamXP] Triggering level up - Remaining: ", pending_level_ups - 1)
 		pending_level_ups -= 1
-
-		# Wait a moment between level ups for UI processing
-		await get_tree().create_timer(0.5).timeout
+		level_up_ready.emit()
+		return true
+	return false
 
 
 ## Get number of pending level ups
 func get_pending_level_ups() -> int:
 	return pending_level_ups
+
+
+## Check if there are pending level ups
+func has_pending_level_ups() -> bool:
+	return pending_level_ups > 0
 
 
 ## Clear pending level ups (used when rest wave starts)
