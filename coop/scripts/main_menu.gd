@@ -3,6 +3,7 @@ extends Control
 
 func _ready():
 	# Connect button signals
+	$VBoxContainer/PlayLocalButton.pressed.connect(_on_play_local_pressed)
 	$VBoxContainer/HostButton.pressed.connect(_on_host_pressed)
 	$VBoxContainer/JoinButton.pressed.connect(_on_join_pressed)
 	$VBoxContainer/ExitButton.pressed.connect(_on_exit_pressed)
@@ -65,6 +66,12 @@ func _on_join_pressed() -> void:
 	print("Join button pressed with host ID: ", host_id)
 	# Join server which will transition to lobby
 	NetworkHandler.start_client(host_id)
+
+
+func _on_play_local_pressed() -> void:
+	print("Play Local button pressed")
+	# Go to class selection screen
+	get_tree().change_scene_to_file("res://coop/scenes/local_class_selection.tscn")
 
 
 func _on_exit_pressed() -> void:
