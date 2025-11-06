@@ -440,9 +440,9 @@ func request_ready_up() -> void:
 	check_all_players_ready()
 
 
-@rpc("authority", "reliable")
+@rpc("authority", "reliable", "call_local")
 func sync_ready_states(ready_states: Dictionary) -> void:
-	# Sync ready states to all clients
+	# Sync ready states to all clients (including server in solo play)
 	player_ready_states = ready_states
 	print("[NetworkHandler] Ready states synced: ", ready_states)
 
@@ -530,8 +530,14 @@ func hide_rest_wave_ui() -> void:
 func update_rest_wave_ui() -> void:
 	# Update rest wave UI with current ready states
 	var rest_wave_overlay = get_tree().current_scene.get_node_or_null("RestWaveOverlay")
-	if rest_wave_overlay and rest_wave_overlay.has_method("update_ready_states"):
-		rest_wave_overlay.update_ready_states(player_ready_states)
+	if rest_wave_overlay:
+		if rest_wave_overlay.has_method("update_ready_states"):
+			print("[NetworkHandler] Calling update_ready_states on overlay with: ", player_ready_states)
+			rest_wave_overlay.update_ready_states(player_ready_states)
+		else:
+			print("[NetworkHandler] ERROR: RestWaveOverlay doesn't have update_ready_states method!")
+	else:
+		print("[NetworkHandler] ERROR: RestWaveOverlay node not found in scene!")
 
 
 func update_wave_display_rest_wave(is_rest: bool) -> void:
