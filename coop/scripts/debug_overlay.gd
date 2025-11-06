@@ -2,7 +2,7 @@ extends CanvasLayer
 
 ## Debug Overlay for Game Director
 ## Displays real-time director metrics and performance data
-## Toggle with F3
+## Toggle with 0 key
 
 # ============================================================================
 # UI REFERENCES
@@ -15,7 +15,7 @@ extends CanvasLayer
 # STATE
 # ============================================================================
 
-var is_visible: bool = true
+var is_visible: bool = false
 var update_timer: float = 0.0
 const UPDATE_INTERVAL = 0.1  # Update display 10 times per second
 
@@ -30,14 +30,14 @@ func _ready():
 	# Initial visibility
 	debug_panel.visible = is_visible
 
-	print("[DebugOverlay] Ready - Press F3 to toggle")
+	print("[DebugOverlay] Ready - Press 0 to toggle")
 
 # ============================================================================
 # INPUT HANDLING
 # ============================================================================
 
 func _input(event):
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F3:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_0:
 		toggle_debug()
 
 func toggle_debug():
@@ -163,7 +163,7 @@ func update_display():
 		text += "\n"
 
 	# === FOOTER ===
-	text += "[color=gray][font_size=12]Press F3 to hide[/font_size][/color]"
+	text += "[color=gray][font_size=12]Press 0 to hide[/font_size][/color]"
 
 	debug_label.text = text
 
