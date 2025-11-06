@@ -705,21 +705,17 @@ func update_animation() -> void:
 
 
 func award_xp_to_killer() -> void:
-	# Find the player who killed this enemy and award XP
-	if last_attacker.is_empty():
-		return
+	# Award XP to the team (team-based XP system)
+	TeamXP.gain_xp(25)
 
-	var players = get_tree().get_nodes_in_group("players")
-	for player in players:
-		if str(player.name) == last_attacker or str(player.name.to_int()) == last_attacker:
-			player.gain_xp(25)  # Award 25 XP per kill
-
-			# Notify GameDirector of kill (server only)
-			if multiplayer.is_server():
+	# Track individual kill stats for GameDirector
+	if not last_attacker.is_empty() and multiplayer.is_server():
+		var players = get_tree().get_nodes_in_group("players")
+		for player in players:
+			if str(player.name) == last_attacker or str(player.name.to_int()) == last_attacker:
 				var peer_id = player.name.to_int()
 				GameDirector.on_player_kill(peer_id)
-
-			break
+				break
 
 
 func apply_poison(damage_per_sec: int, duration: float) -> void:
