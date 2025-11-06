@@ -20,6 +20,7 @@ var attack_damage: int = 15  # Base arrow damage
 
 # Player state
 var is_alive: bool = true  # Track if player is alive for enemy targeting
+var player_name: String = "Player"  # Player's name loaded from save system
 
 # Currency System
 var coins: int = 0  # Currency collected by the player
@@ -113,6 +114,10 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	var peer_id = name.to_int()
+	
+	# Load player name from save system (only for local player)
+	if is_multiplayer_authority():
+		_load_player_name()
 	
 	# Enable Y-sort for proper depth sorting
 	# Characters with higher Y position (lower on screen) will render in front
@@ -2043,3 +2048,13 @@ func apply_class_modifiers(selected_class: String) -> void:
 	# Update displays
 	update_health_display()
 	update_xp_display()
+
+
+# Load player name from save system
+func _load_player_name() -> void:
+	# Wait for SaveSystem to load if it hasn't yet
+	if not SaveSystem.is_loaded:
+		await SaveSystem.data_loaded
+	
+	player_name = SaveSystem.get_player_name()
+	print("[Player] Loaded player name: ", player_name)

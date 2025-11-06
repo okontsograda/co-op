@@ -21,6 +21,7 @@ func _ready():
 	LobbyManager.player_left.connect(_on_player_left)
 	LobbyManager.player_ready_changed.connect(_on_player_ready_changed)
 	LobbyManager.player_class_changed.connect(_on_player_class_changed)
+	LobbyManager.player_name_changed.connect(_on_player_name_changed)
 	LobbyManager.all_players_ready.connect(_on_all_players_ready)
 
 	# Set up UI
@@ -45,6 +46,9 @@ func _ready():
 	# Add existing players to list
 	for peer_id in LobbyManager.players:
 		_on_player_joined(peer_id, LobbyManager.players[peer_id])
+	
+	# Set the local player's name from SaveSystem
+	_set_local_player_name()
 
 
 func _setup_class_selection():
@@ -105,15 +109,17 @@ func _create_player_list_item(peer_id: int, player_data: Dictionary) -> PanelCon
 	hbox.add_theme_constant_override("separation", 10)
 	margin.add_child(hbox)
 
-	# Player ID label (flex to take remaining space)
-	var id_label = Label.new()
-	id_label.text = "Player " + str(peer_id)
+	# Player name label (flex to take remaining space)
+	var name_label = Label.new()
+	name_label.name = "NameLabel"
+	var display_name = player_data.get("player_name", "Player " + str(peer_id))
+	name_label.text = display_name
 	if player_data["is_host"]:
-		id_label.text += " (Host)"
-	id_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	id_label.custom_minimum_size.x = 120
-	id_label.clip_text = true
-	hbox.add_child(id_label)
+		name_label.text += " 👑"
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.custom_minimum_size.x = 120
+	name_label.clip_text = true
+	hbox.add_child(name_label)
 
 	# Class label
 	var class_label = Label.new()
@@ -173,6 +179,29 @@ func _on_player_class_changed(peer_id: int, selected_class: String):
 			class_label.text = class_data["name"]
 
 
+func _on_player_name_changed(peer_id: int, player_name: String):
+	if player_list_items.has(peer_id):
+		var panel = player_list_items[peer_id]
+		var name_label = panel.get_node_or_null("MarginContainer/HBoxContainer/NameLabel")
+		if name_label:
+			var is_host = LobbyManager.players[peer_id].get("is_host", false)
+			name_label.text = player_name
+			if is_host:
+				name_label.text += " 👑"
+			print("[LobbyUI] Updated display name for peer ", peer_id, " to: ", player_name)
+
+
+func _set_local_player_name():
+	# Wait for SaveSystem to load if needed
+	if not SaveSystem.is_loaded:
+		await SaveSystem.data_loaded
+	
+	# Get saved name and send to lobby
+	var saved_name = SaveSystem.get_player_name()
+	LobbyManager.set_player_name(saved_name)
+	print("[LobbyUI] Set local player name in lobby: ", saved_name)
+
+
 func _on_all_players_ready():
 	if LobbyManager.is_local_player_host():
 		start_button.disabled = false
@@ -227,7 +256,9 @@ func _on_lobby_chat_message_received(sender_id: String, message: String) -> void
 # Called from NetworkHandler when chat message received
 func add_chat_message(sender_id: String, message: String):
 	var label = Label.new()
-	label.text = "Player " + str(sender_id) + ": " + message
+	var sender_peer_id = int(sender_id)
+	var sender_name = LobbyManager.get_player_name(sender_peer_id)
+	label.text = sender_name + ": " + message
 	chat_messages.add_child(label)
 
 	# Auto-scroll to bottom

@@ -107,3 +107,4 @@ Potential additions:
 - Visual indicators for class compatibility
 - Filter toggle to show "all items" vs "compatible items only"
 
+

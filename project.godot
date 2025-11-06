@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+SaveSystem="*res://coop/scripts/save_system.gd"
 LobbyManager="*res://coop/scripts/lobby_manager.gd"
 NetworkHandler="*res://coop/scripts/network_handler.gd"
 UpgradeSystem="*res://coop/scripts/upgrade_system.gd"
