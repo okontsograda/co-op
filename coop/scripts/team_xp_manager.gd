@@ -37,10 +37,11 @@ func _ready() -> void:
 
 
 ## Calculate XP requirement based on level and player count
-## Formula: (BASE_XP_PER_LEVEL * level) * (1 + player_count * 0.5)
+## Formula: (BASE_XP_PER_LEVEL * level) * (1 + (player_count - 1) * 0.5)
+## Solo: 100/200/300... (1x), 2 players: 150/300/450... (1.5x), 4 players: 250/500/750... (2.5x)
 func calculate_xp_requirement(level: int, player_count: int) -> int:
 	var base_requirement = BASE_XP_PER_LEVEL * level
-	var scaling_multiplier = 1.0 + (player_count * 0.5)
+	var scaling_multiplier = 1.0 + ((player_count - 1) * 0.5)
 	return int(base_requirement * scaling_multiplier)
 
 
@@ -90,16 +91,8 @@ func _level_up() -> void:
 	# Update XP requirement for next level
 	update_xp_requirement()
 
-	# Play sound
-	if level_up_sound and level_up_sound.stream:
-		level_up_sound.play()
-
-	# Broadcast level up to all clients
+	# Broadcast level up to all clients (call_local will emit signals on server too)
 	rpc("broadcast_level_up", team_level)
-
-	# Emit signals
-	level_changed.emit(team_level)
-	level_up_ready.emit()
 
 
 ## RPC: Client requests XP gain from server

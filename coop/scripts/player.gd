@@ -149,8 +149,9 @@ func _ready() -> void:
 	if NetworkHandler:
 		NetworkHandler.chat_message_received.connect(_on_chat_message_received)
 
-	# Connect to TeamXP level-up signal to show upgrade overlay and apply bonuses
+	# Connect to TeamXP signals
 	TeamXP.level_up_ready.connect(_on_team_level_up)
+	TeamXP.xp_changed.connect(_on_team_xp_changed)
 
 	# Set up bow release sound
 	setup_bow_sound()
@@ -1492,6 +1493,12 @@ func _on_team_level_up() -> void:
 	# Game does NOT pause - player can choose upgrade while playing
 	if is_multiplayer_authority():
 		_on_level_up_ready()
+
+
+# Team XP System - Called when team XP changes
+func _on_team_xp_changed(_current_xp: int, _xp_needed: int) -> void:
+	# Update XP display whenever team XP changes
+	update_xp_display()
 
 
 # Apply upgrade when selected from upgrade menu
