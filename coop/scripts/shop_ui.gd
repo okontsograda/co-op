@@ -34,8 +34,11 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	
 	# Close shop with ESC
-	if visible and event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("ui_cancel"):
 		close_shop()
 		get_viewport().set_input_as_handled()
 
@@ -105,12 +108,17 @@ func load_category(category: String) -> void:
 	for child in items_container.get_children():
 		child.queue_free()
 	
-	# Get items in this category
-	var items = ShopManager.get_items_by_category(category)
+	# Get player's weapon type for filtering
+	var player_weapon = "bow"  # Default
+	if current_player and "equipped_weapon" in current_player:
+		player_weapon = current_player.equipped_weapon
+	
+	# Get items in this category filtered by weapon
+	var items = ShopManager.get_items_by_category_and_weapon(category, player_weapon)
 	
 	if items.is_empty():
 		var label = Label.new()
-		label.text = "No items available in this category"
+		label.text = "No items available in this category for your class"
 		items_container.add_child(label)
 		return
 	

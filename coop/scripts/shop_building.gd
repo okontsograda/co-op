@@ -1,4 +1,4 @@
-extends Area2D
+extends Node2D
 
 # Shop Building - Players can interact with this to open the shop UI
 
@@ -8,6 +8,8 @@ var players_in_range: Array = []
 var interaction_hint_visible: bool = false
 
 @onready var interaction_label: Label = null
+@onready var sprite: Sprite2D = $Sprite2D
+@onready var area_2d: Area2D = $Area2D
 
 
 func _ready() -> void:
@@ -15,11 +17,62 @@ func _ready() -> void:
 	add_to_group("shop_buildings")
 	
 	# Connect area signals
-	body_entered.connect(_on_body_entered)
-	body_exited.connect(_on_body_exited)
+	if area_2d:
+		area_2d.body_entered.connect(_on_body_entered)
+		area_2d.body_exited.connect(_on_body_exited)
 	
 	# Create interaction hint label
 	create_interaction_label()
+	
+	# Set initial sprite shader for outline effect
+	setup_outline_shader()
+
+
+func setup_outline_shader() -> void:
+	# Create shader material for outline effect
+	var shader_code = """
+shader_type canvas_item;
+
+uniform bool show_outline = false;
+uniform vec4 outline_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform float outline_width : hint_range(0.0, 10.0) = 2.0;
+
+void fragment() {
+	vec4 color = texture(TEXTURE, UV);
+	
+	if (show_outline && color.a > 0.1) {
+		// Sample surrounding pixels to create outline
+		float outline = 0.0;
+		for (float y = -outline_width; y <= outline_width; y += 1.0) {
+			for (float x = -outline_width; x <= outline_width; x += 1.0) {
+				vec2 offset = vec2(x, y) * TEXTURE_PIXEL_SIZE;
+				outline += texture(TEXTURE, UV + offset).a;
+			}
+		}
+		
+		// If we're on the edge, show outline
+		if (color.a < 0.5 && outline > 0.1) {
+			COLOR = outline_color;
+		} else {
+			COLOR = color;
+		}
+	} else {
+		COLOR = color;
+	}
+}
+"""
+	
+	var shader = Shader.new()
+	shader.code = shader_code
+	
+	var material = ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("show_outline", false)
+	material.set_shader_parameter("outline_color", Color(1, 1, 1, 1))
+	material.set_shader_parameter("outline_width", 2.0)
+	
+	if sprite:
+		sprite.material = material
 
 
 func create_interaction_label() -> void:
@@ -83,6 +136,11 @@ func _on_body_exited(body: Node2D) -> void:
 func show_interaction_hint(visible: bool) -> void:
 	if interaction_label:
 		interaction_label.visible = visible
+	
+	# Show/hide white outline
+	if sprite and sprite.material:
+		sprite.material.set_shader_parameter("show_outline", visible)
+	
 	interaction_hint_visible = visible
 
 
@@ -114,4 +172,3 @@ func open_shop_for_player(player: Node) -> void:
 	# Initialize shop UI with player
 	if shop_ui.has_method("open_shop"):
 		shop_ui.open_shop(player)
-

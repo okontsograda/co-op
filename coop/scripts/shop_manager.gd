@@ -12,6 +12,7 @@ class ShopItem:
 	var max_purchases: int  # -1 for unlimited
 	var stat_bonuses: Dictionary  # Stats this item provides
 	var icon_path: String
+	var compatible_weapons: Array  # Array of weapon IDs, or ["all"] for all weapons
 	
 	func _init(
 		p_id: String,
@@ -21,7 +22,8 @@ class ShopItem:
 		p_category: String = "upgrade",
 		p_max: int = 1,
 		p_bonuses: Dictionary = {},
-		p_icon: String = ""
+		p_icon: String = "",
+		p_compatible: Array = ["all"]
 	):
 		id = p_id
 		name = p_name
@@ -31,6 +33,10 @@ class ShopItem:
 		max_purchases = p_max
 		stat_bonuses = p_bonuses
 		icon_path = p_icon
+		compatible_weapons = p_compatible
+	
+	func is_compatible_with_weapon(weapon_id: String) -> bool:
+		return "all" in compatible_weapons or weapon_id in compatible_weapons
 
 
 # Shop items database
@@ -45,7 +51,7 @@ func _ready() -> void:
 
 
 func _initialize_items() -> void:
-	# ===== WEAPONS =====
+	# ===== RANGED WEAPONS =====
 	items["better_bow"] = ShopItem.new(
 		"better_bow",
 		"Superior Bow",
@@ -53,7 +59,9 @@ func _initialize_items() -> void:
 		50,
 		"weapon",
 		1,
-		{"damage": 10, "fire_rate_mult": 0.8}
+		{"damage": 10, "fire_rate_mult": 0.8},
+		"",
+		["bow"]
 	)
 	
 	items["war_bow"] = ShopItem.new(
@@ -63,7 +71,9 @@ func _initialize_items() -> void:
 		150,
 		"weapon",
 		1,
-		{"damage": 25, "fire_rate_mult": 0.7, "pierce": 1}
+		{"damage": 25, "fire_rate_mult": 0.7, "pierce": 1},
+		"",
+		["bow"]
 	)
 	
 	items["legendary_bow"] = ShopItem.new(
@@ -73,10 +83,49 @@ func _initialize_items() -> void:
 		500,
 		"weapon",
 		1,
-		{"damage": 50, "fire_rate_mult": 0.5, "pierce": 2, "multishot": 1}
+		{"damage": 50, "fire_rate_mult": 0.5, "pierce": 2, "multishot": 1},
+		"",
+		["bow"]
 	)
 	
-	# ===== ARMOR =====
+	# ===== MELEE WEAPONS =====
+	items["iron_sword"] = ShopItem.new(
+		"iron_sword",
+		"Iron Sword",
+		"+10 damage, +10% attack speed",
+		50,
+		"weapon",
+		1,
+		{"damage": 10, "fire_rate_mult": 0.9},
+		"",
+		["sword"]
+	)
+	
+	items["battle_sword"] = ShopItem.new(
+		"battle_sword",
+		"Battle Sword",
+		"+25 damage, +20% attack speed, +15% attack range",
+		150,
+		"weapon",
+		1,
+		{"damage": 25, "fire_rate_mult": 0.8, "attack_range_mult": 0.15},
+		"",
+		["sword"]
+	)
+	
+	items["legendary_blade"] = ShopItem.new(
+		"legendary_blade",
+		"Legendary Blade",
+		"+50 damage, +40% attack speed, +30% attack range",
+		500,
+		"weapon",
+		1,
+		{"damage": 50, "fire_rate_mult": 0.6, "attack_range_mult": 0.3},
+		"",
+		["sword"]
+	)
+	
+	# ===== ARMOR (All Classes) =====
 	items["leather_armor"] = ShopItem.new(
 		"leather_armor",
 		"Leather Armor",
@@ -84,7 +133,9 @@ func _initialize_items() -> void:
 		30,
 		"armor",
 		1,
-		{"max_health": 20}
+		{"max_health": 20},
+		"",
+		["all"]
 	)
 	
 	items["chainmail"] = ShopItem.new(
@@ -94,7 +145,9 @@ func _initialize_items() -> void:
 		100,
 		"armor",
 		1,
-		{"max_health": 50, "damage_reduction": 0.05}
+		{"max_health": 50, "damage_reduction": 0.05},
+		"",
+		["all"]
 	)
 	
 	items["plate_armor"] = ShopItem.new(
@@ -104,10 +157,12 @@ func _initialize_items() -> void:
 		300,
 		"armor",
 		1,
-		{"max_health": 100, "damage_reduction": 0.15}
+		{"max_health": 100, "damage_reduction": 0.15},
+		"",
+		["all"]
 	)
 	
-	# ===== ACCESSORIES =====
+	# ===== ACCESSORIES (All Classes) =====
 	items["attack_ring"] = ShopItem.new(
 		"attack_ring",
 		"Ring of Power",
@@ -115,7 +170,9 @@ func _initialize_items() -> void:
 		80,
 		"upgrade",
 		3,
-		{"damage_mult": 0.15}
+		{"damage_mult": 0.15},
+		"",
+		["all"]
 	)
 	
 	items["speed_boots"] = ShopItem.new(
@@ -125,7 +182,9 @@ func _initialize_items() -> void:
 		60,
 		"upgrade",
 		2,
-		{"speed_mult": 0.2}
+		{"speed_mult": 0.2},
+		"",
+		["all"]
 	)
 	
 	items["life_amulet"] = ShopItem.new(
@@ -135,7 +194,9 @@ func _initialize_items() -> void:
 		120,
 		"upgrade",
 		2,
-		{"max_health": 50, "lifesteal": 3}
+		{"max_health": 50, "lifesteal": 3},
+		"",
+		["all"]
 	)
 	
 	items["crit_pendant"] = ShopItem.new(
@@ -145,7 +206,9 @@ func _initialize_items() -> void:
 		200,
 		"upgrade",
 		1,
-		{"crit_chance": 0.2, "crit_mult": 0.5}
+		{"crit_chance": 0.2, "crit_mult": 0.5},
+		"",
+		["all"]
 	)
 	
 	items["lucky_coin"] = ShopItem.new(
@@ -155,7 +218,9 @@ func _initialize_items() -> void:
 		100,
 		"upgrade",
 		3,
-		{"coin_mult": 0.5}
+		{"coin_mult": 0.5},
+		"",
+		["all"]
 	)
 	
 	items["xp_tome"] = ShopItem.new(
@@ -165,10 +230,12 @@ func _initialize_items() -> void:
 		150,
 		"upgrade",
 		3,
-		{"xp_mult": 0.3}
+		{"xp_mult": 0.3},
+		"",
+		["all"]
 	)
 	
-	# ===== CONSUMABLES =====
+	# ===== CONSUMABLES (All Classes) =====
 	items["health_potion"] = ShopItem.new(
 		"health_potion",
 		"Health Potion",
@@ -176,7 +243,9 @@ func _initialize_items() -> void:
 		20,
 		"consumable",
 		-1,  # Unlimited purchases
-		{"instant_heal": 50}
+		{"instant_heal": 50},
+		"",
+		["all"]
 	)
 	
 	items["max_health_potion"] = ShopItem.new(
@@ -186,18 +255,22 @@ func _initialize_items() -> void:
 		40,
 		"consumable",
 		-1,
-		{"instant_heal": 999999}  # Full heal
+		{"instant_heal": 999999},  # Full heal
+		"",
+		["all"]
 	)
 	
-	# ===== SPECIAL UPGRADES =====
+	# ===== RANGED UPGRADES =====
 	items["pierce_upgrade"] = ShopItem.new(
 		"pierce_upgrade",
 		"Piercing Upgrade",
-		"+1 pierce count",
+		"+1 pierce count (ranged only)",
 		50,
 		"upgrade",
 		5,
-		{"pierce": 1}
+		{"pierce": 1},
+		"",
+		["bow", "rocket"]
 	)
 	
 	items["multishot_upgrade"] = ShopItem.new(
@@ -207,7 +280,9 @@ func _initialize_items() -> void:
 		100,
 		"upgrade",
 		3,
-		{"multishot": 1}
+		{"multishot": 1},
+		"",
+		["bow"]
 	)
 	
 	items["explosion_upgrade"] = ShopItem.new(
@@ -217,9 +292,61 @@ func _initialize_items() -> void:
 		150,
 		"upgrade",
 		5,
-		{"explosion_chance": 0.2}
+		{"explosion_chance": 0.2},
+		"",
+		["bow", "rocket"]
 	)
 	
+	# ===== MELEE UPGRADES =====
+	items["cleave_upgrade"] = ShopItem.new(
+		"cleave_upgrade",
+		"Cleaving Blade",
+		"+20% attack range for melee",
+		50,
+		"upgrade",
+		5,
+		{"attack_range_mult": 0.2},
+		"",
+		["sword"]
+	)
+	
+	items["berserker_rage"] = ShopItem.new(
+		"berserker_rage",
+		"Berserker's Rage",
+		"+10% damage per enemy in range (max 50%)",
+		120,
+		"upgrade",
+		1,
+		{"berserker": true},
+		"",
+		["sword"]
+	)
+	
+	items["shield_bash"] = ShopItem.new(
+		"shield_bash",
+		"Shield Bash",
+		"Melee attacks knock back enemies",
+		80,
+		"upgrade",
+		1,
+		{"knockback_mult": 0.5},
+		"",
+		["sword"]
+	)
+	
+	items["blade_mastery"] = ShopItem.new(
+		"blade_mastery",
+		"Blade Mastery",
+		"+30% melee damage",
+		100,
+		"upgrade",
+		5,
+		{"damage_mult": 0.3},
+		"",
+		["sword"]
+	)
+	
+	# ===== UNIVERSAL UPGRADES =====
 	items["stamina_upgrade"] = ShopItem.new(
 		"stamina_upgrade",
 		"Stamina Boost",
@@ -227,7 +354,9 @@ func _initialize_items() -> void:
 		80,
 		"upgrade",
 		3,
-		{"max_stamina": 50, "stamina_regen_mult": 0.5}
+		{"max_stamina": 50, "stamina_regen_mult": 0.5},
+		"",
+		["all"]
 	)
 
 
@@ -237,6 +366,16 @@ func get_items_by_category(category: String) -> Array[ShopItem]:
 	for item_id in items:
 		var item = items[item_id]
 		if item.category == category:
+			result.append(item)
+	return result
+
+
+# Get items by category and weapon type (filtered)
+func get_items_by_category_and_weapon(category: String, weapon_id: String) -> Array[ShopItem]:
+	var result: Array[ShopItem] = []
+	for item_id in items:
+		var item = items[item_id]
+		if item.category == category and item.is_compatible_with_weapon(weapon_id):
 			result.append(item)
 	return result
 
@@ -415,6 +554,11 @@ func apply_item_effects(player: Node, item: ShopItem) -> void:
 	if bonuses.has("stamina_regen_mult"):
 		player.stamina_regen_rate *= (1.0 + bonuses.stamina_regen_mult)
 		print("  - Stamina regen: +", bonuses.stamina_regen_mult * 100, "%")
+	
+	# Melee attack range
+	if bonuses.has("attack_range_mult"):
+		player.melee_attack_range *= (1.0 + bonuses.attack_range_mult)
+		print("  - Melee attack range: +", bonuses.attack_range_mult * 100, "%")
 	
 	# Note: coin_mult and xp_mult would need to be tracked separately
 	# and applied in the respective collection functions

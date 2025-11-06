@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://c7x8lam3n5p6r"]
+[gd_scene load_steps=3 format=3 uid="uid://c7x8lam3n5p6r"]
 
-[ext_resource type="Script" path="res://coop/scripts/chat_bubble.gd" id="1_chat_bubble"]
+[ext_resource type="Script" uid="uid://dxh4pjbrgtnp4" path="res://coop/scripts/chat_bubble.gd" id="1_chat_bubble"]
+[ext_resource type="FontFile" uid="uid://bsc3m53ghkchk" path="res://assets/font/PeaberryBase.ttf" id="2_bp75w"]
 
 [node name="ChatBubble" type="Control"]
 layout_mode = 3
@@ -10,27 +11,26 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -150.0
-offset_top = -120.0
+offset_top = -80.0
 offset_right = 150.0
-offset_bottom = -70.0
+offset_bottom = -30.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_chat_bubble")
-
-[node name="Background" type="NinePatchRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(0, 0, 0, 0.8)
 
 [node name="MessageLabel" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = -5.0
+offset_bottom = -5.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = ExtResource("2_bp75w")
+theme_override_font_sizes/font_size = 16
 text = "Hello!"
 horizontal_alignment = 1
 vertical_alignment = 1

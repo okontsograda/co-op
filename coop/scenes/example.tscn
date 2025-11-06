@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=4 uid="uid://c66m8oem8ehsl"]
+[gd_scene load_steps=21 format=4 uid="uid://c66m8oem8ehsl"]
 
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="1_ewl3q"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="1_ta1gp"]
@@ -11,6 +11,7 @@
 [ext_resource type="Texture2D" uid="uid://dw5wdxd2wki68" path="res://tileset/01.png" id="8_lfjhb"]
 [ext_resource type="Texture2D" uid="uid://d2jx20a5b8cwr" path="res://tileset/02.png" id="9_1f1uy"]
 [ext_resource type="Texture2D" uid="uid://dmyfxyhhw8kfx" path="res://tileset/03.png" id="10_tyu68"]
+[ext_resource type="Script" uid="uid://83hum4bblwje" path="res://coop/scripts/easy_world_setup.gd" id="12_tyu68"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ydsdc"]
 texture = ExtResource("1_ewl3q")
@@ -1695,9 +1696,6 @@ position = Vector2(758, 408)
 [node name="Tree9" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(1507, 877)
 
-[node name="Tree10" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(235, 92)
-
 [node name="Tree11" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(531, 461)
 
@@ -1742,4 +1740,10 @@ position = Vector2(59, -86)
 texture = ExtResource("9_1f1uy")
 
 [node name="ShopBuilding" parent="." instance=ExtResource("7_shop")]
-position = Vector2(346, 106)
+position = Vector2(128, -15)
+
+[node name="Tree10" parent="." instance=ExtResource("6_ydsdc")]
+position = Vector2(208, 103)
+
+[node name="Node" type="Node" parent="."]
+script = ExtResource("12_tyu68")

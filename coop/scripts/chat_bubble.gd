@@ -1,7 +1,7 @@
 extends Control
 
 @onready var message_label: Label = $MessageLabel
-@onready var background: NinePatchRect = $Background
+@onready var background: ColorRect = $Background
 
 var display_duration: float = 5.0
 var fade_duration: float = 1.0
