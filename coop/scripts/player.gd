@@ -165,6 +165,13 @@ func _ready() -> void:
 	# Set up bow release sound
 	setup_bow_sound()
 
+	# Initialize health tracking with GameDirector (server only)
+	if multiplayer.is_server():
+		# Wait a frame for everything to be fully initialized
+		await get_tree().process_frame
+		var player_peer_id = name.to_int()
+		GameDirector.update_player_health(player_peer_id, current_health, max_health)
+
 
 func _input(event: InputEvent) -> void:
 	# Only handle input for the local player
@@ -1088,10 +1095,15 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 	# Apply damage locally
 	# Reduce health
 	current_health -= amount
-	
+
 	# Track damage taken
 	if GameStats:
 		GameStats.record_damage_taken(amount)
+
+	# Update GameDirector with health change (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.update_player_health(peer_id, current_health, max_health)
 
 	# Broadcast health update to all clients
 	rpc("sync_player_health", current_health)
@@ -1211,6 +1223,12 @@ func spawn_evade_text() -> void:
 func sync_player_health(health: int) -> void:
 	# Update health on all clients (including the local player)
 	current_health = health
+
+	# Update GameDirector with health change (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.update_player_health(peer_id, current_health, max_health)
+
 	update_health_display()
 
 
@@ -1218,6 +1236,11 @@ func sync_player_health(health: int) -> void:
 func heal(amount: int) -> void:
 	# Cap health at maximum
 	current_health = min(current_health + amount, max_health)
+
+	# Update GameDirector with health change (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.update_player_health(peer_id, current_health, max_health)
 
 	# Broadcast health update to all clients
 	rpc("sync_player_health", current_health)
@@ -1299,25 +1322,30 @@ func handle_death_rpc() -> void:
 func handle_death() -> void:
 	# Handle death on authority/server
 	print("Player ", name, " has died!")
-	
+
+	# Notify GameDirector of player death (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.on_player_death(peer_id)
+
 	# Mark player as dead
 	is_alive = false
-	
+
 	# Hide the player sprite but keep them in spectator mode
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite:
 		sprite.visible = false
-	
+
 	# Hide UI elements on ALL clients (so other players don't see dead player's UI)
 	hide_player_ui()
-	
+
 	# Disable collision so they don't block others
 	set_collision_layer_value(1, false)  # Disable player collision layer
 	set_collision_mask_value(1, false)  # Disable collision with other players
-	
+
 	# Stop movement
 	velocity = Vector2.ZERO
-	
+
 	# Check if ALL players are dead
 	if is_multiplayer_authority() and are_all_players_dead():
 		# Show game over to everyone
@@ -1503,6 +1531,11 @@ func level_up() -> void:
 	print("New max health: ", max_health)
 	print("New attack damage: ", attack_damage)
 
+	# Update GameDirector with new health values (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.update_player_health(peer_id, current_health, max_health)
+
 	# Update health bar
 	update_health_display()
 
@@ -1544,6 +1577,12 @@ func sync_level_up(
 	current_xp = xp
 	xp_to_next_level = xp_needed
 	attack_damage = new_attack_damage
+
+	# Update GameDirector with new health values (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.update_player_health(peer_id, current_health, max_health)
+
 	update_health_display()
 	update_xp_display()
 	print(

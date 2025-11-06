@@ -22,6 +22,7 @@ LobbyManager="*res://coop/scripts/lobby_manager.gd"
 NetworkHandler="*res://coop/scripts/network_handler.gd"
 UpgradeSystem="*res://coop/scripts/upgrade_system.gd"
 GameStats="*res://coop/scripts/game_stats.gd"
+GameDirector="*res://coop/scripts/game_director.gd"
 ShopManager="*res://coop/scripts/shop_manager.gd"
 
 [display]

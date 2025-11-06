@@ -713,6 +713,12 @@ func award_xp_to_killer() -> void:
 	for player in players:
 		if str(player.name) == last_attacker or str(player.name.to_int()) == last_attacker:
 			player.gain_xp(25)  # Award 25 XP per kill
+
+			# Notify GameDirector of kill (server only)
+			if multiplayer.is_server():
+				var peer_id = player.name.to_int()
+				GameDirector.on_player_kill(peer_id)
+
 			break
 
 
