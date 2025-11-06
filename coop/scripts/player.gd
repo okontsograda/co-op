@@ -25,13 +25,6 @@ var player_name: String = "Player"  # Player's name loaded from save system
 # Currency System
 var coins: int = 0  # Currency collected by the player
 
-# XP System
-var current_xp: int = 0
-var current_level: int = 1
-var xp_to_next_level: int = 100
-const base_xp_per_level: int = 100
-const xp_per_enemy_kill: int = 25
-
 var is_firing: bool = false
 var can_fire: bool = true
 var is_fire_button_held: bool = false  # Track if fire button is held
@@ -97,9 +90,6 @@ var upgrade_stacks = {}
 # Active abilities (arrow nova, summon archer, shield, etc.)
 var active_abilities = []
 
-# Signal emitted when player levels up and is ready for upgrade selection
-signal level_up_ready
-
 # Sound effects
 var bow_sound_player: AudioStreamPlayer2D = null
 
@@ -159,8 +149,8 @@ func _ready() -> void:
 	if NetworkHandler:
 		NetworkHandler.chat_message_received.connect(_on_chat_message_received)
 
-	# Connect level-up signal to show upgrade overlay
-	level_up_ready.connect(_on_level_up_ready)
+	# Connect to TeamXP level-up signal to show upgrade overlay and apply bonuses
+	TeamXP.level_up_ready.connect(_on_team_level_up)
 
 	# Set up bow release sound
 	setup_bow_sound()
@@ -1034,15 +1024,15 @@ func update_health_display() -> void:
 
 
 func update_xp_display() -> void:
-	# Update the XP bar
+	# Update the XP bar with team XP
 	var xp_bar = get_node_or_null("XPBar")
 	if xp_bar:
-		xp_bar.update_xp(current_xp, xp_to_next_level)
+		xp_bar.update_xp(TeamXP.get_team_xp(), TeamXP.get_xp_to_next_level())
 
-	# Update the level label
+	# Update the level label with team level
 	var level_label = get_node_or_null("LevelLabel")
 	if level_label:
-		level_label.text = "Lv." + str(current_level)
+		level_label.text = "Lv." + str(TeamXP.get_team_level())
 
 
 func update_stamina_display() -> void:
@@ -1478,56 +1468,14 @@ func find_player_by_name(player_name: String) -> Node2D:
 	return null
 
 
-# XP System Functions
-func gain_xp(amount: int) -> void:
-	# Always call via RPC so it processes on the correct player instance
-	rpc("gain_xp_rpc", amount)
-
-
-@rpc("any_peer", "reliable", "call_local")
-func gain_xp_rpc(amount: int) -> void:
-	print(
-		"gain_xp_rpc called for player ",
-		name,
-		", is_multiplayer_authority: ",
-		is_multiplayer_authority()
-	)
-	# Only process on the player who has authority
-	if not is_multiplayer_authority():
-		print("Player ", name, " not authority, returning")
-		return
-
-	current_xp += amount
-	print("Player ", name, " gained ", amount, " XP. Total: ", current_xp)
-
-	# Check for level up
-	while current_xp >= xp_to_next_level:
-		level_up()
-
-	# Update XP display locally
-	update_xp_display()
-
-	# Sync XP to all clients (including self via call_local)
-	rpc("sync_xp", current_xp, current_level, xp_to_next_level)
-	print("Sent sync_xp RPC: ", current_xp, "/", xp_to_next_level, " level ", current_level)
-
-
-func level_up() -> void:
-	current_xp -= xp_to_next_level
-	current_level += 1
-
-	# Play level up sound
-	play_levelup_sound()
-
-	# Increase XP requirement for next level (scaling)
-	xp_to_next_level = base_xp_per_level * current_level
-
-	# Level up bonuses (baseline automatic increases)
+# Team XP System - Called when team levels up
+func _on_team_level_up() -> void:
+	# Apply automatic level up bonuses to this player
 	max_health += 10
 	current_health = max_health  # Full heal on level up
 	attack_damage += 5  # Increase attack damage by 5 per level
 
-	print("Player ", name, " leveled up to level ", current_level, "!")
+	print("Player ", name, " received team level up bonuses!")
 	print("New max health: ", max_health)
 	print("New attack damage: ", attack_damage)
 
@@ -1536,65 +1484,14 @@ func level_up() -> void:
 		var peer_id = name.to_int()
 		GameDirector.update_player_health(peer_id, current_health, max_health)
 
-	# Update health bar
+	# Update displays
 	update_health_display()
+	update_xp_display()
 
-	# Emit signal for upgrade system (only for local player)
+	# Show upgrade overlay (only for local player)
+	# Game does NOT pause - player can choose upgrade while playing
 	if is_multiplayer_authority():
-		level_up_ready.emit()
-
-	# Sync level up to all clients
-	rpc("sync_level_up", current_level, max_health, current_xp, xp_to_next_level, attack_damage)
-
-
-@rpc("any_peer", "reliable", "call_local")
-func sync_xp(xp: int, level: int, xp_needed: int) -> void:
-	print("sync_xp RPC received for player ", name, ": ", xp, "/", xp_needed, " level ", level)
-	current_xp = xp
-	current_level = level
-	xp_to_next_level = xp_needed
-	update_xp_display()
-	print(
-		"Synced XP for player ",
-		name,
-		": ",
-		current_xp,
-		"/",
-		xp_to_next_level,
-		" (Level ",
-		current_level,
-		")"
-	)
-
-
-@rpc("any_peer", "reliable", "call_local")
-func sync_level_up(
-	level: int, new_max_health: int, xp: int, xp_needed: int, new_attack_damage: int
-) -> void:
-	current_level = level
-	max_health = new_max_health
-	current_health = max_health
-	current_xp = xp
-	xp_to_next_level = xp_needed
-	attack_damage = new_attack_damage
-
-	# Update GameDirector with new health values (server only)
-	if multiplayer.is_server():
-		var peer_id = name.to_int()
-		GameDirector.update_player_health(peer_id, current_health, max_health)
-
-	update_health_display()
-	update_xp_display()
-	print(
-		"Synced level up for player ",
-		name,
-		": Level ",
-		current_level,
-		", Health: ",
-		max_health,
-		", Attack Damage: ",
-		attack_damage
-	)
+		_on_level_up_ready()
 
 
 # Apply upgrade when selected from upgrade menu

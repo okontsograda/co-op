@@ -32,12 +32,12 @@ func update_display() -> void:
 
 
 func update_player_stats() -> void:
-	# Level
+	# Team Level
 	var level_value = get_node(
 		"MarginContainer/VBoxContainer/ScrollContainer/Content/PlayerStats/StatsGrid/LevelValue"
 	)
 	if level_value:
-		level_value.text = str(player.current_level)
+		level_value.text = str(TeamXP.get_team_level())
 
 	# Health
 	var health_value = get_node(
@@ -46,12 +46,12 @@ func update_player_stats() -> void:
 	if health_value:
 		health_value.text = str(player.current_health) + " / " + str(player.max_health)
 
-	# XP
+	# Team XP
 	var xp_value = get_node(
 		"MarginContainer/VBoxContainer/ScrollContainer/Content/PlayerStats/StatsGrid/XPValue"
 	)
 	if xp_value:
-		xp_value.text = str(player.current_xp) + " / " + str(player.xp_to_next_level)
+		xp_value.text = str(TeamXP.get_team_xp()) + " / " + str(TeamXP.get_xp_to_next_level())
 
 
 func update_weapon_stats() -> void:
