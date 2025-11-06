@@ -60,6 +60,15 @@ max_length = 20
 layout_mode = 2
 custom_minimum_size = Vector2(0, 20)
 
+[node name="PlayLocalButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 50)
+text = "Play Local"
+
+[node name="Spacer1c" type="Control" parent="VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 10)
+
 [node name="HostButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 50)

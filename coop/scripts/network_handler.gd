@@ -64,6 +64,82 @@ func connect_to_relay_async() -> void:
 signal chat_message_received(player_name: String, message: String)
 
 
+func start_local_game_with_class(selected_class: String) -> void:
+	# Start a local single-player game without networking
+	print("Starting local single-player game with class: ", selected_class)
+	
+	# Create an offline multiplayer peer (allows us to use peer ID 1 without networking)
+	var offline_peer = OfflineMultiplayerPeer.new()
+	multiplayer.multiplayer_peer = offline_peer
+	
+	print("Offline peer created, peer ID: ", multiplayer.get_unique_id())
+	
+	# Get the weapon for the selected class
+	var class_data = PlayerClass.get_class_by_name(selected_class)
+	var weapon = "bow"  # Default
+	if class_data.has("combat_type"):
+		if class_data["combat_type"] == "melee":
+			weapon = "sword"
+	
+	# Set up local player data in LobbyManager with selected class
+	var local_id = multiplayer.get_unique_id()
+	LobbyManager.players[local_id] = {
+		"class": selected_class,
+		"weapon": weapon,
+		"ready": true,
+		"is_host": true,
+		"player_name": SaveSystem.get_player_name()
+	}
+	
+	print("Local player registered with class: ", selected_class, " and weapon: ", weapon)
+	
+	# Go directly to game scene
+	get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
+	
+	# Wait for scene to load, then spawn player and start game
+	await get_tree().create_timer(0.3).timeout
+	
+	# Spawn the local player
+	spawn_local_player()
+	
+	# Find enemy spawn points
+	find_enemy_spawn_points()
+	
+	# Start wave system
+	await get_tree().create_timer(0.5).timeout
+	start_wave_system()
+	
+	# Initialize GameDirector with player count
+	GameDirector.update_player_count(1)
+	print("Local game started successfully!")
+
+
+func spawn_local_player() -> void:
+	# Spawn a single local player
+	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
+	var player = player_scene.instantiate()
+	
+	# Set the player name to the local peer ID
+	var local_peer_id = multiplayer.get_unique_id()
+	player.name = str(local_peer_id)
+	
+	# Set spawn position
+	player.position = get_spawn_position()
+	
+	# Store the player's selected class and weapon
+	player.set_meta("selected_class", LobbyManager.players[local_peer_id]["class"])
+	player.set_meta("selected_weapon", LobbyManager.players[local_peer_id]["weapon"])
+	
+	# Add the player to the scene tree
+	get_tree().current_scene.add_child(player)
+	
+	# Register player with GameDirector
+	GameDirector.register_player(local_peer_id)
+	
+	print("Local player spawned with peer ID: ", local_peer_id)
+	print("Player position: ", player.position)
+
+
 func start_server(go_to_lobby: bool = true) -> void:
 	# Ensure relay connection is established before hosting
 	print("Starting server, checking relay connection...")

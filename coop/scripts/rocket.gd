@@ -82,6 +82,10 @@ func _on_body_entered(body: Node2D) -> void:
 	if body in enemies_hit:
 		return
 
+	# Don't hit other players (no friendly fire)
+	if body.is_in_group("players"):
+		return
+
 	# Check if we hit something that can take damage
 	if body.has_method("take_damage"):
 		var shooter = get_meta("shooter", null)
