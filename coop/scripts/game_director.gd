@@ -59,6 +59,12 @@ enum SpecialEventType {
 	TANK_WAVE       # More Large/Huge enemies
 }
 
+enum WaveType {
+	NORMAL,     # Standard combat wave
+	BOSS,       # Boss wave (every 5 waves)
+	REST        # Rest wave for shop/upgrades
+}
+
 # ============================================================================
 # STATE VARIABLES
 # ============================================================================
@@ -84,6 +90,11 @@ var enemies_spawned_count: int = 0
 
 ## Performance tracking timer
 var performance_update_timer: float = 0.0
+
+## Rest wave tracking
+var waves_since_last_rest: int = 0
+var rest_wave_threshold: int = 3  # Default, dynamically adjusted
+var next_wave_type: WaveType = WaveType.NORMAL
 
 ## Debug mode
 var debug_mode: bool = true
@@ -173,6 +184,71 @@ func determine_special_event(wave_number: int) -> SpecialEventType:
 ## Called when wave completes
 func on_wave_complete() -> void:
 	print("[GameDirector] Wave %d complete - Stress level: %.1f%%" % [current_wave, group_stress_level * 100])
+
+	# Track waves since last rest (only for non-rest waves)
+	if next_wave_type != WaveType.REST:
+		waves_since_last_rest += 1
+
+	# Determine next wave type
+	next_wave_type = get_next_wave_type()
+	print("[GameDirector] Next wave will be: %s" % WaveType.keys()[next_wave_type])
+
+## Get the type of wave that should come next
+func get_next_wave_type() -> WaveType:
+	var upcoming_wave = current_wave + 1
+
+	# Boss waves take priority
+	if upcoming_wave % BOSS_WAVE_INTERVAL == 0:
+		return WaveType.BOSS
+
+	# Check if rest wave should trigger
+	if should_trigger_rest_wave():
+		return WaveType.REST
+
+	return WaveType.NORMAL
+
+## Determine if a rest wave should occur based on dynamic factors
+func should_trigger_rest_wave() -> bool:
+	# Calculate dynamic threshold based on stress and difficulty
+	calculate_rest_wave_frequency()
+
+	# Trigger rest if we've reached threshold
+	if waves_since_last_rest >= rest_wave_threshold:
+		return true
+
+	return false
+
+## Calculate rest wave frequency based on player performance
+func calculate_rest_wave_frequency() -> void:
+	# Base frequency: 2-4 waves between rest periods
+	var base_frequency = 3
+
+	# Adjust based on stress level
+	if group_stress_level >= STRESS_THRESHOLD_HIGH:
+		# High stress = more frequent rests (every 2 waves)
+		rest_wave_threshold = 2
+	elif group_stress_level >= STRESS_THRESHOLD_MEDIUM:
+		# Medium stress = normal frequency (every 3 waves)
+		rest_wave_threshold = 3
+	elif group_stress_level >= STRESS_THRESHOLD_LOW:
+		# Low stress = less frequent rests (every 4 waves)
+		rest_wave_threshold = 4
+	else:
+		# Very low stress = even less frequent (every 4-5 waves)
+		rest_wave_threshold = 4
+
+	# Early game (first 3 waves) always gets faster rest waves
+	if current_wave <= 3:
+		rest_wave_threshold = min(rest_wave_threshold, 2)
+
+	print("[GameDirector] Rest wave threshold: %d (stress: %.2f, waves since rest: %d)" % [
+		rest_wave_threshold, group_stress_level, waves_since_last_rest
+	])
+
+## Reset rest wave counter (called when rest wave starts)
+func reset_rest_wave_counter() -> void:
+	waves_since_last_rest = 0
+	print("[GameDirector] Rest wave counter reset")
 
 ## Check if all spawned enemies have been killed
 func check_all_enemies_killed() -> bool:
@@ -483,7 +559,10 @@ func get_debug_data() -> Dictionary:
 		"enemies_spawned": enemies_spawned_count,
 		"enemies_total": enemies_to_spawn_this_wave,
 		"spawn_progress": float(enemies_spawned_count) / enemies_to_spawn_this_wave if enemies_to_spawn_this_wave > 0 else 0,
-		"player_performance": player_performance
+		"player_performance": player_performance,
+		"next_wave_type": WaveType.keys()[next_wave_type],
+		"waves_since_rest": waves_since_last_rest,
+		"rest_threshold": rest_wave_threshold
 	}
 
 ## Get intensity color for debug display
