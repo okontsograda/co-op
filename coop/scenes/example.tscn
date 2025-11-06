@@ -12,7 +12,6 @@
 [ext_resource type="Texture2D" uid="uid://dw5wdxd2wki68" path="res://tileset/01.png" id="8_lfjhb"]
 [ext_resource type="Texture2D" uid="uid://d2jx20a5b8cwr" path="res://tileset/02.png" id="9_1f1uy"]
 [ext_resource type="Texture2D" uid="uid://dmyfxyhhw8kfx" path="res://tileset/03.png" id="10_tyu68"]
-[ext_resource type="Script" uid="uid://83hum4bblwje" path="res://coop/scripts/easy_world_setup.gd" id="12_tyu68"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ydsdc"]
 texture = ExtResource("1_ewl3q")
@@ -1747,6 +1746,3 @@ position = Vector2(128, -15)
 
 [node name="Tree10" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(208, 103)
-
-[node name="Node" type="Node" parent="."]
-script = ExtResource("12_tyu68")
