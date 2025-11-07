@@ -103,6 +103,9 @@ func start_local_game_with_class(selected_class: String) -> void:
 	# Wait for scene to load, then spawn player and start game
 	await get_tree().create_timer(0.3).timeout
 	
+	# Start fade-in effect (runs in parallel with spawning)
+	_fade_in_scene(1.2)
+	
 	# Spawn the local player
 	spawn_local_player()
 	
@@ -115,6 +118,7 @@ func start_local_game_with_class(selected_class: String) -> void:
 	
 	# Initialize GameDirector with player count
 	GameDirector.update_player_count(1)
+	
 	print("Local game started successfully!")
 
 
@@ -916,6 +920,9 @@ func update_enemy_position(enemy_name: String, position: Vector2) -> void:
 func start_game_from_lobby() -> void:
 	print("Starting game from lobby...")
 
+	# Start fade-in effect (runs in parallel with spawning)
+	_fade_in_scene(1.2)
+
 	# Spawn players with their selected classes
 	spawn_players_with_classes()
 
@@ -972,6 +979,150 @@ func spawn_players_with_classes() -> void:
 	# Update GameDirector with total player count
 	GameDirector.update_player_count(player_count)
 	print("GameDirector: Updated player count to ", player_count)
+
+
+func _create_fade_overlay() -> CanvasLayer:
+	# Create a fade overlay for smooth scene transitions
+	var fade_layer = CanvasLayer.new()
+	fade_layer.name = "FadeOverlay"
+	fade_layer.layer = 200  # High layer to be above everything
+	
+	var control = Control.new()
+	control.name = "Control"
+	control.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fade_layer.add_child(control)
+	
+	var fade_rect = ColorRect.new()
+	fade_rect.name = "FadeRect"
+	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fade_rect.color = Color(0, 0, 0, 1.0)  # Start fully opaque (black)
+	control.add_child(fade_rect)
+	
+	# Add to root so it persists across scene operations
+	get_tree().root.add_child(fade_layer)
+	
+	return fade_layer
+
+
+func _fade_in_scene(fade_duration: float = 1.0) -> void:
+	# Create fade overlay and fade it out smoothly
+	var fade_layer = _create_fade_overlay()
+	var fade_rect = fade_layer.get_node("Control/FadeRect")
+	
+	# Wait a brief moment for scene to start loading
+	await get_tree().create_timer(0.1).timeout
+	
+	# Create a tween on the fade_rect node to fade out
+	var tween = fade_rect.create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.tween_property(fade_rect, "color:a", 0.0, fade_duration)
+	
+	# Wait for fade to complete
+	await tween.finished
+	
+	# Remove the fade overlay
+	if is_instance_valid(fade_layer):
+		fade_layer.queue_free()
+
+
+func _cleanup_game_over_screens() -> void:
+	# Remove all game over screens from the root (they persist across scene reloads)
+	var root = get_tree().root
+	var screens_to_remove = []
+	for child in root.get_children():
+		if child is CanvasLayer and child.name == "GameOverScreen":
+			screens_to_remove.append(child)
+	
+	# Remove them immediately to prevent persistence across scene reloads
+	for screen in screens_to_remove:
+		if is_instance_valid(screen):
+			root.remove_child(screen)
+			screen.queue_free()
+
+
+func restart_game_with_current_config() -> void:
+	# Restart the game while preserving the current player configuration
+	print("Restarting game with current configuration...")
+	
+	# Save the current configuration before reloading
+	var is_local_game = multiplayer.multiplayer_peer is OfflineMultiplayerPeer
+	var saved_selected_class = "archer"  # Default fallback
+	
+	if is_local_game:
+		# Local single-player game - save the selected class
+		var local_id = multiplayer.get_unique_id()
+		if LobbyManager.players.has(local_id):
+			saved_selected_class = LobbyManager.players[local_id]["class"]
+			print("Restarting local game with class: ", saved_selected_class)
+		else:
+			print("WARNING: No player data found in LobbyManager, using default class")
+	else:
+		# Multiplayer game - LobbyManager.players should still have all player data
+		print("Restarting multiplayer game with ", LobbyManager.players.size(), " players")
+	
+	# Remove any existing game over screens from root before reloading
+	_cleanup_game_over_screens()
+	
+	# Reload the scene
+	get_tree().reload_current_scene()
+	
+	# Wait for scene to load
+	await get_tree().create_timer(0.3).timeout
+	
+	# Clean up any game over screens that might have persisted after reload
+	_cleanup_game_over_screens()
+	
+	if is_local_game:
+		# Restore local game configuration
+		# Recreate the offline multiplayer peer
+		var offline_peer = OfflineMultiplayerPeer.new()
+		multiplayer.multiplayer_peer = offline_peer
+		
+		# Get the weapon for the selected class
+		var class_data = PlayerClass.get_class_by_name(saved_selected_class)
+		var weapon = "bow"  # Default
+		if class_data.has("combat_type"):
+			if class_data["combat_type"] == "melee":
+				weapon = "sword"
+		
+		# Restore player data in LobbyManager
+		var local_id = multiplayer.get_unique_id()
+		LobbyManager.players[local_id] = {
+			"class": saved_selected_class,
+			"weapon": weapon,
+			"ready": true,
+			"is_host": true,
+			"player_name": SaveSystem.get_player_name()
+		}
+		
+		# Start fade-in effect (runs in parallel with spawning)
+		_fade_in_scene(1.2)
+		
+		# Spawn the local player
+		spawn_local_player()
+		
+		# Find enemy spawn points
+		find_enemy_spawn_points()
+		
+		# Start wave system
+		await get_tree().create_timer(0.5).timeout
+		start_wave_system()
+		
+		# Initialize GameDirector with player count
+		GameDirector.update_player_count(1)
+		
+		print("Local game restarted successfully!")
+	else:
+		# Multiplayer game - LobbyManager.players should still have all player data
+		# Ensure multiplayer peer is still set (should persist, but check to be safe)
+		if not multiplayer.has_multiplayer_peer() or not (multiplayer.multiplayer_peer is NodeTunnelPeer):
+			multiplayer.multiplayer_peer = peer
+			print("Restored multiplayer peer after scene reload")
+		
+		# Reinitialize the game from lobby (spawn players and start wave system)
+		# Note: start_game_from_lobby() will handle the fade-in
+		start_game_from_lobby()
 
 
 func get_spawn_position_at_index(index: int) -> Vector2:

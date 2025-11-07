@@ -35,8 +35,8 @@ func display_stats() -> void:
 
 
 func _on_restart_pressed() -> void:
-	# Close the game over screen
-	queue_free()
+	# Remove all game over screens from root before restarting
+	_remove_all_game_over_screens()
 	
 	# Reset stats
 	if GameStats:
@@ -47,13 +47,23 @@ func _on_restart_pressed() -> void:
 		# Peer can't restart - send them to main menu
 		get_tree().change_scene_to_file("res://coop/scenes/main_menu.tscn")
 	else:
-		# Host can restart the game
-		get_tree().reload_current_scene()
+		# Host/server can restart the game with current configuration
+		NetworkHandler.restart_game_with_current_config()
+
+
+func _remove_all_game_over_screens() -> void:
+	# Remove all game over screens from the root (they persist across scene reloads)
+	var root = get_tree().root
+	for child in root.get_children():
+		if child is CanvasLayer and child.name == "GameOverScreen":
+			child.queue_free()
+	# Also remove this instance
+	queue_free()
 
 
 func _on_main_menu_pressed() -> void:
-	# Close the game over screen
-	queue_free()
+	# Remove all game over screens from root
+	_remove_all_game_over_screens()
 	
 	# Reset stats
 	if GameStats:
