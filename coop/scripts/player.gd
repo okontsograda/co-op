@@ -20,7 +20,18 @@ var attack_damage: int = 100  # Base arrow damage
 
 # Player state
 var is_alive: bool = true  # Track if player is alive for enemy targeting
+var is_downed: bool = false  # Track if player is downed (can be revived)
 var player_name: String = "Player"  # Player's name loaded from save system
+
+# Revive system
+const REVIVE_RADIUS: float = 80.0  # Distance required to revive
+const REVIVE_TIME: float = 10.0  # Time in seconds to revive
+const REVIVE_HP_PERCENT: float = 0.25  # HP restored when revived (25%)
+var revive_timer: float = 0.0  # Time remaining before permanent death
+var revive_progress: float = 0.0  # Current revive progress (0.0 to REVIVE_TIME)
+var reviving_player: Node2D = null  # Player currently reviving this player
+var revive_request_cooldowns: Dictionary = {}  # Cooldown per downed player to prevent spam RPC calls
+const REVIVE_REQUEST_COOLDOWN_TIME: float = 0.5  # Only send revive request every 0.5 seconds
 
 # Currency System
 var coins: int = 0  # Currency collected by the player
@@ -170,8 +181,8 @@ func _input(event: InputEvent) -> void:
 	if peer_id != multiplayer.get_unique_id():
 		return
 
-	# Don't handle input if player is dead (health <= 0)
-	if current_health <= 0:
+	# Don't handle input if player is dead or downed
+	if current_health <= 0 or is_downed:
 		return
 
 	# Handle dodge roll (Spacebar only, not Enter)
@@ -226,12 +237,23 @@ func _physics_process(_delta: float) -> void:
 	if !is_multiplayer_authority():
 		return
 
-	# Handle spectator camera if player is dead
-	if current_health <= 0:
+	# Handle spectator camera if player is dead (not downed and not alive)
+	if current_health <= 0 and not is_downed and not is_alive:
 		update_spectator_camera()
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
+	
+	# Handle downed state
+	if is_downed:
+		handle_downed_state(_delta)
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+	
+	# Check for revive interactions (only for alive players)
+	if is_alive and current_health > 0:
+		check_revive_interactions(_delta)
 
 	# Check if chat is active - if so, don't process movement or combat
 	var chat_ui = get_node("ChatUI")
@@ -1312,20 +1334,27 @@ func handle_death_rpc() -> void:
 
 func handle_death() -> void:
 	# Handle death on authority/server
-	print("Player ", name, " has died!")
+	print("Player ", name, " has been downed!")
 
-	# Notify GameDirector of player death (server only)
-	if multiplayer.is_server():
-		var peer_id = name.to_int()
-		GameDirector.on_player_death(peer_id)
+	# Set downed state instead of immediate death
+	is_downed = true
+	is_alive = false  # Still mark as not alive for enemy targeting
+	revive_timer = REVIVE_TIME
+	revive_progress = 0.0
+	reviving_player = null
 
-	# Mark player as dead
-	is_alive = false
+	# Broadcast downed state to all clients
+	rpc("sync_downed_state", true, REVIVE_TIME)
 
-	# Hide the player sprite but keep them in spectator mode
+	# Make sprite semi-transparent and slightly red to show downed state
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite:
-		sprite.visible = false
+		print("[REVIVE] handle_death: Setting sprite visible for player ", name)
+		sprite.modulate = Color(1.0, 0.5, 0.5, 0.7)  # Red tint, semi-transparent
+		sprite.visible = true  # Keep visible so teammates can see them
+		sprite.show()  # Force show to ensure visibility
+	else:
+		print("[REVIVE] ERROR: handle_death: AnimatedSprite2D not found for player ", name)
 
 	# Hide UI elements on ALL clients (so other players don't see dead player's UI)
 	hide_player_ui()
@@ -1337,6 +1366,39 @@ func handle_death() -> void:
 	# Stop movement
 	velocity = Vector2.ZERO
 
+	# Create revive UI indicator
+	create_revive_indicator()
+
+	# Start revive timeout timer
+	if is_multiplayer_authority():
+		start_revive_timeout()
+
+
+func handle_permanent_death() -> void:
+	# Actually die permanently (called after revive timeout)
+	print("Player ", name, " has permanently died!")
+
+	# Notify GameDirector of player death (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.on_player_death(peer_id)
+
+	# Mark as permanently dead
+	is_downed = false
+	is_alive = false
+
+	# Broadcast permanent death to all clients
+	rpc("sync_downed_state", false, 0.0)
+
+	# Hide the player sprite completely
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.visible = false
+		sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+	# Remove revive indicator
+	remove_revive_indicator()
+
 	# Check if ALL players are dead
 	if is_multiplayer_authority() and are_all_players_dead():
 		# Show game over to everyone
@@ -1344,12 +1406,15 @@ func handle_death() -> void:
 
 
 func are_all_players_dead() -> bool:
-	# Check if all players in the game are dead
+	# Check if all players in the game are dead (not downed, actually dead)
 	var players = get_tree().get_nodes_in_group("players")
 	for player in players:
 		if "is_alive" in player and player.is_alive:
 			return false  # Found at least one alive player
-	return true  # All players are dead
+		# Also check if downed (downed players are still "alive" for revive purposes)
+		if "is_downed" in player and player.is_downed:
+			return false  # Found at least one downed player (can be revived)
+	return true  # All players are permanently dead
 
 
 @rpc("any_peer", "reliable", "call_local")
@@ -1413,10 +1478,487 @@ func hide_player_ui() -> void:
 		stats_screen.visible = false
 
 
+func handle_downed_state(_delta: float) -> void:
+	# Handle downed player state - countdown timer
+	if is_multiplayer_authority():
+		# If someone is actively reviving, pause the death timer
+		var is_being_revived = reviving_player and is_instance_valid(reviving_player)
+		
+		if is_being_revived:
+			# Check if reviving player is still in range
+			var distance = global_position.distance_to(reviving_player.global_position)
+			if distance <= REVIVE_RADIUS:
+				# Someone is actively reviving in range - pause death timer and update progress
+				revive_progress += _delta
+				# Broadcast progress update (throttle to every 0.1 seconds to reduce network traffic)
+				if int(revive_progress * 10) != int((revive_progress - _delta) * 10):
+					rpc("sync_revive_progress", revive_progress)
+				
+				# Debug output every second
+				if int(revive_progress) != int(revive_progress - _delta):
+					print("[REVIVE] Progress: ", revive_progress, "/", REVIVE_TIME, " for player ", name, " (timer paused at ", revive_timer, "s)")
+				
+				# Check if revive is complete
+				if revive_progress >= REVIVE_TIME:
+					print("[REVIVE] Revive complete for player ", name)
+					complete_revive()
+					return
+			else:
+				# Reviving player moved out of range, cancel revive and resume timer
+				print("[REVIVE] Reviver moved out of range (", distance, " > ", REVIVE_RADIUS, ")")
+				cancel_revive()
+				# Resume death timer countdown
+				revive_timer -= _delta
+		else:
+			# No one is reviving, countdown timer normally
+			revive_timer -= _delta
+			# Reset progress if it was set
+			if revive_progress > 0.0:
+				revive_progress = 0.0
+				rpc("sync_revive_progress", 0.0)
+		
+		# Update revive indicator
+		update_revive_indicator()
+		
+		# If timer expires (and no one is reviving), permanently die
+		if revive_timer <= 0.0 and not is_being_revived:
+			print("[REVIVE] Timer expired for player ", name, " - permanent death")
+			handle_permanent_death()
+			return
+
+
+func check_revive_interactions(_delta: float) -> void:
+	# Check if this alive player is near any downed players
+	# Only check on authority to avoid duplicate RPC calls
+	if not is_multiplayer_authority():
+		return
+	
+	var players = get_tree().get_nodes_in_group("players")
+	var downed_player_ids = []
+	
+	for player in players:
+		if not is_instance_valid(player):
+			continue
+		
+		# Skip self
+		if player == self:
+			continue
+		
+		# Check if player is downed
+		if not ("is_downed" in player) or not player.is_downed:
+			continue
+		
+		var player_id = player.name.to_int()
+		downed_player_ids.append(player_id)
+		
+		# Update cooldown for this player
+		if not revive_request_cooldowns.has(player_id):
+			revive_request_cooldowns[player_id] = 0.0
+		if revive_request_cooldowns[player_id] > 0.0:
+			revive_request_cooldowns[player_id] -= _delta
+		
+		# Check distance
+		var distance = global_position.distance_to(player.global_position)
+		if distance <= REVIVE_RADIUS:
+			# In range to revive - start/continue reviving
+			# Only send revive request if cooldown is ready
+			if revive_request_cooldowns[player_id] <= 0.0:
+				start_revive(player)
+				revive_request_cooldowns[player_id] = REVIVE_REQUEST_COOLDOWN_TIME
+		else:
+			# Out of range - stop reviving if we were
+			# Only send stop request if cooldown is ready
+			if revive_request_cooldowns[player_id] <= 0.0:
+				stop_revive(player)
+				revive_request_cooldowns[player_id] = REVIVE_REQUEST_COOLDOWN_TIME
+	
+	# Clean up cooldowns for players that are no longer downed
+	for player_id in revive_request_cooldowns.keys():
+		if player_id not in downed_player_ids:
+			revive_request_cooldowns.erase(player_id)
+
+
+func start_revive(downed_player: Node2D) -> void:
+	# Start reviving a downed player
+	# Send RPC to the downed player to start revive (they have authority over their state)
+	if not is_multiplayer_authority():
+		return
+	
+	var reviver_player_id = name.to_int()
+	var distance = global_position.distance_to(downed_player.global_position)
+	
+	print("[REVIVE] start_revive called: ", name, " trying to revive ", downed_player.name, " (distance: ", distance, ")")
+	
+	# Call RPC on the downed player (will be processed by their authority)
+	# Use rpc_id to send directly to the downed player's authority
+	var downed_authority = downed_player.get_multiplayer_authority()
+	if downed_authority > 0:
+		downed_player.request_revive_start.rpc_id(downed_authority, reviver_player_id)
+		print("[REVIVE] Sent RPC to player ", downed_player.name, " (authority: ", downed_authority, ", reviver: ", reviver_player_id, ")")
+	else:
+		print("[REVIVE] ERROR: Could not get authority for downed player ", downed_player.name)
+
+
+func stop_revive(downed_player: Node2D) -> void:
+	# Stop reviving a downed player
+	# Send RPC to the downed player to stop revive
+	if not is_multiplayer_authority():
+		return
+	
+	# Call RPC on the downed player (will be processed by their authority)
+	# Use rpc_id to send directly to the downed player's authority
+	var downed_authority = downed_player.get_multiplayer_authority()
+	if downed_authority > 0:
+		downed_player.request_revive_stop.rpc_id(downed_authority)
+		print("Player ", name, " stopped reviving player ", downed_player.name)
+
+
+func cancel_revive() -> void:
+	# Cancel revive (called when reviving player moves out of range)
+	if reviving_player:
+		var reviver_name = reviving_player.name
+		reviving_player = null
+		revive_progress = 0.0
+		rpc("sync_revive_progress", 0.0)
+		rpc("sync_revive_stop", name.to_int())
+		print("Revive cancelled for player ", name, " (reviver: ", reviver_name, " moved away)")
+
+
+func complete_revive() -> void:
+	# Complete the revive process
+	if not is_multiplayer_authority():
+		return
+	
+	print("Player ", name, " has been revived!")
+	
+	# Restore health to 25% of max
+	current_health = int(max_health * REVIVE_HP_PERCENT)
+	
+	# Reset downed state
+	is_downed = false
+	is_alive = true
+	
+	# Reset revive variables
+	revive_timer = 0.0
+	revive_progress = 0.0
+	var reviver = reviving_player
+	reviving_player = null
+	
+	# Restore sprite appearance
+	var sprite = get_node_or_null("AnimatedSprite2D")
+	if sprite:
+		sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Reset color
+		sprite.visible = true
+	
+	# Re-enable collision
+	set_collision_layer_value(1, true)  # Enable player collision layer
+	set_collision_mask_value(1, true)  # Enable collision with other players
+	
+	# Show UI elements again
+	show_player_ui()
+	
+	# Update health display
+	update_health_display()
+	
+	# Update GameDirector with health change (server only)
+	if multiplayer.is_server():
+		var peer_id = name.to_int()
+		GameDirector.update_player_health(peer_id, current_health, max_health)
+	
+	# Broadcast revive completion
+	rpc("sync_revive_complete", name.to_int(), current_health)
+	
+	# Remove revive indicator
+	remove_revive_indicator()
+	
+	# Re-setup camera for local player (important after revival)
+	var peer_id = name.to_int()
+	if peer_id == multiplayer.get_unique_id():
+		setup_camera()
+	
+	# Notify reviver
+	if reviver and is_instance_valid(reviver):
+		print("Player ", reviver.name, " successfully revived player ", name)
+
+
+func start_revive_timeout() -> void:
+	# Start the timer for permanent death if not revived
+	# This is handled in handle_downed_state, but we can add a visual countdown here
+	pass  # Timer is handled in handle_downed_state
+
+
+func create_revive_indicator() -> void:
+	# Create UI indicator for revive progress
+	var existing_indicator = get_node_or_null("ReviveIndicator")
+	if existing_indicator:
+		return  # Already exists
+	
+	# Create a simple progress bar above the player
+	var indicator = Control.new()
+	indicator.name = "ReviveIndicator"
+	indicator.position = Vector2(-50, -80)  # Above player
+	indicator.size = Vector2(100, 20)
+	
+	# Background panel
+	var bg = Panel.new()
+	bg.name = "Background"
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.modulate = Color(0.2, 0.2, 0.2, 0.8)
+	indicator.add_child(bg)
+	
+	# Progress bar
+	var progress_bar = ProgressBar.new()
+	progress_bar.name = "ProgressBar"
+	progress_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	progress_bar.min_value = 0.0
+	progress_bar.max_value = REVIVE_TIME
+	progress_bar.value = 0.0
+	progress_bar.show_percentage = false
+	progress_bar.modulate = Color(0.2, 0.8, 0.2, 0.9)  # Green
+	indicator.add_child(progress_bar)
+	
+	# Timer label
+	var timer_label = Label.new()
+	timer_label.name = "TimerLabel"
+	timer_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	timer_label.text = "DOWNED"
+	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	timer_label.add_theme_font_size_override("font_size", 12)
+	timer_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	indicator.add_child(timer_label)
+	
+	add_child(indicator)
+
+
+func update_revive_indicator() -> void:
+	# Update the revive indicator UI
+	var indicator = get_node_or_null("ReviveIndicator")
+	if not indicator:
+		return
+	
+	var progress_bar = indicator.get_node_or_null("ProgressBar")
+	var timer_label = indicator.get_node_or_null("TimerLabel")
+	
+	if progress_bar:
+		# Show time remaining or revive progress
+		if reviving_player:
+			# Someone is reviving - show progress
+			progress_bar.value = revive_progress
+			progress_bar.modulate = Color(0.2, 0.8, 0.2, 0.9)  # Green
+		else:
+			# No one reviving - show time remaining
+			progress_bar.value = revive_timer
+			progress_bar.modulate = Color(0.8, 0.2, 0.2, 0.9)  # Red
+	
+	if timer_label:
+		if reviving_player:
+			var reviver_name = reviving_player.player_name if "player_name" in reviving_player else reviving_player.name
+			timer_label.text = "REVIVING..."
+		else:
+			var time_left = int(revive_timer)
+			timer_label.text = "DOWNED (" + str(time_left) + "s)"
+
+
+func remove_revive_indicator() -> void:
+	# Remove the revive indicator UI
+	var indicator = get_node_or_null("ReviveIndicator")
+	if indicator:
+		indicator.queue_free()
+
+
+func show_player_ui() -> void:
+	# Show all UI elements when player is revived
+	var health_bar = get_node_or_null("HealthBar")
+	if health_bar:
+		health_bar.visible = true
+
+	var stamina_bar = get_node_or_null("StaminaBar")
+	if stamina_bar:
+		stamina_bar.visible = true
+
+	var level_label = get_node_or_null("LevelLabel")
+	if level_label:
+		level_label.visible = true
+
+	var xp_bar = get_node_or_null("XPBar")
+	if xp_bar:
+		xp_bar.visible = true
+
+	var coin_display = get_node_or_null("CoinDisplay")
+	if coin_display:
+		coin_display.visible = true
+
+	var wave_display = get_node_or_null("WaveDisplay")
+	if wave_display:
+		wave_display.visible = true
+
+	var combo_ui = get_tree().root.get_node_or_null("ComboAttackUI")
+	if combo_ui:
+		combo_ui.visible = true
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_downed_state(downed: bool, timer: float) -> void:
+	# Sync downed state across all clients
+	print("[REVIVE] sync_downed_state called for player ", name, " - downed: ", downed)
+	is_downed = downed
+	revive_timer = timer
+	
+	if downed:
+		# Apply visual state
+		var sprite = get_node_or_null("AnimatedSprite2D")
+		if sprite:
+			print("[REVIVE] Setting sprite visible and red tint for player ", name)
+			sprite.modulate = Color(1.0, 0.5, 0.5, 0.7)
+			sprite.visible = true
+			# Force update to ensure visibility
+			sprite.show()
+		else:
+			print("[REVIVE] ERROR: AnimatedSprite2D not found for player ", name)
+		create_revive_indicator()
+	else:
+		# Reset visual state (permanent death)
+		var sprite = get_node_or_null("AnimatedSprite2D")
+		if sprite:
+			sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			sprite.visible = false
+		remove_revive_indicator()
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_revive_progress(progress: float) -> void:
+	# Sync revive progress across all clients
+	revive_progress = progress
+	update_revive_indicator()
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_revive_start(downed_player_id: int, reviver_player_id: int) -> void:
+	# Sync revive start across all clients
+	var downed_player = get_tree().current_scene.get_node_or_null(str(downed_player_id))
+	var reviver_player = get_tree().current_scene.get_node_or_null(str(reviver_player_id))
+	
+	if downed_player and reviver_player:
+		downed_player.reviving_player = reviver_player
+		downed_player.revive_progress = 0.0
+		downed_player.update_revive_indicator()
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_revive_stop(downed_player_id: int) -> void:
+	# Sync revive stop across all clients
+	var downed_player = get_tree().current_scene.get_node_or_null(str(downed_player_id))
+	
+	if downed_player:
+		downed_player.reviving_player = null
+		downed_player.revive_progress = 0.0
+		downed_player.update_revive_indicator()
+
+
+@rpc("any_peer", "reliable")
+func request_revive_start(reviver_player_id: int) -> void:
+	# Request to start reviving this player (called by reviving player)
+	print("[REVIVE] request_revive_start called for player ", name, " by reviver ", reviver_player_id)
+	
+	if not is_multiplayer_authority():
+		print("[REVIVE] Not authority, returning")
+		return  # Only process on authority
+	
+	if not is_downed:
+		print("[REVIVE] Not downed, returning")
+		return  # Not downed
+	
+	if reviving_player:
+		print("[REVIVE] Already being revived by ", reviving_player.name)
+		return  # Already being revived
+	
+	# Find the reviving player
+	var reviver = get_tree().current_scene.get_node_or_null(str(reviver_player_id))
+	if not reviver:
+		print("[REVIVE] ERROR: Could not find reviver player ", reviver_player_id)
+		return
+	
+	# Check distance
+	var distance = global_position.distance_to(reviver.global_position)
+	print("[REVIVE] Distance to reviver: ", distance, " (required: ", REVIVE_RADIUS, ")")
+	if distance > REVIVE_RADIUS:
+		print("[REVIVE] Too far away, returning")
+		return  # Too far away
+	
+	# Start revive
+	reviving_player = reviver
+	revive_progress = 0.0
+	
+	# Broadcast revive start
+	rpc("sync_revive_start", name.to_int(), reviver_player_id)
+	
+	print("[REVIVE] Player ", name, " started being revived by player ", reviver.name)
+
+
+@rpc("any_peer", "reliable")
+func request_revive_stop() -> void:
+	# Request to stop reviving this player (called by reviving player)
+	if not is_multiplayer_authority():
+		return  # Only process on authority
+	
+	if not reviving_player:
+		return  # Not being revived
+	
+	# Stop revive
+	reviving_player = null
+	revive_progress = 0.0
+	
+	# Broadcast revive stop
+	rpc("sync_revive_stop", name.to_int())
+	
+	print("Player ", name, " stopped being revived")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_revive_complete(player_id: int, new_health: int) -> void:
+	# Sync revive completion across all clients
+	var player = get_tree().current_scene.get_node_or_null(str(player_id))
+	
+	if player:
+		player.is_downed = false
+		player.is_alive = true
+		player.current_health = new_health
+		player.reviving_player = null
+		player.revive_progress = 0.0
+		player.revive_timer = 0.0
+		
+		# Restore sprite
+		var sprite = player.get_node_or_null("AnimatedSprite2D")
+		if sprite:
+			sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			sprite.visible = true
+		
+		# Re-enable collision
+		player.set_collision_layer_value(1, true)
+		player.set_collision_mask_value(1, true)
+		
+		# Show UI
+		player.show_player_ui()
+		player.update_health_display()
+		player.remove_revive_indicator()
+		
+		# Re-setup camera for local player (important after revival)
+		var player_peer_id = player.name.to_int()
+		if player_peer_id == multiplayer.get_unique_id():
+			player.setup_camera()
+
+
 func update_spectator_camera() -> void:
 	# Follow an alive player's camera (preferably the host)
+	# Only update camera position, don't move the player's position
+	# The player should stay where they died
 	var camera = get_node_or_null("Camera2D")
 	if not camera:
+		return
+	
+	# Don't update if this player is alive (shouldn't be in spectator mode)
+	if is_alive and current_health > 0:
 		return
 
 	# Find the first alive player to spectate
@@ -1438,10 +1980,12 @@ func update_spectator_camera() -> void:
 				alive_player = player
 				break
 
-	# Follow the alive player's position
+	# Move camera to follow the alive player (but don't move the dead player's position)
 	if alive_player:
-		# Smoothly move our position towards the alive player
-		global_position = global_position.lerp(alive_player.global_position, 0.1)
+		# Only update camera position, not player position
+		# The camera will follow the alive player automatically if it's a child
+		# But if we need to manually position it, we can do that here
+		pass  # Camera should already be following if set up correctly
 
 
 func show_game_over_screen() -> void:
