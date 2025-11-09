@@ -54,6 +54,10 @@ func _ready():
 func _setup_class_selection():
 	var classes = PlayerClass.get_all_classes()
 	for class_id in classes:
+		# Skip mage and tank classes
+		if class_id == "mage" or class_id == "tank":
+			continue
+		
 		var class_data = classes[class_id]
 
 		var button = Button.new()

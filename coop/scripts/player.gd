@@ -25,13 +25,15 @@ var player_name: String = "Player"  # Player's name loaded from save system
 
 # Revive system
 const REVIVE_RADIUS: float = 80.0  # Distance required to revive
-const REVIVE_TIME: float = 10.0  # Time in seconds to revive
+const REVIVE_TIME: float = 5.0  # Time in seconds to revive
 const REVIVE_HP_PERCENT: float = 0.25  # HP restored when revived (25%)
 var revive_timer: float = 0.0  # Time remaining before permanent death
 var revive_progress: float = 0.0  # Current revive progress (0.0 to REVIVE_TIME)
 var reviving_player: Node2D = null  # Player currently reviving this player
 var revive_request_cooldowns: Dictionary = {}  # Cooldown per downed player to prevent spam RPC calls
 const REVIVE_REQUEST_COOLDOWN_TIME: float = 0.5  # Only send revive request every 0.5 seconds
+var revive_timer_sync_cooldown: float = 0.0  # Cooldown for syncing timer to reduce network traffic
+const REVIVE_TIMER_SYNC_INTERVAL: float = 0.2  # Sync timer every 0.2 seconds
 
 # Currency System
 var coins: int = 0  # Currency collected by the player
@@ -1342,6 +1344,7 @@ func handle_death() -> void:
 	revive_timer = REVIVE_TIME
 	revive_progress = 0.0
 	reviving_player = null
+	revive_timer_sync_cooldown = 0.0  # Reset sync cooldown
 
 	# Broadcast downed state to all clients
 	rpc("sync_downed_state", true, REVIVE_TIME)
@@ -1517,6 +1520,12 @@ func handle_downed_state(_delta: float) -> void:
 				revive_progress = 0.0
 				rpc("sync_revive_progress", 0.0)
 		
+		# Sync timer to all clients periodically
+		revive_timer_sync_cooldown -= _delta
+		if revive_timer_sync_cooldown <= 0.0:
+			rpc("sync_revive_timer", revive_timer)
+			revive_timer_sync_cooldown = REVIVE_TIMER_SYNC_INTERVAL
+		
 		# Update revive indicator
 		update_revive_indicator()
 		
@@ -1525,6 +1534,9 @@ func handle_downed_state(_delta: float) -> void:
 			print("[REVIVE] Timer expired for player ", name, " - permanent death")
 			handle_permanent_death()
 			return
+	else:
+		# On non-authority clients, just update the indicator
+		update_revive_indicator()
 
 
 func check_revive_interactions(_delta: float) -> void:
@@ -1801,9 +1813,10 @@ func show_player_ui() -> void:
 @rpc("any_peer", "reliable", "call_local")
 func sync_downed_state(downed: bool, timer: float) -> void:
 	# Sync downed state across all clients
-	print("[REVIVE] sync_downed_state called for player ", name, " - downed: ", downed)
+	print("[REVIVE] sync_downed_state called for player ", name, " - downed: ", downed, " timer: ", timer)
 	is_downed = downed
 	revive_timer = timer
+	revive_timer_sync_cooldown = 0.0  # Reset sync cooldown
 	
 	if downed:
 		# Apply visual state
@@ -1824,6 +1837,13 @@ func sync_downed_state(downed: bool, timer: float) -> void:
 			sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
 			sprite.visible = false
 		remove_revive_indicator()
+
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_revive_timer(timer: float) -> void:
+	# Sync revive timer across all clients (called periodically from authority)
+	revive_timer = timer
+	update_revive_indicator()
 
 
 @rpc("any_peer", "reliable", "call_local")
