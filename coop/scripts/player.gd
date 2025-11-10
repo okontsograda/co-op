@@ -97,6 +97,14 @@ var weapon_stats = {
 	"homing_strength": 0.0,  # Strength of homing effect (0.0 to 1.0)
 }
 
+# RPC Security - Rate limiting and validation
+var rpc_rate_limits: Dictionary = {}  # Track RPC calls per peer: {peer_id: {rpc_name: last_call_time}}
+const RPC_MIN_INTERVAL: float = 0.05  # Minimum 50ms between same RPC from same peer
+const ATTACK_RPC_MIN_INTERVAL: float = 0.1  # Minimum 100ms between attack RPCs (anti-spam)
+var last_melee_attack_time: float = 0.0  # Track last melee attack for validation
+var last_dash_strike_time: float = 0.0  # Track last dash strike for validation
+var last_projectile_spawn_time: float = 0.0  # Track last projectile spawn for validation
+
 # Upgrade tracking - how many times each upgrade has been taken
 var upgrade_stacks = {}
 
@@ -479,10 +487,11 @@ func handle_ranged_attack(_mouse_position: Vector2) -> void:
 
 			# Wait for animation to play before firing arrow (about halfway through fire animation)
 			await get_tree().create_timer(0.3).timeout
-			# Spawn arrow locally immediately
-			spawn_arrow_for_player(self, world_target)
-			# Send RPC to network to spawn arrow on other clients
-			rpc("spawn_arrow_network", world_target)
+			# Spawn visual-only projectile locally for instant feedback
+			spawn_projectile_visual(world_target)
+
+			# Request server to spawn authoritative projectile
+			request_projectile_spawn(world_target)
 
 		# After remaining animation time, return to normal animation
 		await get_tree().create_timer(0.3).timeout
@@ -599,11 +608,9 @@ func handle_melee_attack(_mouse_position: Vector2) -> void:
 			# Wait for animation to reach attack point (about halfway through)
 			await get_tree().create_timer(0.3).timeout
 
-			# Perform melee attack - damage enemies in range
-			perform_melee_damage(world_target)
-
-			# Send RPC to network to perform melee attack on other clients
-			rpc("perform_melee_damage_network", world_target)
+			# Request server to perform hit detection and damage
+			# Server is authoritative for all combat
+			request_melee_attack(world_target)
 
 		# Wait for the animation to actually finish
 		if animated_sprite:
@@ -729,12 +736,9 @@ func perform_dash_combo(world_target: Vector2, dash_direction: Vector2) -> void:
 			play_weapon_sound(self)
 			print("Sound played for strike #", strikes_performed)
 
-			# Perform damage in a wider area during dash
+			# Request server to perform dash strike damage
 			var strike_range = melee_attack_range * 1.2  # 20% wider range during dash
-			perform_dash_strike_damage(world_target, strike_range)
-
-			# Send RPC for network sync
-			rpc("perform_dash_strike_network", world_target, strike_range)
+			request_dash_strike(world_target, strike_range)
 
 		await get_tree().process_frame
 
@@ -776,159 +780,308 @@ func perform_dash_combo(world_target: Vector2, dash_direction: Vector2) -> void:
 	print("Dash combo complete!")
 
 
-func perform_dash_strike_damage(target_pos: Vector2, strike_range: float) -> void:
-	# Similar to perform_melee_damage but with custom range
-	var attack_direction = (target_pos - global_position).normalized()
+## Client requests dash strike from server
+func request_dash_strike(target_pos: Vector2, strike_range: float) -> void:
+	# Send dash strike request to server
+	rpc_id(1, "process_dash_strike_on_server", global_position, target_pos, strike_range)
+
+## Server processes dash strike (authoritative)
+@rpc("any_peer", "reliable")
+func process_dash_strike_on_server(attacker_pos: Vector2, target_pos: Vector2, strike_range: float) -> void:
+	if not multiplayer.is_server():
+		return
+
+	# Get attacker
+	var attacker_peer_id = multiplayer.get_remote_sender_id()
+
+	# SECURITY: Rate limiting - prevent dash strike spam
+	if not validate_rpc_rate_limit(attacker_peer_id, "process_dash_strike_on_server", ATTACK_RPC_MIN_INTERVAL):
+		return
+
+	# SECURITY: Validate vector bounds
+	if not validate_vector_bounds(attacker_pos) or not validate_vector_bounds(target_pos):
+		return
+
+	# SECURITY: Validate strike range
+	if not validate_float_bounds(strike_range, 0.0, 500.0):  # Max 500 pixels range
+		return
+
+	var attacker = null
+	for player in get_tree().get_nodes_in_group("players"):
+		if player.name.to_int() == attacker_peer_id:
+			attacker = player
+			break
+
+	if not attacker or not is_instance_valid(attacker):
+		return
+
+	# SECURITY: Validate attacker position is near actual player position
+	var distance_from_real_pos = attacker_pos.distance_to(attacker.global_position)
+	if distance_from_real_pos > 150.0:  # Max 150 pixels (dash moves player)
+		push_warning("Dash strike position too far from actual player position: ", distance_from_real_pos)
+		return
+
+	# SECURITY: Validate dash strike cooldown
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var time_since_last_dash = current_time - attacker.last_dash_strike_time
+	if time_since_last_dash < attacker.combo_cooldown_duration:  # Respect combo cooldown
+		push_warning("Dash strike cooldown violation from peer ", attacker_peer_id)
+		return
+
+	# Update last dash strike time
+	attacker.last_dash_strike_time = current_time
+
+	# Server does hit detection
+	var attack_direction = (target_pos - attacker_pos).normalized()
 	var enemies = get_tree().get_nodes_in_group("enemies")
 
-	# Calculate final damage (slightly boosted for combo)
-	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier * 1.15
+	# Calculate final damage (boosted for combo)
+	var final_damage = (attacker.attack_damage + attacker.weapon_stats.damage) * attacker.weapon_stats.damage_multiplier * 1.15
 
 	# Check for critical hit
-	var is_crit = randf() < weapon_stats.crit_chance
+	var is_crit = randf() < attacker.weapon_stats.crit_chance
 	if is_crit:
-		final_damage *= weapon_stats.crit_multiplier
+		final_damage *= attacker.weapon_stats.crit_multiplier
 
-	const KNOCKBACK_FORCE = 150.0  # Slightly less knockback during rapid strikes
+	const KNOCKBACK_FORCE = 150.0
+
+	var hits = []
 
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
 
-		# Check if enemy is within range
-		var distance = global_position.distance_to(enemy.global_position)
+		# Server validates hit
+		var distance = attacker_pos.distance_to(enemy.global_position)
 		if distance > strike_range:
 			continue
 
-		# Check if enemy is roughly in the direction of attack (wider cone for dash)
-		var direction_to_enemy = (enemy.global_position - global_position).normalized()
+		var direction_to_enemy = (enemy.global_position - attacker_pos).normalized()
 		var dot_product = attack_direction.dot(direction_to_enemy)
 
-		# Wider attack cone during dash (from 0.3 to 0.15)
-		var in_attack_direction = "whirlwind" in active_abilities or dot_product > 0.15
+		# Wider cone for dash strike
+		var in_attack_direction = "whirlwind" in attacker.active_abilities or dot_product > 0.15
 
 		if in_attack_direction:
-			# Damage the enemy
+			# Server applies damage
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(int(final_damage), self)
+				enemy.take_damage(int(final_damage), attacker)
 
-				# Apply knockback to enemy
+				# Apply knockback
 				if enemy.has_method("apply_knockback"):
 					var knockback_direction = direction_to_enemy
 					var knockback_velocity = knockback_direction * KNOCKBACK_FORCE
 					enemy.apply_knockback(knockback_velocity)
 
 			# Apply lifesteal
-			if weapon_stats.lifesteal > 0:
-				heal(weapon_stats.lifesteal)
+			if attacker.weapon_stats.lifesteal > 0:
+				attacker.heal(attacker.weapon_stats.lifesteal)
 
-			# Track damage dealt
+			# Track damage
 			if GameStats:
 				GameStats.record_damage_dealt(int(final_damage))
 
-			# Spawn damage number
-			spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
+			# Record hit for VFX
+			hits.append({
+				"enemy_name": enemy.name,
+				"position": enemy.global_position,
+				"damage": int(final_damage),
+				"is_crit": is_crit
+			})
+
+	# Broadcast hits to all clients
+	if hits.size() > 0:
+		rpc("show_melee_hits", attacker_peer_id, hits)
 
 
+## DEPRECATED: Old client-authoritative network RPC
+## No longer used - replaced by server-authoritative process_dash_strike_on_server
 @rpc("any_peer", "reliable")
 func perform_dash_strike_network(target_pos: Vector2, strike_range: float) -> void:
-	# Get the player who sent this RPC
-	var attacker_peer_id = multiplayer.get_remote_sender_id()
+	push_warning("perform_dash_strike_network is deprecated - combat is now server-authoritative")
 
-	# Don't process on the client that sent it (they already did it locally)
-	if attacker_peer_id == multiplayer.get_unique_id():
+
+## ============================================================================
+## RPC SECURITY VALIDATION HELPERS
+## ============================================================================
+
+## Validate RPC call is not being spammed (rate limiting)
+func validate_rpc_rate_limit(peer_id: int, rpc_name: String, min_interval: float = RPC_MIN_INTERVAL) -> bool:
+	var current_time = Time.get_ticks_msec() / 1000.0
+
+	# Initialize peer tracking if needed
+	if not rpc_rate_limits.has(peer_id):
+		rpc_rate_limits[peer_id] = {}
+
+	# Check if this RPC was called too recently
+	if rpc_rate_limits[peer_id].has(rpc_name):
+		var time_since_last_call = current_time - rpc_rate_limits[peer_id][rpc_name]
+		if time_since_last_call < min_interval:
+			push_warning("RPC rate limit exceeded for ", rpc_name, " from peer ", peer_id,
+				" (", time_since_last_call, "s since last call, min: ", min_interval, "s)")
+			return false
+
+	# Update last call time
+	rpc_rate_limits[peer_id][rpc_name] = current_time
+	return true
+
+
+## Validate RPC caller has server authority
+func validate_rpc_authority(peer_id: int, rpc_name: String) -> bool:
+	# Authority RPCs must come from server (peer 1)
+	if peer_id != 1 and not multiplayer.is_server():
+		push_warning("Unauthorized RPC call: ", rpc_name, " from non-server peer ", peer_id)
+		return false
+	return true
+
+
+## Validate vector is within reasonable bounds (prevent exploit values)
+func validate_vector_bounds(vec: Vector2, max_magnitude: float = 10000.0) -> bool:
+	if vec.length_squared() > max_magnitude * max_magnitude:
+		push_warning("Vector exceeds maximum bounds: ", vec)
+		return false
+	return true
+
+
+## Validate float is within reasonable bounds
+func validate_float_bounds(value: float, min_val: float = -10000.0, max_val: float = 10000.0) -> bool:
+	if value < min_val or value > max_val or is_nan(value) or is_inf(value):
+		push_warning("Float value out of bounds or invalid: ", value)
+		return false
+	return true
+
+
+## ============================================================================
+## CLIENT REQUEST FUNCTIONS
+## ============================================================================
+
+## Client requests melee attack from server
+func request_melee_attack(target_pos: Vector2) -> void:
+	# Send attack request to server with attacker's position and target
+	rpc_id(1, "process_melee_attack_on_server", global_position, target_pos)
+
+## Server processes melee attack (authoritative hit detection)
+@rpc("any_peer", "reliable")
+func process_melee_attack_on_server(attacker_pos: Vector2, target_pos: Vector2) -> void:
+	if not multiplayer.is_server():
 		return
 
-	# Find the attacker player
+	# Get attacker peer ID and find their player
+	var attacker_peer_id = multiplayer.get_remote_sender_id()
+
+	# SECURITY: Rate limiting - prevent attack spam
+	if not validate_rpc_rate_limit(attacker_peer_id, "process_melee_attack_on_server", ATTACK_RPC_MIN_INTERVAL):
+		return
+
+	# SECURITY: Validate vector bounds
+	if not validate_vector_bounds(attacker_pos) or not validate_vector_bounds(target_pos):
+		return
+
 	var attacker = null
 	for player in get_tree().get_nodes_in_group("players"):
 		if player.name.to_int() == attacker_peer_id:
 			attacker = player
 			break
 
-	if attacker:
-		# Play attack sound for remote clients
-		play_weapon_sound(attacker)
-		# Perform dash strike damage from attacker's position
-		attacker.perform_dash_strike_damage(target_pos, strike_range)
+	if not attacker or not is_instance_valid(attacker):
+		return
 
+	# SECURITY: Validate attacker position is near actual player position (anti-cheat)
+	var distance_from_real_pos = attacker_pos.distance_to(attacker.global_position)
+	if distance_from_real_pos > 100.0:  # Max 100 pixels deviation
+		push_warning("Melee attack position too far from actual player position: ", distance_from_real_pos)
+		return
 
-func perform_melee_damage(target_pos: Vector2, apply_knockback: bool = true) -> void:
-	# Find enemies within melee range and damage them
-	var attack_direction = (target_pos - global_position).normalized()
+	# SECURITY: Validate attack cooldown (prevent faster-than-allowed attacks)
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var time_since_last_attack = current_time - attacker.last_melee_attack_time
+	if time_since_last_attack < 0.3:  # Minimum 300ms between melee attacks
+		push_warning("Melee attack cooldown violation from peer ", attacker_peer_id)
+		return
+
+	# Update last attack time
+	attacker.last_melee_attack_time = current_time
+
+	# Server does hit detection
+	var attack_direction = (target_pos - attacker_pos).normalized()
 	var enemies = get_tree().get_nodes_in_group("enemies")
 
-	# Calculate final damage
-	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
+	# Calculate final damage (using attacker's stats)
+	var final_damage = (attacker.attack_damage + attacker.weapon_stats.damage) * attacker.weapon_stats.damage_multiplier
 
 	# Check for critical hit
-	var is_crit = randf() < weapon_stats.crit_chance
+	var is_crit = randf() < attacker.weapon_stats.crit_chance
 	if is_crit:
-		final_damage *= weapon_stats.crit_multiplier
+		final_damage *= attacker.weapon_stats.crit_multiplier
 
-	const KNOCKBACK_FORCE = 200.0  # Knockback strength
+	const KNOCKBACK_FORCE = 200.0
+
+	var hits = []  # Track hits for broadcasting
 
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
 
-		# Check if enemy is within range
-		var distance = global_position.distance_to(enemy.global_position)
-		if distance > melee_attack_range:
+		# Server validates hit (range and cone check)
+		var distance = attacker_pos.distance_to(enemy.global_position)
+		if distance > attacker.melee_attack_range:
 			continue
 
-		# Check if enemy is roughly in the direction of attack (cone check)
-		var direction_to_enemy = (enemy.global_position - global_position).normalized()
+		var direction_to_enemy = (enemy.global_position - attacker_pos).normalized()
 		var dot_product = attack_direction.dot(direction_to_enemy)
 
-		# If whirlwind is active, hit all enemies in range (360 degrees)
-		# Otherwise, only hit enemies in ~60 degree cone in front
-		var in_attack_direction = "whirlwind" in active_abilities or dot_product > 0.3
+		# Whirlwind or cone check
+		var in_attack_direction = "whirlwind" in attacker.active_abilities or dot_product > 0.3
 
 		if in_attack_direction:
-			# Damage the enemy
+			# Server applies damage (enemy.take_damage validates authority)
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(int(final_damage), self)
+				enemy.take_damage(int(final_damage), attacker)
 
-				# Apply knockback to enemy
-				if apply_knockback and enemy.has_method("apply_knockback"):
+				# Apply knockback
+				if enemy.has_method("apply_knockback"):
 					var knockback_direction = direction_to_enemy
 					var knockback_velocity = knockback_direction * KNOCKBACK_FORCE
 					enemy.apply_knockback(knockback_velocity)
 
-			# Apply lifesteal
-			if weapon_stats.lifesteal > 0:
-				heal(weapon_stats.lifesteal)
+			# Apply lifesteal (server-authoritative healing)
+			if attacker.weapon_stats.lifesteal > 0:
+				attacker.heal(attacker.weapon_stats.lifesteal)
 
-			# Track damage dealt
+			# Track damage on server
 			if GameStats:
 				GameStats.record_damage_dealt(int(final_damage))
 
-			# Spawn damage number
-			spawn_damage_number(enemy.global_position, int(final_damage), is_crit)
+			# Record hit for VFX broadcast
+			hits.append({
+				"enemy_name": enemy.name,
+				"position": enemy.global_position,
+				"damage": int(final_damage),
+				"is_crit": is_crit
+			})
 
+	# Broadcast hits to all clients for VFX
+	if hits.size() > 0:
+		rpc("show_melee_hits", attacker_peer_id, hits)
 
-@rpc("any_peer", "reliable")
-func perform_melee_damage_network(target_pos: Vector2) -> void:
-	# Get the player who sent this RPC
-	var attacker_peer_id = multiplayer.get_remote_sender_id()
-
-	# Don't process on the client that sent it (they already did it locally)
-	if attacker_peer_id == multiplayer.get_unique_id():
+## All clients show VFX for melee hits
+@rpc("authority", "reliable", "call_local")
+func show_melee_hits(attacker_peer_id: int, hits: Array) -> void:
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not validate_rpc_authority(sender_id, "show_melee_hits"):
 		return
 
-	# Find the attacker player
-	var attacker = null
-	for player in get_tree().get_nodes_in_group("players"):
-		if player.name.to_int() == attacker_peer_id:
-			attacker = player
-			break
+	# Show damage numbers and effects for each hit
+	for hit in hits:
+		spawn_damage_number(hit.position, hit.damage, hit.is_crit)
 
-	if attacker:
-		# Play attack sound for remote clients
-		play_weapon_sound(attacker)
-		# Perform melee damage from attacker's position (without knockback on remote - already applied)
-		attacker.perform_melee_damage(target_pos, false)
+
+## DEPRECATED: Old client-authoritative network RPC
+## No longer used - replaced by server-authoritative process_melee_attack_on_server
+@rpc("any_peer", "reliable")
+func perform_melee_damage_network(target_pos: Vector2) -> void:
+	push_warning("perform_melee_damage_network is deprecated - combat is now server-authoritative")
 
 
 func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
@@ -946,8 +1099,11 @@ func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
 			damage_instance.set_damage(damage, is_crit, false)
 
 
+## DEPRECATED: Old client-authoritative projectile spawning
+## Use spawn_projectile_on_server() instead (server-authoritative)
 @rpc("any_peer", "reliable")
 func spawn_arrow_network(target_pos: Vector2) -> void:
+	push_warning("DEPRECATED: spawn_arrow_network() called - this is the old client-authoritative system")
 	# This function is called on all clients to spawn the arrow
 	# Get the player who sent this RPC
 	var shooter_peer_id = multiplayer.get_remote_sender_id()
@@ -965,6 +1121,7 @@ func spawn_arrow_network(target_pos: Vector2) -> void:
 		spawn_arrow_for_player(shooter, target_pos)
 
 
+## DEPRECATED: Helper for old client-authoritative system
 func spawn_arrow_for_player(shooter: Node2D, target_pos: Vector2) -> void:
 	# Calculate direction from shooter to target
 	var animated_sprite = shooter.get_node("AnimatedSprite2D")
@@ -1149,6 +1306,11 @@ func handle_death_on_server(attacker_name: String) -> void:
 ## Client receives damage from server (authoritative)
 @rpc("authority", "reliable", "call_local")
 func apply_damage_from_server(amount: int, new_health: int, attacker_name: String) -> void:
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not validate_rpc_authority(sender_id, "apply_damage_from_server"):
+		return
+
 	# Update local health to match server
 	current_health = new_health
 
@@ -1161,6 +1323,11 @@ func apply_damage_from_server(amount: int, new_health: int, attacker_name: Strin
 ## Client receives evade notification
 @rpc("authority", "reliable", "call_local")
 func on_damage_evaded() -> void:
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not validate_rpc_authority(sender_id, "on_damage_evaded"):
+		return
+
 	spawn_evade_text()
 	print("Player ", name, " evaded attack!")
 
@@ -1303,6 +1470,11 @@ func heal(amount: int) -> void:
 ## Client receives healing from server (authoritative)
 @rpc("authority", "reliable", "call_local")
 func apply_healing_from_server(amount: int, new_health: int) -> void:
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not validate_rpc_authority(sender_id, "apply_healing_from_server"):
+		return
+
 	# Update local health to match server
 	current_health = new_health
 
@@ -2310,8 +2482,84 @@ func toggle_stats_screen() -> void:
 	print("Stats screen shown for player ", name)
 
 
-# Spawn projectile(s) in given direction with current weapon_stats
-func spawn_projectile(direction: Vector2) -> void:
+## CLIENT: Spawn visual-only projectile for instant feedback
+func spawn_projectile_visual(target_pos: Vector2) -> void:
+	# Calculate direction
+	var animated_sprite = get_node("AnimatedSprite2D")
+	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
+	var direction = (target_pos - sprite_position).normalized()
+
+	# Spawn visual projectile with is_visual_only flag
+	_internal_spawn_projectile(direction, true)
+
+
+## CLIENT: Request server to spawn authoritative projectile
+func request_projectile_spawn(target_pos: Vector2) -> void:
+	# Calculate direction for server validation
+	var animated_sprite = get_node("AnimatedSprite2D")
+	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
+	var direction = (target_pos - sprite_position).normalized()
+
+	# Send request to server
+	rpc_id(1, "spawn_projectile_on_server", sprite_position, direction, multiplayer.get_unique_id())
+
+
+## SERVER: Validate and spawn authoritative projectile, broadcast to all clients
+@rpc("any_peer", "reliable")
+func spawn_projectile_on_server(spawn_pos: Vector2, direction: Vector2, shooter_peer_id: int) -> void:
+	# Only server processes projectile spawning
+	if not multiplayer.is_server():
+		push_warning("Client attempted to call spawn_projectile_on_server directly")
+		return
+
+	# SECURITY: Rate limiting - prevent projectile spam
+	if not validate_rpc_rate_limit(shooter_peer_id, "spawn_projectile_on_server", ATTACK_RPC_MIN_INTERVAL):
+		return
+
+	# SECURITY: Validate vector bounds
+	if not validate_vector_bounds(spawn_pos) or not validate_vector_bounds(direction):
+		return
+
+	# SECURITY: Validate direction is normalized (prevent speed hacks)
+	if abs(direction.length() - 1.0) > 0.1:  # Should be normalized (length ~= 1.0)
+		push_warning("Projectile direction not normalized: ", direction.length())
+		return
+
+	# Find the shooter player to get their stats
+	var shooter = null
+	for player in get_tree().get_nodes_in_group("players"):
+		if player.name.to_int() == shooter_peer_id:
+			shooter = player
+			break
+
+	if not shooter:
+		push_warning("Could not find shooter player for peer ", shooter_peer_id)
+		return
+
+	# SECURITY: Validate spawn position is near shooter (anti-cheat)
+	var distance_from_shooter = spawn_pos.distance_to(shooter.global_position)
+	if distance_from_shooter > 100.0:  # Max 100 pixels from shooter
+		push_warning("Projectile spawn too far from shooter: ", distance_from_shooter)
+		return
+
+	# SECURITY: Validate fire cooldown
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var time_since_last_shot = current_time - shooter.last_projectile_spawn_time
+	var min_fire_cooldown = shooter.weapon_stats.fire_cooldown * 0.8  # Allow 20% leeway for network lag
+	if time_since_last_shot < min_fire_cooldown:
+		push_warning("Projectile fire cooldown violation from peer ", shooter_peer_id)
+		return
+
+	# Update last projectile spawn time
+	shooter.last_projectile_spawn_time = current_time
+
+	# Server spawns authoritative projectile and broadcasts to all clients
+	shooter._internal_spawn_projectile(direction, false)
+
+
+## INTERNAL: Spawn projectile with visual-only or authoritative mode
+## @param is_visual_only: If true, projectile is client-side visual feedback only (no damage)
+func _internal_spawn_projectile(direction: Vector2, is_visual_only: bool = false) -> void:
 	# Ensure weapon is initialized (safety check for multiplayer)
 	if not current_weapon_config:
 		print("WARNING: Weapon not initialized for player ", name, ", initializing now...")
@@ -2336,7 +2584,8 @@ func spawn_projectile(direction: Vector2) -> void:
 		print("ERROR: Failed to get projectile scene for weapon: ", equipped_weapon)
 		return
 
-	print("Spawning projectile for weapon: ", equipped_weapon, " (player: ", name, ")")
+	var mode_str = "VISUAL" if is_visual_only else "AUTHORITATIVE"
+	print("Spawning ", mode_str, " projectile for weapon: ", equipped_weapon, " (player: ", name, ")")
 
 	# Get spawn position (slightly ahead of player)
 	var animated_sprite = get_node("AnimatedSprite2D")
@@ -2352,6 +2601,7 @@ func spawn_projectile(direction: Vector2) -> void:
 	print("weapon_stats.damage: ", weapon_stats.damage)
 	print("weapon_stats.damage_multiplier: ", weapon_stats.damage_multiplier)
 	print("CALCULATED final_damage: ", final_damage)
+	print("Mode: ", mode_str)
 	print("==============================")
 
 	# Spawn projectiles based on multishot count
@@ -2388,6 +2638,10 @@ func spawn_projectile(direction: Vector2) -> void:
 		projectile.homing_strength = weapon_stats.homing_strength
 		projectile.direction = projectile_direction
 
+		# Set multiplayer authority flags
+		projectile.is_visual_only = is_visual_only
+		projectile.shooter_peer_id = multiplayer.get_unique_id()
+
 		# Initialize with old method for compatibility
 		projectile.initialize(self, base_spawn_position, target_position)
 
@@ -2396,6 +2650,12 @@ func spawn_projectile(direction: Vector2) -> void:
 
 		# Add to scene
 		get_tree().current_scene.add_child(projectile)
+
+
+# Spawn projectile(s) in given direction with current weapon_stats
+# DEPRECATED: Use spawn_projectile_visual() or request_projectile_spawn() instead
+func spawn_projectile(direction: Vector2) -> void:
+	_internal_spawn_projectile(direction, false)
 
 
 # Legacy function for backwards compatibility

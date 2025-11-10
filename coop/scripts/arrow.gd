@@ -16,8 +16,12 @@ var poison_duration: float = 0.0
 var homing_strength: float = 0.0
 
 # Tracking
-var enemies_hit: Array = []  # For pierce tracking
+var enemies_hit: Array = []  # For Pierce tracking
 var has_hit: bool = false  # Legacy flag, now using enemies_hit
+
+# Multiplayer authority
+var is_visual_only: bool = false  # Client visual projectiles don't deal damage
+var shooter_peer_id: int = 0  # ID of player who shot this arrow
 
 
 func _ready() -> void:
@@ -79,6 +83,17 @@ func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("players"):
 		return
 
+	# Visual-only projectiles don't deal damage (client prediction)
+	if is_visual_only:
+		# Still destroy on hit for visual feedback
+		has_hit = true
+		queue_free()
+		return
+
+	# Only server processes actual hits
+	if not multiplayer.is_server():
+		return
+
 	# Check if we hit something that can take damage
 	if body.has_method("take_damage"):
 		var shooter = get_meta("shooter", null)
@@ -94,13 +109,10 @@ func _on_body_entered(body: Node2D) -> void:
 		if is_crit:
 			final_damage *= crit_multiplier
 
-		# Apply damage
+		# Server applies damage (enemy.take_damage already validates authority)
 		body.take_damage(final_damage, shooter)
 
-		# Spawn damage number
-		spawn_damage_number(body.global_position, final_damage, is_crit)
-
-		# Lifesteal
+		# Lifesteal (server-authoritative healing)
 		if lifesteal > 0 and shooter and shooter.has_method("heal"):
 			shooter.heal(lifesteal)
 
@@ -112,6 +124,9 @@ func _on_body_entered(body: Node2D) -> void:
 		if randf() < explosion_chance:
 			create_explosion()
 
+		# Broadcast hit to all clients for VFX
+		rpc("show_arrow_hit", body.name, global_position, final_damage, is_crit)
+
 		# Pierce check - destroy arrow only if no pierce remaining
 		if pierce_remaining > 0:
 			pierce_remaining -= 1
@@ -121,9 +136,25 @@ func _on_body_entered(body: Node2D) -> void:
 	has_hit = true
 	queue_free()
 
+## All clients show VFX for arrow hit
+@rpc("authority", "reliable", "call_local")
+func show_arrow_hit(enemy_name: String, hit_position: Vector2, damage_amount: float, is_crit: bool) -> void:
+	# Spawn damage number
+	spawn_damage_number(hit_position, damage_amount, is_crit)
 
-# Create explosion effect and deal AoE damage
+## All clients show VFX for explosion hits
+@rpc("authority", "reliable", "call_local")
+func show_explosion_hits(hits: Array) -> void:
+	# Show damage numbers for all explosion hits
+	for hit in hits:
+		spawn_damage_number(hit.position, hit.damage, false)
+
+# Create explosion effect and deal AoE damage (server-only)
 func create_explosion() -> void:
+	# Only server processes explosions
+	if not multiplayer.is_server():
+		return
+
 	# Create Area2D for explosion detection
 	var explosion_area = Area2D.new()
 	explosion_area.global_position = global_position
@@ -147,16 +178,26 @@ func create_explosion() -> void:
 	var shooter = get_meta("shooter", null)
 	var explosion_dmg = explosion_damage if explosion_damage > 0 else damage * 0.75
 
+	var hits = []
+
 	# Deal damage to all enemies in radius
 	for body in bodies_in_explosion:
 		if body == shooter:  # Don't damage shooter
 			continue
 
 		if body.has_method("take_damage") and body.is_in_group("enemies"):
+			# Server applies damage
 			body.take_damage(explosion_dmg, shooter)
 
-			# Spawn damage number for explosion damage
-			spawn_damage_number(body.global_position, explosion_dmg, false)
+			# Record hit for VFX broadcast
+			hits.append({
+				"position": body.global_position,
+				"damage": explosion_dmg
+			})
+
+	# Broadcast explosion hits to all clients
+	if hits.size() > 0:
+		rpc("show_explosion_hits", hits)
 
 	# TODO: Spawn explosion particle effect
 

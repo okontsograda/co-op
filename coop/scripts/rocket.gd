@@ -19,6 +19,10 @@ var homing_strength: float = 0.0
 var enemies_hit: Array = []  # For pierce tracking
 var has_hit: bool = false
 
+# Multiplayer authority
+var is_visual_only: bool = false  # Client visual projectiles don't deal damage
+var shooter_peer_id: int = 0  # ID of player who shot this rocket
+
 # Rocket-specific
 var trail_particles: GPUParticles2D = null
 
@@ -86,6 +90,19 @@ func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("players"):
 		return
 
+	# Visual-only projectiles don't deal damage (client prediction)
+	if is_visual_only:
+		# Still destroy on hit for visual feedback
+		if trail_particles:
+			trail_particles.emitting = false
+		has_hit = true
+		queue_free()
+		return
+
+	# Only server processes actual hits
+	if not multiplayer.is_server():
+		return
+
 	# Check if we hit something that can take damage
 	if body.has_method("take_damage"):
 		var shooter = get_meta("shooter", null)
@@ -95,47 +112,33 @@ func _on_body_entered(body: Node2D) -> void:
 
 		# Calculate damage
 		var final_damage = damage
-		print("=== ROCKET HIT DEBUG ===")
-		print("Rocket's damage property: ", damage)
-		print("final_damage (before crit): ", final_damage)
 
 		# Critical hit check
 		var is_crit = randf() < crit_chance
 		if is_crit:
 			final_damage *= crit_multiplier
-			print("CRITICAL HIT! ", final_damage, " damage")
 
-		# Apply damage
-		print("Calling take_damage on ", body.name, " with damage: ", final_damage)
+		# Server applies damage (enemy.take_damage already validates authority)
 		body.take_damage(final_damage, shooter)
-		print(
-			"Rocket hit ", body.name, " for ", final_damage, " damage", " (crit)" if is_crit else ""
-		)
 
-		# Spawn damage number
-		print("Spawning damage number with: ", final_damage, ", is_crit: ", is_crit)
-		spawn_damage_number(body.global_position, final_damage, is_crit)
-		print("========================")
-
-		# Lifesteal
+		# Lifesteal (server-authoritative healing)
 		if lifesteal > 0 and shooter and shooter.has_method("heal"):
 			shooter.heal(lifesteal)
-			print("Lifesteal: healed ", lifesteal, " HP")
 
 		# Poison application
 		if poison_damage > 0 and body.has_method("apply_poison"):
 			body.apply_poison(poison_damage, poison_duration)
-			print("Applied poison: ", poison_damage, " damage/sec for ", poison_duration, "s")
 
-			# Explosion (rockets always explode unless explosion_chance is manually set to 0)
-			if randf() < explosion_chance:
-				call_deferred("create_explosion")
-				print("Rocket explosion!")
+		# Explosion (rockets always explode unless explosion_chance is manually set to 0)
+		if randf() < explosion_chance:
+			call_deferred("create_explosion")
+
+		# Broadcast hit to all clients for VFX
+		rpc("show_rocket_hit", body.name, global_position, final_damage, is_crit)
 
 		# Pierce check - destroy rocket only if no pierce remaining
 		if pierce_remaining > 0:
 			pierce_remaining -= 1
-			print("Rocket pierced! ", pierce_remaining, " pierce remaining")
 			return  # Don't destroy rocket, let it continue
 
 	# Destroy rocket (no pierce remaining or hit non-damageable object)
@@ -147,8 +150,27 @@ func _on_body_entered(body: Node2D) -> void:
 	queue_free()
 
 
-# Create explosion effect and deal AoE damage
+## All clients show VFX for rocket hit
+@rpc("authority", "reliable", "call_local")
+func show_rocket_hit(enemy_name: String, hit_position: Vector2, damage_amount: float, is_crit: bool) -> void:
+	# Spawn damage number
+	spawn_damage_number(hit_position, damage_amount, is_crit)
+
+
+## All clients show VFX for explosion hits
+@rpc("authority", "reliable", "call_local")
+func show_explosion_hits(hits: Array) -> void:
+	# Show damage numbers for all explosion hits
+	for hit in hits:
+		spawn_damage_number(hit.position, hit.damage, false)
+
+
+# Create explosion effect and deal AoE damage (server-only)
 func create_explosion() -> void:
+	# Only server processes explosions
+	if not multiplayer.is_server():
+		return
+
 	# Spawn explosion visual effect
 	var explosion_scene = preload("res://coop/scenes/explosion.tscn")
 	if explosion_scene:
@@ -179,17 +201,26 @@ func create_explosion() -> void:
 	var shooter = get_meta("shooter", null)
 	var explosion_dmg = explosion_damage if explosion_damage > 0 else damage * 0.75
 
+	var hits = []
+
 	# Deal damage to all enemies in radius
 	for body in bodies_in_explosion:
 		if body == shooter:  # Don't damage shooter
 			continue
 
 		if body.has_method("take_damage") and body.is_in_group("enemies"):
+			# Server applies damage
 			body.take_damage(explosion_dmg, shooter)
-			print("Explosion hit ", body.name, " for ", explosion_dmg, " damage")
 
-			# Spawn damage number for explosion damage
-			spawn_damage_number(body.global_position, explosion_dmg, false)
+			# Record hit for VFX broadcast
+			hits.append({
+				"position": body.global_position,
+				"damage": explosion_dmg
+			})
+
+	# Broadcast explosion hits to all clients
+	if hits.size() > 0:
+		rpc("show_explosion_hits", hits)
 
 	# Clean up explosion area
 	explosion_area.queue_free()
@@ -234,4 +265,4 @@ func spawn_damage_number(pos: Vector2, damage_amount: float, is_crit: bool) -> v
 	get_tree().current_scene.add_child(damage_number)
 
 	# NOW set damage text and styling (after _ready() has been called)
-	damage_number.set_damage(damage_amount, is_crit)
+	damage_number.set_damage(damage_amount, is_crit, false)
