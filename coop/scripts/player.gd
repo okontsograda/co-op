@@ -38,6 +38,14 @@ const REVIVE_TIMER_SYNC_INTERVAL: float = 0.2  # Sync timer every 0.2 seconds
 # Currency System
 var coins: int = 0  # Currency collected by the player
 
+# Consumables System
+var consumable_slots: Dictionary = {
+	1: {"item_id": "", "quantity": 0},  # Slot 1 (key "1")
+	2: {"item_id": "", "quantity": 0}   # Slot 2 (key "2")
+}
+var consumable_cooldown: float = 0.0  # Cooldown to prevent spam
+const CONSUMABLE_COOLDOWN_DURATION: float = 0.5  # 0.5 second cooldown between uses
+
 var is_firing: bool = false
 var can_fire: bool = true
 var is_fire_button_held: bool = false  # Track if fire button is held
@@ -161,13 +169,14 @@ func _ready() -> void:
 	# Configure MultiplayerSynchronizer for efficient network sync
 	setup_multiplayer_sync()
 
-	# Initialize health bar, XP display, stamina bar, coin display, wave display, and combo UI
+	# Initialize health bar, XP display, stamina bar, coin display, wave display, combo UI, and consumables
 	update_health_display()
 	update_xp_display()
 	update_stamina_display()
 	setup_coin_display()
 	setup_wave_display()
 	setup_combo_ui()
+	setup_consumables_display()
 
 	# Set up camera to follow this player if this is the local player
 	setup_camera()
@@ -232,6 +241,17 @@ func _input(event: InputEvent) -> void:
 		else:
 			print("ERROR: ChatUI not found for player ", name)
 		return
+	
+	# Handle consumable usage (1 and 2 keys)
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		# Check if UI is blocking (don't use consumables while in shop/menus)
+		if not is_ui_blocking_combat():
+			if event.keycode == KEY_1:
+				use_consumable(1)
+				return
+			elif event.keycode == KEY_2:
+				use_consumable(2)
+				return
 
 	# Handle fire button state (left mouse button)
 	if event is InputEventMouseButton:
@@ -366,6 +386,12 @@ func _physics_process(_delta: float) -> void:
 			combo_cooldown_time = 0
 			combo_cooldown_ready = true
 		update_combo_ui()
+	
+	# Update consumable cooldown
+	if consumable_cooldown > 0:
+		consumable_cooldown -= _delta
+		if consumable_cooldown < 0:
+			consumable_cooldown = 0
 
 	# Debug input detection (removed spam)
 	#if direction != Vector2.ZERO:
@@ -1614,6 +1640,168 @@ func update_coin_display() -> void:
 	var coin_display = get_node_or_null("CoinDisplay")
 	if coin_display and coin_display.has_method("update_coins"):
 		coin_display.update_coins(coins)
+
+
+# ============================================================================
+# CONSUMABLES SYSTEM
+# ============================================================================
+
+func setup_consumables_display() -> void:
+	# Create consumables display if it doesn't exist (only for local player)
+	var peer_id = name.to_int()
+	if peer_id == multiplayer.get_unique_id() and not get_node_or_null("ConsumablesDisplay"):
+		var consumables_display_scene = load("res://coop/scenes/consumables_display.tscn")
+		if consumables_display_scene:
+			var consumables_display = consumables_display_scene.instantiate()
+			consumables_display.name = "ConsumablesDisplay"
+			add_child(consumables_display)
+			print("Consumables display created for player ", name)
+	
+	# Initialize the display
+	update_consumables_display()
+
+
+func update_consumables_display() -> void:
+	# Update the consumables display UI
+	var consumables_display = get_node_or_null("ConsumablesDisplay")
+	if consumables_display:
+		for slot_num in [1, 2]:
+			var slot = consumable_slots[slot_num]
+			consumables_display.set_slot(slot_num, slot["item_id"], slot["quantity"])
+
+
+func add_consumable_to_slot(slot_number: int, item_id: String, quantity: int = 1) -> void:
+	# Add consumable to the specified slot
+	if slot_number not in [1, 2]:
+		push_error("Invalid consumable slot: " + str(slot_number))
+		return
+	
+	var slot = consumable_slots[slot_number]
+	
+	# If slot is empty or has a different item, replace it
+	if slot["item_id"] == "" or slot["item_id"] == item_id:
+		slot["item_id"] = item_id
+		slot["quantity"] += quantity
+		print("Added ", quantity, " x ", item_id, " to slot ", slot_number, " (total: ", slot["quantity"], ")")
+	else:
+		# Slot has a different item, find an empty slot or replace slot 2
+		var other_slot = 2 if slot_number == 1 else 1
+		if consumable_slots[other_slot]["item_id"] == "" or consumable_slots[other_slot]["item_id"] == item_id:
+			add_consumable_to_slot(other_slot, item_id, quantity)
+			return
+		else:
+			# Both slots full with different items, replace the current slot
+			slot["item_id"] = item_id
+			slot["quantity"] = quantity
+			print("Replaced slot ", slot_number, " with ", quantity, " x ", item_id)
+	
+	update_consumables_display()
+
+
+func use_consumable(slot_number: int) -> void:
+	# Check if on cooldown
+	if consumable_cooldown > 0:
+		print("Consumable on cooldown: ", consumable_cooldown, "s remaining")
+		return
+	
+	# Check if valid slot
+	if slot_number not in [1, 2]:
+		return
+	
+	var slot = consumable_slots[slot_number]
+	
+	# Check if slot has items
+	if slot["item_id"] == "" or slot["quantity"] <= 0:
+		print("Consumable slot ", slot_number, " is empty")
+		return
+	
+	# Get item data
+	var item = ShopManager.get_item(slot["item_id"])
+	if not item:
+		push_error("Consumable item not found: " + slot["item_id"])
+		return
+	
+	# Check if we're at full health (for healing items)
+	if item.stat_bonuses.has("instant_heal"):
+		if current_health >= max_health:
+			print("Already at full health")
+			return
+	
+	# Request server to use consumable (server-authoritative)
+	if multiplayer.is_server():
+		_server_use_consumable(slot_number, slot["item_id"])
+	else:
+		rpc_id(1, "_server_use_consumable", slot_number, slot["item_id"])
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _server_use_consumable(slot_number: int, item_id: String) -> void:
+	# SECURITY: Verify sender is the player who owns this character
+	var sender_id = multiplayer.get_remote_sender_id()
+	var peer_id = name.to_int()
+	if sender_id != peer_id and sender_id != 0:  # Allow server (0) or owning player
+		push_error("Player " + str(sender_id) + " attempted to use consumable for player " + str(peer_id))
+		return
+	
+	# Verify slot has the item
+	var slot = consumable_slots[slot_number]
+	if slot["item_id"] != item_id or slot["quantity"] <= 0:
+		push_error("Consumable verification failed for player " + str(peer_id))
+		return
+	
+	# Get item data
+	var item = ShopManager.get_item(item_id)
+	if not item:
+		push_error("Consumable item not found: " + item_id)
+		return
+	
+	# Apply consumable effect (server-side)
+	if item.stat_bonuses.has("instant_heal"):
+		var heal_amount = item.stat_bonuses.instant_heal
+		# Cap at max health
+		var actual_heal = min(heal_amount, max_health - current_health)
+		if actual_heal > 0:
+			heal(actual_heal)
+			print("Player ", name, " healed for ", actual_heal, " HP using ", item.name)
+	
+	# Consume the item (reduce quantity)
+	slot["quantity"] -= 1
+	if slot["quantity"] <= 0:
+		slot["quantity"] = 0
+		slot["item_id"] = ""
+	
+	# Sync to all clients
+	rpc("_sync_consumable_slot", slot_number, slot["item_id"], slot["quantity"])
+	
+	# Set cooldown
+	consumable_cooldown = CONSUMABLE_COOLDOWN_DURATION
+	rpc("_sync_consumable_cooldown", consumable_cooldown)
+
+
+@rpc("authority", "reliable", "call_local")
+func _sync_consumable_slot(slot_number: int, item_id: String, quantity: int) -> void:
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not multiplayer.is_server() and sender_id != 1:
+		push_error("Non-server attempted to sync consumable slot")
+		return
+	
+	# Update local slot data
+	if slot_number in [1, 2]:
+		consumable_slots[slot_number]["item_id"] = item_id
+		consumable_slots[slot_number]["quantity"] = quantity
+		update_consumables_display()
+
+
+@rpc("authority", "reliable", "call_local")
+func _sync_consumable_cooldown(cooldown: float) -> void:
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not multiplayer.is_server() and sender_id != 1:
+		push_error("Non-server attempted to sync consumable cooldown")
+		return
+	
+	consumable_cooldown = cooldown
 
 
 @rpc("any_peer", "reliable")

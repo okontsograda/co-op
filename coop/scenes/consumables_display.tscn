@@ -1,0 +1,106 @@
+[gd_scene load_steps=2 format=3 uid="uid://cmq6ywaxch61f"]
+
+[ext_resource type="Script" path="res://coop/scripts/consumables_display.gd" id="1_consumables_display"]
+
+[node name="ConsumablesDisplay" type="CanvasLayer"]
+script = ExtResource("1_consumables_display")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Slot1Container" type="Panel" parent="Control"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 90.0
+offset_right = 160.0
+offset_bottom = 140.0
+
+[node name="KeyLabel" type="Label" parent="Control/Slot1Container"]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 25.0
+offset_bottom = 25.0
+theme_override_colors/font_color = Color(1, 1, 0.5, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 16
+text = "1"
+vertical_alignment = 1
+
+[node name="ItemLabel" type="Label" parent="Control/Slot1Container"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 5.0
+offset_right = 145.0
+offset_bottom = 25.0
+theme_override_colors/font_color = Color(0.9, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 14
+text = "Empty"
+vertical_alignment = 1
+
+[node name="CountLabel" type="Label" parent="Control/Slot1Container"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 25.0
+offset_right = 145.0
+offset_bottom = 45.0
+theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 12
+text = ""
+vertical_alignment = 1
+
+[node name="Slot2Container" type="Panel" parent="Control"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 150.0
+offset_right = 160.0
+offset_bottom = 200.0
+
+[node name="KeyLabel" type="Label" parent="Control/Slot2Container"]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 25.0
+offset_bottom = 25.0
+theme_override_colors/font_color = Color(1, 1, 0.5, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 16
+text = "2"
+vertical_alignment = 1
+
+[node name="ItemLabel" type="Label" parent="Control/Slot2Container"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 5.0
+offset_right = 145.0
+offset_bottom = 25.0
+theme_override_colors/font_color = Color(0.9, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 14
+text = "Empty"
+vertical_alignment = 1
+
+[node name="CountLabel" type="Label" parent="Control/Slot2Container"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 25.0
+offset_right = 145.0
+offset_bottom = 45.0
+theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 12
+text = ""
+vertical_alignment = 1
+

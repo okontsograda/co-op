@@ -241,4 +241,3 @@ func play_purchase_sound() -> void:
 		temp_sound.play()
 		# Clean up after sound finishes
 		temp_sound.finished.connect(func(): temp_sound.queue_free())
-
