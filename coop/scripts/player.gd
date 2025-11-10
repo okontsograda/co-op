@@ -1101,39 +1101,68 @@ func setup_combo_ui() -> void:
 			combo_ui.queue_free()
 
 
+## Server-authoritative damage system
+## External callers (enemies, projectiles) should call this
 func take_damage(amount: int, attacker: Node2D) -> void:
-	# Check if player is invincible from dodge roll
+	# Only server can apply damage to players
+	if not multiplayer.is_server():
+		push_warning("Client attempted to call take_damage - damage must be server-authoritative")
+		return
+
+	# Server checks dodge status
 	if dodge_invincible:
-		# Spawn visual feedback that damage was evaded
-		spawn_evade_text()
+		# Notify all clients damage was evaded (for VFX)
+		rpc("on_damage_evaded")
 		print("Player ", name, " evaded attack!")
 		return
 
-	# Apply damage locally
-	# Reduce health
+	# Server applies damage
+	var old_health = current_health
 	current_health -= amount
+	current_health = max(0, current_health)  # Clamp to 0
 
-	# Track damage taken
+	# Track damage on server
 	if GameStats:
 		GameStats.record_damage_taken(amount)
 
-	# Update GameDirector with health change (server only)
-	if multiplayer.is_server():
-		var peer_id = name.to_int()
-		GameDirector.update_player_health(peer_id, current_health, max_health)
+	# Update GameDirector (server only)
+	var peer_id = name.to_int()
+	GameDirector.update_player_health(peer_id, current_health, max_health)
 
-	# Broadcast health update to all clients
-	rpc("sync_player_health", current_health)
+	# Broadcast damage to all clients (including victim)
+	var attacker_name = str(attacker.name) if attacker else "unknown"
+	rpc("apply_damage_from_server", amount, current_health, attacker_name)
+
+	# Check for death on server
+	if current_health <= 0:
+		handle_death_on_server(attacker_name)
+
+## Server-only death handling
+func handle_death_on_server(attacker_name: String) -> void:
+	if not multiplayer.is_server():
+		return
+
+	# Broadcast death to all clients
+	rpc("handle_death_rpc")
+	rpc("on_player_died", attacker_name)
+
+## Client receives damage from server (authoritative)
+@rpc("authority", "reliable", "call_local")
+func apply_damage_from_server(amount: int, new_health: int, attacker_name: String) -> void:
+	# Update local health to match server
+	current_health = new_health
 
 	# Update health bar
 	update_health_display()
 
-	# Check if player died
-	if current_health <= 0:
-		current_health = 0
-		# Sync death to all clients
-		rpc("handle_death_rpc")
-		rpc("on_player_died", str(attacker.name) if attacker else "unknown")
+	# Play damage VFX/sounds locally
+	# (damage feedback code would go here)
+
+## Client receives evade notification
+@rpc("authority", "reliable", "call_local")
+func on_damage_evaded() -> void:
+	spawn_evade_text()
+	print("Player ", name, " evaded attack!")
 
 
 func perform_dodge_roll() -> void:
@@ -1236,9 +1265,12 @@ func spawn_evade_text() -> void:
 				evade_instance.set_damage(0, false, true)  # Pass true for "is_evade"
 
 
-@rpc("any_peer", "reliable", "call_local")
+## DEPRECATED: Use apply_damage_from_server or apply_healing_from_server instead
+## This RPC is now server-authoritative only
+@rpc("authority", "reliable", "call_local")
 func sync_player_health(health: int) -> void:
-	# Update health on all clients (including the local player)
+	# Only server can broadcast health changes
+	# Clients receive this RPC from server, not send it
 	current_health = health
 
 	# Update GameDirector with health change (server only)
@@ -1249,21 +1281,36 @@ func sync_player_health(health: int) -> void:
 	update_health_display()
 
 
-# Heal player (used by lifesteal and other effects)
+## Server-authoritative healing
+## External callers (lifesteal, pickups) should call this
 func heal(amount: int) -> void:
-	# Cap health at maximum
+	# Only server can apply healing
+	if not multiplayer.is_server():
+		push_warning("Client attempted to call heal - healing must be server-authoritative")
+		return
+
+	# Server applies healing
+	var old_health = current_health
 	current_health = min(current_health + amount, max_health)
 
-	# Update GameDirector with health change (server only)
-	if multiplayer.is_server():
-		var peer_id = name.to_int()
-		GameDirector.update_player_health(peer_id, current_health, max_health)
+	# Update GameDirector (server only)
+	var peer_id = name.to_int()
+	GameDirector.update_player_health(peer_id, current_health, max_health)
 
-	# Broadcast health update to all clients
-	rpc("sync_player_health", current_health)
+	# Broadcast healing to all clients
+	rpc("apply_healing_from_server", amount, current_health)
+
+## Client receives healing from server (authoritative)
+@rpc("authority", "reliable", "call_local")
+func apply_healing_from_server(amount: int, new_health: int) -> void:
+	# Update local health to match server
+	current_health = new_health
 
 	# Update health bar
 	update_health_display()
+
+	# Play heal VFX/sounds locally
+	# (healing feedback code would go here)
 
 
 # Collect coin (called when player picks up a coin)
