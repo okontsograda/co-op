@@ -982,9 +982,12 @@ func setup_multiplayer_sync() -> void:
 	# Set root path to this player node
 	sync_node.root_path = NodePath("..")
 
-	# Configure replication
-	sync_node.replication_interval = 0.1  # Sync 10 times per second
-	sync_node.delta_interval = 0.05  # Delta compression checks every 50ms
+	# Configure replication for smooth movement
+	sync_node.replication_interval = 0.0  # Sync as fast as possible (no throttling)
+	sync_node.delta_interval = 0.0  # Always sync position changes
+
+	# Enable visibility culling to reduce bandwidth
+	sync_node.visibility_update_mode = MultiplayerSynchronizer.VISIBILITY_PROCESS_IDLE
 
 	# Configure which properties to sync (only essential ones)
 	var config = SceneReplicationConfig.new()
@@ -1001,9 +1004,6 @@ func setup_multiplayer_sync() -> void:
 	# Sync animation states (for visual consistency)
 	config.add_property(".:is_firing")
 	config.property_set_replication_mode(".:is_firing", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
-
-	config.add_property(".:is_attacking")
-	config.property_set_replication_mode(".:is_attacking", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
 
 	config.add_property(".:is_dodging")
 	config.property_set_replication_mode(".:is_dodging", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)

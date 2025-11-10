@@ -126,9 +126,12 @@ func setup_multiplayer_sync() -> void:
 	# Set root path to this enemy node
 	sync_node.root_path = NodePath("..")
 
-	# Configure replication
-	sync_node.replication_interval = 0.1  # Sync 10 times per second
-	sync_node.delta_interval = 0.05  # Delta compression checks every 50ms
+	# Configure replication for smooth movement
+	sync_node.replication_interval = 0.0  # Sync as fast as possible (no throttling)
+	sync_node.delta_interval = 0.0  # Always sync position changes
+
+	# Enable visibility culling to reduce bandwidth
+	sync_node.visibility_update_mode = MultiplayerSynchronizer.VISIBILITY_PROCESS_IDLE
 
 	# Configure which properties to sync (only essential ones)
 	var config = SceneReplicationConfig.new()
@@ -486,6 +489,9 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 	# Update health bar locally
 	update_health_display()
 
+	# Broadcast damage number to all clients (server shows damage VFX)
+	rpc("show_damage_number", global_position, amount, false)
+
 	if current_health <= 0:
 		# Award XP to the killer before death
 		award_xp_to_killer()
@@ -593,6 +599,23 @@ func play_hit_animation() -> void:
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("hit"):
 		sprite.play("hit")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func show_damage_number(pos: Vector2, damage_amount: float, is_crit: bool) -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("show_damage_number"):
+		return
+
+	# Spawn damage number visual
+	var damage_number_scene = load("res://coop/scenes/damage_number.tscn")
+	if damage_number_scene:
+		var damage_number = damage_number_scene.instantiate()
+		damage_number.global_position = pos
+		get_tree().current_scene.add_child(damage_number)
+
+		if damage_number.has_method("set_damage"):
+			damage_number.set_damage(damage_amount, is_crit, false)
 
 
 func setup_hit_sound() -> void:

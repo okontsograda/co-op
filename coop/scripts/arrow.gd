@@ -124,9 +124,6 @@ func _on_body_entered(body: Node2D) -> void:
 		if randf() < explosion_chance:
 			create_explosion()
 
-		# Broadcast hit to all clients for VFX
-		rpc("show_arrow_hit", body.name, global_position, final_damage, is_crit)
-
 		# Pierce check - destroy arrow only if no pierce remaining
 		if pierce_remaining > 0:
 			pierce_remaining -= 1
@@ -178,26 +175,14 @@ func create_explosion() -> void:
 	var shooter = get_meta("shooter", null)
 	var explosion_dmg = explosion_damage if explosion_damage > 0 else damage * 0.75
 
-	var hits = []
-
 	# Deal damage to all enemies in radius
 	for body in bodies_in_explosion:
 		if body == shooter:  # Don't damage shooter
 			continue
 
 		if body.has_method("take_damage") and body.is_in_group("enemies"):
-			# Server applies damage
+			# Server applies damage (enemy will broadcast its own damage number)
 			body.take_damage(explosion_dmg, shooter)
-
-			# Record hit for VFX broadcast
-			hits.append({
-				"position": body.global_position,
-				"damage": explosion_dmg
-			})
-
-	# Broadcast explosion hits to all clients
-	if hits.size() > 0:
-		rpc("show_explosion_hits", hits)
 
 	# TODO: Spawn explosion particle effect
 
