@@ -30,6 +30,15 @@ const SCALING_4_PLAYERS = 2.0
 ## Boss Wave Configuration
 const BOSS_WAVE_INTERVAL = 5  # Boss wave every N waves
 const BOSS_ENEMY_COUNT = 3  # Number of HUGE enemies in boss wave
+const BOSS_MIN_HEALTH = 200
+const BOSS_MAX_HEALTH = 500
+const BOSS_SIZE = 3  # EnemySize.HUGE
+const BOSS_NAMES: Array[String] = [
+	"Gargantua", "Titan", "Colossus", "Behemoth", "Leviathan",
+	"Juggernaut", "Goliath", "Destroyer", "Ravager", "Annihilator",
+	"Dreadnought", "Obliterator", "Executioner", "Warlord", "Overlord",
+	"Havoc", "Reaper", "Crusher", "Demolisher", "Decimator"
+]
 
 ## Spawn Rate Multipliers (per intensity phase)
 const SPAWN_RATE_CALM = 0.6
@@ -39,6 +48,23 @@ const SPAWN_RATE_RELIEF = 0.3
 
 ## Performance Tracking Update Rate
 const PERFORMANCE_UPDATE_INTERVAL = 1.0  # seconds
+
+## Enemy Stat Scaling (Wave-Based)
+const WAVE_HEALTH_SCALING = 0.05  # +5% health per wave
+const WAVE_DAMAGE_SCALING = 0.02  # +2% damage per wave
+const MAX_HEALTH_MULTIPLIER = 3.0  # Cap at 3x health
+const MAX_DAMAGE_MULTIPLIER = 2.0  # Cap at 2x damage
+
+## Wave System Configuration
+const WAVE_COUNTDOWN_SECONDS = 5
+const REST_WAVE_END_DELAY = 1.0
+const PRE_COUNTDOWN_DELAY = 1.0
+const DEFAULT_SPAWN_POSITIONS: Array[Vector2] = [
+	Vector2(800, 200), Vector2(-800, 200),
+	Vector2(800, -200), Vector2(-800, -200),
+	Vector2(0, 600), Vector2(0, -600),
+	Vector2(1200, 0), Vector2(-1200, 0)
+]
 
 # ============================================================================
 # ENUMS
@@ -94,7 +120,6 @@ var performance_update_timer: float = 0.0
 ## Rest wave tracking
 var waves_since_last_rest: int = 0
 var rest_wave_threshold: int = 3  # Default, dynamically adjusted
-var next_wave_type: WaveType = WaveType.NORMAL
 
 ## Debug mode
 var debug_mode: bool = true
@@ -185,20 +210,14 @@ func determine_special_event(wave_number: int) -> SpecialEventType:
 func on_wave_complete() -> void:
 	print("[GameDirector] Wave %d complete - Stress level: %.1f%%" % [current_wave, group_stress_level * 100])
 
-	# Track waves since last rest (only for non-rest waves)
-	if next_wave_type != WaveType.REST:
-		waves_since_last_rest += 1
+	# Increment waves since last rest (only called for combat waves, not rest waves)
+	waves_since_last_rest += 1
+	print("[GameDirector] Waves since last rest: %d" % waves_since_last_rest)
 
-	# Determine next wave type
-	next_wave_type = get_next_wave_type()
-	print("[GameDirector] Next wave will be: %s" % WaveType.keys()[next_wave_type])
-
-## Get the type of wave that should come next
-func get_next_wave_type() -> WaveType:
-	var upcoming_wave = current_wave + 1
-
+## Get the type for a specific wave number
+func get_wave_type_for_wave(wave_number: int) -> WaveType:
 	# Boss waves take priority
-	if upcoming_wave % BOSS_WAVE_INTERVAL == 0:
+	if wave_number % BOSS_WAVE_INTERVAL == 0:
 		return WaveType.BOSS
 
 	# Check if rest wave should trigger
@@ -249,6 +268,18 @@ func calculate_rest_wave_frequency() -> void:
 func reset_rest_wave_counter() -> void:
 	waves_since_last_rest = 0
 	print("[GameDirector] Rest wave counter reset")
+
+## Get random boss health within configured range
+func get_boss_health() -> int:
+	return randi_range(BOSS_MIN_HEALTH, BOSS_MAX_HEALTH)
+
+## Get random boss name from configured list
+func get_random_boss_name() -> String:
+	return BOSS_NAMES[randi() % BOSS_NAMES.size()]
+
+## Get boss size (always HUGE)
+func get_boss_size() -> int:
+	return BOSS_SIZE
 
 ## Check if all spawned enemies have been killed
 func check_all_enemies_killed() -> bool:
@@ -372,6 +403,20 @@ func get_enemy_health_multiplier() -> float:
 		return 1.0
 	else:
 		return 1.0 + (player_count - 1) * 0.2  # +20% HP per extra player
+
+## Get wave-based health multiplier for enemy scaling
+func get_wave_health_multiplier(wave: int) -> float:
+	if wave <= 1:
+		return 1.0
+	var multiplier = 1.0 + ((wave - 1) * WAVE_HEALTH_SCALING)
+	return min(multiplier, MAX_HEALTH_MULTIPLIER)
+
+## Get wave-based damage multiplier for enemy scaling
+func get_wave_damage_multiplier(wave: int) -> float:
+	if wave <= 1:
+		return 1.0
+	var multiplier = 1.0 + ((wave - 1) * WAVE_DAMAGE_SCALING)
+	return min(multiplier, MAX_DAMAGE_MULTIPLIER)
 
 # ============================================================================
 # PERFORMANCE TRACKING
