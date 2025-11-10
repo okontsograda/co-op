@@ -281,6 +281,10 @@ func get_random_boss_name() -> String:
 func get_boss_size() -> int:
 	return BOSS_SIZE
 
+## Check if current wave is a boss wave
+func is_boss_wave() -> bool:
+	return current_event == SpecialEventType.BOSS_WAVE
+
 ## Check if all spawned enemies have been killed
 func check_all_enemies_killed() -> bool:
 	# Only check if we've spawned enemies
@@ -605,7 +609,7 @@ func get_debug_data() -> Dictionary:
 		"enemies_total": enemies_to_spawn_this_wave,
 		"spawn_progress": float(enemies_spawned_count) / enemies_to_spawn_this_wave if enemies_to_spawn_this_wave > 0 else 0,
 		"player_performance": player_performance,
-		"next_wave_type": WaveType.keys()[next_wave_type],
+		"next_wave_type": WaveType.keys()[get_wave_type_for_wave(current_wave + 1)],
 		"waves_since_rest": waves_since_last_rest,
 		"rest_threshold": rest_wave_threshold
 	}

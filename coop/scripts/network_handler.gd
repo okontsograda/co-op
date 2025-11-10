@@ -354,14 +354,22 @@ func spawn_wave_enemies() -> void:
 	enemies_in_wave = GameDirector.enemies_to_spawn_this_wave
 
 	# Spawn enemies for the current wave
-	# GameDirector's special event system handles BOSS_WAVE (every 5th wave)
+	# For BOSS_WAVE events (every 5th wave), spawn 1 named boss + 2 HUGE enemies
+	var is_boss_wave = GameDirector.is_boss_wave()
+
 	for i in range(enemies_in_wave):
 		# Check if GameDirector allows more spawns
 		if not GameDirector.should_spawn_enemy():
 			break
 
-		# Spawn enemy (GameDirector determines size based on special events)
-		spawn_single_enemy()
+		# For boss waves, spawn first enemy as a named boss
+		if is_boss_wave and i == 0 and not boss_spawned_this_wave:
+			spawn_boss()
+			boss_spawned_this_wave = true
+		else:
+			# Regular enemy (will be HUGE during boss waves due to GameDirector logic)
+			spawn_single_enemy()
+
 		enemies_spawned_this_wave += 1
 
 		# Use dynamic spawn delay from GameDirector
@@ -709,8 +717,7 @@ func spawn_single_enemy() -> void:
 
 func spawn_boss() -> void:
 	# Spawn a unique boss enemy with random name and health
-	# Note: Currently unused - BOSS_WAVE special events handle boss spawning
-	# Kept for future use if named bosses are needed
+	# Used during BOSS_WAVE events (every 5th wave) for the first enemy
 	var spawn_position = get_next_enemy_spawn_position()
 
 	# Get boss configuration from GameDirector
