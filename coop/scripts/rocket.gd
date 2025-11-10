@@ -147,21 +147,6 @@ func _on_body_entered(body: Node2D) -> void:
 	queue_free()
 
 
-## All clients show VFX for rocket hit
-@rpc("authority", "reliable", "call_local")
-func show_rocket_hit(enemy_name: String, hit_position: Vector2, damage_amount: float, is_crit: bool) -> void:
-	# Spawn damage number
-	spawn_damage_number(hit_position, damage_amount, is_crit)
-
-
-## All clients show VFX for explosion hits
-@rpc("authority", "reliable", "call_local")
-func show_explosion_hits(hits: Array) -> void:
-	# Show damage numbers for all explosion hits
-	for hit in hits:
-		spawn_damage_number(hit.position, hit.damage, false)
-
-
 # Create explosion effect and deal AoE damage (server-only)
 func create_explosion() -> void:
 	# Only server processes explosions
@@ -236,18 +221,3 @@ func initialize(shooter: Node2D, start_pos: Vector2, target_pos: Vector2) -> voi
 
 	# Rotate rocket to face direction
 	rotation = direction.angle()
-
-
-# Spawn floating damage number
-func spawn_damage_number(pos: Vector2, damage_amount: float, is_crit: bool) -> void:
-	var damage_number_scene = preload("res://coop/scenes/damage_number.tscn")
-	var damage_number = damage_number_scene.instantiate()
-
-	# Position at hit location
-	damage_number.global_position = pos
-
-	# Add to scene FIRST (this triggers _ready() which initializes the label reference)
-	get_tree().current_scene.add_child(damage_number)
-
-	# NOW set damage text and styling (after _ready() has been called)
-	damage_number.set_damage(damage_amount, is_crit, false)

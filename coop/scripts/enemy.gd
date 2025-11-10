@@ -28,7 +28,6 @@ var current_health: int = max_health
 var target_player: Node2D = null
 var can_attack: bool = true
 var is_in_attack_range: bool = false
-var last_sync_position: Vector2 = Vector2.ZERO
 var last_attacker: String = ""  # Track who dealt the killing blow
 
 # Animation states
@@ -54,6 +53,10 @@ var hit_sound_player: AudioStreamPlayer2D = null
 
 # Multiplayer synchronization
 var sync_node: MultiplayerSynchronizer = null
+
+# Client-side interpolation
+var server_position: Vector2 = Vector2.ZERO  # Last position from server
+var interpolation_speed: float = 15.0  # How fast to lerp to server position
 
 # RPC Security - Rate limiting
 var rpc_rate_limits: Dictionary = {}  # Track RPC calls: {rpc_name: last_call_time}
@@ -96,8 +99,8 @@ func _ready() -> void:
 	# Configure MultiplayerSynchronizer for efficient network sync
 	setup_multiplayer_sync()
 
-	# Initialize sync position
-	last_sync_position = global_position
+	# Initialize interpolation position
+	server_position = global_position
 
 	# Start with idle animation
 	var sprite = get_node_or_null("AnimatedSprite2D")
@@ -359,8 +362,23 @@ func _physics_process(_delta: float) -> void:
 		if knockback_timer <= 0:
 			is_knocked_back = false
 
-	# Only process on server (authority)
+	# Client-side interpolation for smooth movement
 	if not is_multiplayer_authority():
+		# Clients lerp to server position for smooth movement
+		# MultiplayerSynchronizer updates our actual global_position from server
+		# We store that as server_position and smoothly interpolate to it
+
+		# If position changed significantly from server, update target
+		if global_position.distance_squared_to(server_position) > 1.0:
+			server_position = global_position
+
+		# Smoothly interpolate visual position toward server position
+		# This creates smooth movement between server updates
+		global_position = global_position.lerp(server_position, interpolation_speed * _delta)
+
+		# Update animations and visuals
+		update_animation()
+		z_index = int(global_position.y)
 		return
 
 	# If knocked back, apply friction to velocity and skip normal AI
@@ -416,11 +434,8 @@ func _physics_process(_delta: float) -> void:
 	# Update animation
 	update_animation()
 
-	# Sync position to clients via NetworkHandler (always sync every frame to ensure smooth movement)
-	var distance_moved = global_position.distance_to(last_sync_position)
-	if distance_moved > 0.5:  # Only sync if moved significantly to reduce bandwidth
-		NetworkHandler.sync_enemy_position(name, global_position)
-		last_sync_position = global_position
+	# Position sync is handled automatically by MultiplayerSynchronizer
+	# No manual sync needed - it causes conflicts and choppy movement
 
 
 func find_target_player() -> void:
@@ -489,8 +504,8 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 	# Update health bar locally
 	update_health_display()
 
-	# Broadcast damage number to all clients (server shows damage VFX)
-	rpc("show_damage_number", global_position, amount, false)
+	# Broadcast damage number to all clients via VFXManager
+	VFXManager.spawn_damage_number.rpc(global_position, amount, false)
 
 	if current_health <= 0:
 		# Award XP to the killer before death
@@ -599,23 +614,6 @@ func play_hit_animation() -> void:
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("hit"):
 		sprite.play("hit")
-
-
-@rpc("any_peer", "reliable", "call_local")
-func show_damage_number(pos: Vector2, damage_amount: float, is_crit: bool) -> void:
-	# SECURITY: Verify this RPC came from server
-	if not validate_rpc_authority("show_damage_number"):
-		return
-
-	# Spawn damage number visual
-	var damage_number_scene = load("res://coop/scenes/damage_number.tscn")
-	if damage_number_scene:
-		var damage_number = damage_number_scene.instantiate()
-		damage_number.global_position = pos
-		get_tree().current_scene.add_child(damage_number)
-
-		if damage_number.has_method("set_damage"):
-			damage_number.set_damage(damage_amount, is_crit, false)
 
 
 func setup_hit_sound() -> void:
@@ -803,7 +801,8 @@ func _on_body_exited(body: Node2D) -> void:
 		print("Player left attack range")
 
 
-# sync_position removed - now using NetworkHandler.sync_enemy_position
+# Position sync is now handled automatically by MultiplayerSynchronizer
+# Client-side interpolation provides smooth movement
 
 
 func update_health_display() -> void:

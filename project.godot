@@ -25,6 +25,7 @@ GameStats="*res://coop/scripts/game_stats.gd"
 GameDirector="*res://coop/scripts/game_director.gd"
 ShopManager="*res://coop/scripts/shop_manager.gd"
 TeamXP="*res://coop/scripts/team_xp_manager.gd"
+VFXManager="*res://coop/scripts/vfx_manager.gd"
 
 [display]
 

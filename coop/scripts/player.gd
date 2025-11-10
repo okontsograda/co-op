@@ -116,6 +116,10 @@ var last_projectile_spawn_time: float = 0.0  # Track last projectile spawn for v
 # Multiplayer synchronization
 var sync_node: MultiplayerSynchronizer = null
 
+# Client-side interpolation for remote players
+var server_position: Vector2 = Vector2.ZERO  # Last position from server
+var interpolation_speed: float = 20.0  # How fast to lerp to server position (faster than enemies)
+
 # Upgrade tracking - how many times each upgrade has been taken
 var upgrade_stacks = {}
 
@@ -170,6 +174,9 @@ func _ready() -> void:
 	setup_multiplayer_sync()
 
 	# Initialize health bar, XP display, stamina bar, coin display, wave display, combo UI, and consumables
+	# Initialize interpolation position
+	# server_position = global_position
+
 	update_health_display()
 	update_xp_display()
 	update_stamina_display()
@@ -241,7 +248,7 @@ func _input(event: InputEvent) -> void:
 		else:
 			print("ERROR: ChatUI not found for player ", name)
 		return
-	
+
 	# Handle consumable usage (1 and 2 keys)
 	if event is InputEventKey and event.pressed and not event.is_echo():
 		# Check if UI is blocking (don't use consumables while in shop/menus)
@@ -269,8 +276,22 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	# Only process movement for players with authority
+	# Client-side interpolation for remote players (non-authority)
 	if !is_multiplayer_authority():
+		# Remote players: lerp to server position for smooth movement
+		# MultiplayerSynchronizer updates our actual global_position from server
+		# We store that as server_position and smoothly interpolate to it
+
+		# If position changed significantly from server, update target
+		if global_position.distance_squared_to(server_position) > 1.0:
+			server_position = global_position
+
+		# Smoothly interpolate visual position toward server position
+		# This creates smooth movement between server updates
+		global_position = global_position.lerp(server_position, interpolation_speed * _delta)
+
+		# Update z_index for proper depth sorting
+		z_index = int(global_position.y)
 		return
 
 	# Handle spectator camera if player is dead (not downed and not alive)
@@ -279,14 +300,14 @@ func _physics_process(_delta: float) -> void:
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
-	
+
 	# Handle downed state
 	if is_downed:
 		handle_downed_state(_delta)
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
-	
+
 	# Check for revive interactions (only for alive players)
 	if is_alive and current_health > 0:
 		check_revive_interactions(_delta)
@@ -386,7 +407,7 @@ func _physics_process(_delta: float) -> void:
 			combo_cooldown_time = 0
 			combo_cooldown_ready = true
 		update_combo_ui()
-	
+
 	# Update consumable cooldown
 	if consumable_cooldown > 0:
 		consumable_cooldown -= _delta
@@ -928,9 +949,10 @@ func process_dash_strike_on_server(attacker_pos: Vector2, target_pos: Vector2, s
 				"is_crit": is_crit
 			})
 
-	# Broadcast hits to all clients
+	# Broadcast hits to all clients for VFX via VFXManager
 	if hits.size() > 0:
-		rpc("show_melee_hits", attacker_peer_id, hits)
+		for hit in hits:
+			VFXManager.spawn_damage_number.rpc(hit.position, hit.damage, hit.is_crit)
 
 
 ## DEPRECATED: Old client-authoritative network RPC
@@ -1159,22 +1181,10 @@ func process_melee_attack_on_server(attacker_pos: Vector2, target_pos: Vector2) 
 				"is_crit": is_crit
 			})
 
-	# Broadcast hits to all clients for VFX
+	# Broadcast hits to all clients for VFX via VFXManager
 	if hits.size() > 0:
-		rpc("show_melee_hits", attacker_peer_id, hits)
-
-## All clients show VFX for melee hits
-@rpc("authority", "reliable", "call_local")
-func show_melee_hits(attacker_peer_id: int, hits: Array) -> void:
-	# SECURITY: Verify this RPC came from server
-	var sender_id = multiplayer.get_remote_sender_id()
-	if not validate_rpc_authority(sender_id, "show_melee_hits"):
-		return
-
-	# Note: Damage numbers are shown by enemy's show_damage_number RPC to avoid duplicates
-	# This function is kept for potential future VFX (blood splatters, hit effects, etc.)
-	# for hit in hits:
-	# 	spawn_damage_number(hit.position, hit.damage, hit.is_crit)
+		for hit in hits:
+			VFXManager.spawn_damage_number.rpc(hit.position, hit.damage, hit.is_crit)
 
 
 ## DEPRECATED: Old client-authoritative network RPC
@@ -1182,21 +1192,6 @@ func show_melee_hits(attacker_peer_id: int, hits: Array) -> void:
 @rpc("any_peer", "reliable")
 func perform_melee_damage_network(target_pos: Vector2) -> void:
 	push_warning("perform_melee_damage_network is deprecated - combat is now server-authoritative")
-
-
-func spawn_damage_number(pos: Vector2, damage: int, is_crit: bool) -> void:
-	# Spawn damage number visual effect
-	var damage_scene = load("res://coop/scenes/damage_number.tscn")
-	if damage_scene:
-		var damage_instance = damage_scene.instantiate()
-		damage_instance.global_position = pos
-
-		# Add to scene FIRST (this triggers _ready() which initializes the label reference)
-		get_tree().current_scene.add_child(damage_instance)
-
-		# NOW set damage text and styling (after _ready() has been called)
-		if damage_instance.has_method("set_damage"):
-			damage_instance.set_damage(damage, is_crit, false)
 
 
 ## DEPRECATED: Old client-authoritative projectile spawning
@@ -1656,7 +1651,7 @@ func setup_consumables_display() -> void:
 			consumables_display.name = "ConsumablesDisplay"
 			add_child(consumables_display)
 			print("Consumables display created for player ", name)
-	
+
 	# Initialize the display
 	update_consumables_display()
 
@@ -1675,9 +1670,9 @@ func add_consumable_to_slot(slot_number: int, item_id: String, quantity: int = 1
 	if slot_number not in [1, 2]:
 		push_error("Invalid consumable slot: " + str(slot_number))
 		return
-	
+
 	var slot = consumable_slots[slot_number]
-	
+
 	# If slot is empty or has a different item, replace it
 	if slot["item_id"] == "" or slot["item_id"] == item_id:
 		slot["item_id"] = item_id
@@ -1694,7 +1689,7 @@ func add_consumable_to_slot(slot_number: int, item_id: String, quantity: int = 1
 			slot["item_id"] = item_id
 			slot["quantity"] = quantity
 			print("Replaced slot ", slot_number, " with ", quantity, " x ", item_id)
-	
+
 	update_consumables_display()
 
 
@@ -1703,30 +1698,30 @@ func use_consumable(slot_number: int) -> void:
 	if consumable_cooldown > 0:
 		print("Consumable on cooldown: ", consumable_cooldown, "s remaining")
 		return
-	
+
 	# Check if valid slot
 	if slot_number not in [1, 2]:
 		return
-	
+
 	var slot = consumable_slots[slot_number]
-	
+
 	# Check if slot has items
 	if slot["item_id"] == "" or slot["quantity"] <= 0:
 		print("Consumable slot ", slot_number, " is empty")
 		return
-	
+
 	# Get item data
 	var item = ShopManager.get_item(slot["item_id"])
 	if not item:
 		push_error("Consumable item not found: " + slot["item_id"])
 		return
-	
+
 	# Check if we're at full health (for healing items)
 	if item.stat_bonuses.has("instant_heal"):
 		if current_health >= max_health:
 			print("Already at full health")
 			return
-	
+
 	# Request server to use consumable (server-authoritative)
 	if multiplayer.is_server():
 		_server_use_consumable(slot_number, slot["item_id"])
@@ -1742,19 +1737,19 @@ func _server_use_consumable(slot_number: int, item_id: String) -> void:
 	if sender_id != peer_id and sender_id != 0:  # Allow server (0) or owning player
 		push_error("Player " + str(sender_id) + " attempted to use consumable for player " + str(peer_id))
 		return
-	
+
 	# Verify slot has the item
 	var slot = consumable_slots[slot_number]
 	if slot["item_id"] != item_id or slot["quantity"] <= 0:
 		push_error("Consumable verification failed for player " + str(peer_id))
 		return
-	
+
 	# Get item data
 	var item = ShopManager.get_item(item_id)
 	if not item:
 		push_error("Consumable item not found: " + item_id)
 		return
-	
+
 	# Apply consumable effect (server-side)
 	if item.stat_bonuses.has("instant_heal"):
 		var heal_amount = item.stat_bonuses.instant_heal
@@ -1763,16 +1758,16 @@ func _server_use_consumable(slot_number: int, item_id: String) -> void:
 		if actual_heal > 0:
 			heal(actual_heal)
 			print("Player ", name, " healed for ", actual_heal, " HP using ", item.name)
-	
+
 	# Consume the item (reduce quantity)
 	slot["quantity"] -= 1
 	if slot["quantity"] <= 0:
 		slot["quantity"] = 0
 		slot["item_id"] = ""
-	
+
 	# Sync to all clients
 	rpc("_sync_consumable_slot", slot_number, slot["item_id"], slot["quantity"])
-	
+
 	# Set cooldown
 	consumable_cooldown = CONSUMABLE_COOLDOWN_DURATION
 	rpc("_sync_consumable_cooldown", consumable_cooldown)
@@ -1785,7 +1780,7 @@ func _sync_consumable_slot(slot_number: int, item_id: String, quantity: int) -> 
 	if not multiplayer.is_server() and sender_id != 1:
 		push_error("Non-server attempted to sync consumable slot")
 		return
-	
+
 	# Update local slot data
 	if slot_number in [1, 2]:
 		consumable_slots[slot_number]["item_id"] = item_id
@@ -1800,7 +1795,7 @@ func _sync_consumable_cooldown(cooldown: float) -> void:
 	if not multiplayer.is_server() and sender_id != 1:
 		push_error("Non-server attempted to sync consumable cooldown")
 		return
-	
+
 	consumable_cooldown = cooldown
 
 
@@ -1969,7 +1964,7 @@ func handle_downed_state(_delta: float) -> void:
 	if is_multiplayer_authority():
 		# If someone is actively reviving, pause the death timer
 		var is_being_revived = reviving_player and is_instance_valid(reviving_player)
-		
+
 		if is_being_revived:
 			# Check if reviving player is still in range
 			var distance = global_position.distance_to(reviving_player.global_position)
@@ -1979,11 +1974,11 @@ func handle_downed_state(_delta: float) -> void:
 				# Broadcast progress update (throttle to every 0.1 seconds to reduce network traffic)
 				if int(revive_progress * 10) != int((revive_progress - _delta) * 10):
 					rpc("sync_revive_progress", revive_progress)
-				
+
 				# Debug output every second
 				if int(revive_progress) != int(revive_progress - _delta):
 					print("[REVIVE] Progress: ", revive_progress, "/", REVIVE_TIME, " for player ", name, " (timer paused at ", revive_timer, "s)")
-				
+
 				# Check if revive is complete
 				if revive_progress >= REVIVE_TIME:
 					print("[REVIVE] Revive complete for player ", name)
@@ -2002,16 +1997,16 @@ func handle_downed_state(_delta: float) -> void:
 			if revive_progress > 0.0:
 				revive_progress = 0.0
 				rpc("sync_revive_progress", 0.0)
-		
+
 		# Sync timer to all clients periodically
 		revive_timer_sync_cooldown -= _delta
 		if revive_timer_sync_cooldown <= 0.0:
 			rpc("sync_revive_timer", revive_timer)
 			revive_timer_sync_cooldown = REVIVE_TIMER_SYNC_INTERVAL
-		
+
 		# Update revive indicator
 		update_revive_indicator()
-		
+
 		# If timer expires (and no one is reviving), permanently die
 		if revive_timer <= 0.0 and not is_being_revived:
 			print("[REVIVE] Timer expired for player ", name, " - permanent death")
@@ -2027,31 +2022,31 @@ func check_revive_interactions(_delta: float) -> void:
 	# Only check on authority to avoid duplicate RPC calls
 	if not is_multiplayer_authority():
 		return
-	
+
 	var players = get_tree().get_nodes_in_group("players")
 	var downed_player_ids = []
-	
+
 	for player in players:
 		if not is_instance_valid(player):
 			continue
-		
+
 		# Skip self
 		if player == self:
 			continue
-		
+
 		# Check if player is downed
 		if not ("is_downed" in player) or not player.is_downed:
 			continue
-		
+
 		var player_id = player.name.to_int()
 		downed_player_ids.append(player_id)
-		
+
 		# Update cooldown for this player
 		if not revive_request_cooldowns.has(player_id):
 			revive_request_cooldowns[player_id] = 0.0
 		if revive_request_cooldowns[player_id] > 0.0:
 			revive_request_cooldowns[player_id] -= _delta
-		
+
 		# Check distance
 		var distance = global_position.distance_to(player.global_position)
 		if distance <= REVIVE_RADIUS:
@@ -2066,7 +2061,7 @@ func check_revive_interactions(_delta: float) -> void:
 			if revive_request_cooldowns[player_id] <= 0.0:
 				stop_revive(player)
 				revive_request_cooldowns[player_id] = REVIVE_REQUEST_COOLDOWN_TIME
-	
+
 	# Clean up cooldowns for players that are no longer downed
 	for player_id in revive_request_cooldowns.keys():
 		if player_id not in downed_player_ids:
@@ -2078,12 +2073,12 @@ func start_revive(downed_player: Node2D) -> void:
 	# Send RPC to the downed player to start revive (they have authority over their state)
 	if not is_multiplayer_authority():
 		return
-	
+
 	var reviver_player_id = name.to_int()
 	var distance = global_position.distance_to(downed_player.global_position)
-	
+
 	print("[REVIVE] start_revive called: ", name, " trying to revive ", downed_player.name, " (distance: ", distance, ")")
-	
+
 	# Call RPC on the downed player (will be processed by their authority)
 	# Use rpc_id to send directly to the downed player's authority
 	var downed_authority = downed_player.get_multiplayer_authority()
@@ -2099,7 +2094,7 @@ func stop_revive(downed_player: Node2D) -> void:
 	# Send RPC to the downed player to stop revive
 	if not is_multiplayer_authority():
 		return
-	
+
 	# Call RPC on the downed player (will be processed by their authority)
 	# Use rpc_id to send directly to the downed player's authority
 	var downed_authority = downed_player.get_multiplayer_authority()
@@ -2123,54 +2118,54 @@ func complete_revive() -> void:
 	# Complete the revive process
 	if not is_multiplayer_authority():
 		return
-	
+
 	print("Player ", name, " has been revived!")
-	
+
 	# Restore health to 25% of max
 	current_health = int(max_health * REVIVE_HP_PERCENT)
-	
+
 	# Reset downed state
 	is_downed = false
 	is_alive = true
-	
+
 	# Reset revive variables
 	revive_timer = 0.0
 	revive_progress = 0.0
 	var reviver = reviving_player
 	reviving_player = null
-	
+
 	# Restore sprite appearance
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite:
 		sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Reset color
 		sprite.visible = true
-	
+
 	# Re-enable collision
 	set_collision_layer_value(1, true)  # Enable player collision layer
 	set_collision_mask_value(1, true)  # Enable collision with other players
-	
+
 	# Show UI elements again
 	show_player_ui()
-	
+
 	# Update health display
 	update_health_display()
-	
+
 	# Update GameDirector with health change (server only)
 	if multiplayer.is_server():
 		var peer_id = name.to_int()
 		GameDirector.update_player_health(peer_id, current_health, max_health)
-	
+
 	# Broadcast revive completion
 	rpc("sync_revive_complete", name.to_int(), current_health)
-	
+
 	# Remove revive indicator
 	remove_revive_indicator()
-	
+
 	# Re-setup camera for local player (important after revival)
 	var peer_id = name.to_int()
 	if peer_id == multiplayer.get_unique_id():
 		setup_camera()
-	
+
 	# Notify reviver
 	if reviver and is_instance_valid(reviver):
 		print("Player ", reviver.name, " successfully revived player ", name)
@@ -2187,20 +2182,20 @@ func create_revive_indicator() -> void:
 	var existing_indicator = get_node_or_null("ReviveIndicator")
 	if existing_indicator:
 		return  # Already exists
-	
+
 	# Create a simple progress bar above the player
 	var indicator = Control.new()
 	indicator.name = "ReviveIndicator"
 	indicator.position = Vector2(-50, -80)  # Above player
 	indicator.size = Vector2(100, 20)
-	
+
 	# Background panel
 	var bg = Panel.new()
 	bg.name = "Background"
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.modulate = Color(0.2, 0.2, 0.2, 0.8)
 	indicator.add_child(bg)
-	
+
 	# Progress bar
 	var progress_bar = ProgressBar.new()
 	progress_bar.name = "ProgressBar"
@@ -2211,7 +2206,7 @@ func create_revive_indicator() -> void:
 	progress_bar.show_percentage = false
 	progress_bar.modulate = Color(0.2, 0.8, 0.2, 0.9)  # Green
 	indicator.add_child(progress_bar)
-	
+
 	# Timer label
 	var timer_label = Label.new()
 	timer_label.name = "TimerLabel"
@@ -2222,7 +2217,7 @@ func create_revive_indicator() -> void:
 	timer_label.add_theme_font_size_override("font_size", 12)
 	timer_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	indicator.add_child(timer_label)
-	
+
 	add_child(indicator)
 
 
@@ -2231,10 +2226,10 @@ func update_revive_indicator() -> void:
 	var indicator = get_node_or_null("ReviveIndicator")
 	if not indicator:
 		return
-	
+
 	var progress_bar = indicator.get_node_or_null("ProgressBar")
 	var timer_label = indicator.get_node_or_null("TimerLabel")
-	
+
 	if progress_bar:
 		# Show time remaining or revive progress
 		if reviving_player:
@@ -2245,7 +2240,7 @@ func update_revive_indicator() -> void:
 			# No one reviving - show time remaining
 			progress_bar.value = revive_timer
 			progress_bar.modulate = Color(0.8, 0.2, 0.2, 0.9)  # Red
-	
+
 	if timer_label:
 		if reviving_player:
 			var reviver_name = reviving_player.player_name if "player_name" in reviving_player else reviving_player.name
@@ -2300,7 +2295,7 @@ func sync_downed_state(downed: bool, timer: float) -> void:
 	is_downed = downed
 	revive_timer = timer
 	revive_timer_sync_cooldown = 0.0  # Reset sync cooldown
-	
+
 	if downed:
 		# Apply visual state
 		var sprite = get_node_or_null("AnimatedSprite2D")
@@ -2341,7 +2336,7 @@ func sync_revive_start(downed_player_id: int, reviver_player_id: int) -> void:
 	# Sync revive start across all clients
 	var downed_player = get_tree().current_scene.get_node_or_null(str(downed_player_id))
 	var reviver_player = get_tree().current_scene.get_node_or_null(str(reviver_player_id))
-	
+
 	if downed_player and reviver_player:
 		downed_player.reviving_player = reviver_player
 		downed_player.revive_progress = 0.0
@@ -2352,7 +2347,7 @@ func sync_revive_start(downed_player_id: int, reviver_player_id: int) -> void:
 func sync_revive_stop(downed_player_id: int) -> void:
 	# Sync revive stop across all clients
 	var downed_player = get_tree().current_scene.get_node_or_null(str(downed_player_id))
-	
+
 	if downed_player:
 		downed_player.reviving_player = null
 		downed_player.revive_progress = 0.0
@@ -2363,39 +2358,39 @@ func sync_revive_stop(downed_player_id: int) -> void:
 func request_revive_start(reviver_player_id: int) -> void:
 	# Request to start reviving this player (called by reviving player)
 	print("[REVIVE] request_revive_start called for player ", name, " by reviver ", reviver_player_id)
-	
+
 	if not is_multiplayer_authority():
 		print("[REVIVE] Not authority, returning")
 		return  # Only process on authority
-	
+
 	if not is_downed:
 		print("[REVIVE] Not downed, returning")
 		return  # Not downed
-	
+
 	if reviving_player:
 		print("[REVIVE] Already being revived by ", reviving_player.name)
 		return  # Already being revived
-	
+
 	# Find the reviving player
 	var reviver = get_tree().current_scene.get_node_or_null(str(reviver_player_id))
 	if not reviver:
 		print("[REVIVE] ERROR: Could not find reviver player ", reviver_player_id)
 		return
-	
+
 	# Check distance
 	var distance = global_position.distance_to(reviver.global_position)
 	print("[REVIVE] Distance to reviver: ", distance, " (required: ", REVIVE_RADIUS, ")")
 	if distance > REVIVE_RADIUS:
 		print("[REVIVE] Too far away, returning")
 		return  # Too far away
-	
+
 	# Start revive
 	reviving_player = reviver
 	revive_progress = 0.0
-	
+
 	# Broadcast revive start
 	rpc("sync_revive_start", name.to_int(), reviver_player_id)
-	
+
 	print("[REVIVE] Player ", name, " started being revived by player ", reviver.name)
 
 
@@ -2404,17 +2399,17 @@ func request_revive_stop() -> void:
 	# Request to stop reviving this player (called by reviving player)
 	if not is_multiplayer_authority():
 		return  # Only process on authority
-	
+
 	if not reviving_player:
 		return  # Not being revived
-	
+
 	# Stop revive
 	reviving_player = null
 	revive_progress = 0.0
-	
+
 	# Broadcast revive stop
 	rpc("sync_revive_stop", name.to_int())
-	
+
 	print("Player ", name, " stopped being revived")
 
 
@@ -2422,7 +2417,7 @@ func request_revive_stop() -> void:
 func sync_revive_complete(player_id: int, new_health: int) -> void:
 	# Sync revive completion across all clients
 	var player = get_tree().current_scene.get_node_or_null(str(player_id))
-	
+
 	if player:
 		player.is_downed = false
 		player.is_alive = true
@@ -2430,22 +2425,22 @@ func sync_revive_complete(player_id: int, new_health: int) -> void:
 		player.reviving_player = null
 		player.revive_progress = 0.0
 		player.revive_timer = 0.0
-		
+
 		# Restore sprite
 		var sprite = player.get_node_or_null("AnimatedSprite2D")
 		if sprite:
 			sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
 			sprite.visible = true
-		
+
 		# Re-enable collision
 		player.set_collision_layer_value(1, true)
 		player.set_collision_mask_value(1, true)
-		
+
 		# Show UI
 		player.show_player_ui()
 		player.update_health_display()
 		player.remove_revive_indicator()
-		
+
 		# Re-setup camera for local player (important after revival)
 		var player_peer_id = player.name.to_int()
 		if player_peer_id == multiplayer.get_unique_id():
@@ -2459,7 +2454,7 @@ func update_spectator_camera() -> void:
 	var camera = get_node_or_null("Camera2D")
 	if not camera:
 		return
-	
+
 	# Don't update if this player is alive (shouldn't be in spectator mode)
 	if is_alive and current_health > 0:
 		return

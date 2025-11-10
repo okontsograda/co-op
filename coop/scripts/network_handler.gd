@@ -857,41 +857,9 @@ func receive_chat_message(player_name: String, message: String) -> void:
 	print("NetworkHandler: Signal emitted")
 
 
-# Enemy synchronization functions
-func sync_enemy_position(enemy_name: String, position: Vector2) -> void:
-	# Only server sends position updates
-	if not multiplayer.is_server():
-		return
-
-	# Broadcast position to all clients
-	rpc("update_enemy_position", enemy_name, position)
-
-
-@rpc("any_peer", "unreliable", "call_local")
-func update_enemy_position(enemy_name: String, position: Vector2) -> void:
-	# Find enemy by name and update position (only on clients)
-	# Server already has correct position
-	if multiplayer.is_server():
-		return
-
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	for enemy in enemies:
-		if enemy.name == enemy_name:
-			enemy.global_position = position
-			# Debug output
-			if Engine.get_process_frames() % 60 == 0:  # Every second
-				print("Updated enemy ", enemy_name, " position to ", position, " on client")
-			return
-
-	# If we get here, enemy wasn't found
-	if Engine.get_process_frames() % 60 == 0:
-		print(
-			"WARNING: Enemy ",
-			enemy_name,
-			" not found for position update on client. Total enemies: ",
-			get_tree().get_nodes_in_group("enemies").size()
-		)
-
+# DEPRECATED: Enemy position synchronization
+# Position sync is now handled automatically by MultiplayerSynchronizer in enemy.gd
+# Manual sync caused conflicts and choppy movement
 
 # Called when game starts from lobby
 func start_game_from_lobby() -> void:
