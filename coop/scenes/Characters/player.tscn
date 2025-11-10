@@ -183,12 +183,13 @@ properties/4/replication_mode = 1
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_epkag")
+attack_damage = 15
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -35)
 scale = Vector2(0.5546875, 0.5546875)
 sprite_frames = SubResource("SpriteFrames_db3n1")
-animation = &"walk"
+animation = &"idle"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -29)
@@ -210,8 +211,6 @@ offset_left = -102.0
 offset_top = -117.0
 offset_right = 102.0
 offset_bottom = -83.0
-grow_horizontal = 2
-grow_vertical = 2
 
 [node name="XPBar" parent="." instance=ExtResource("7_d7lt4")]
 layout_mode = 3

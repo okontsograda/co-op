@@ -16,7 +16,7 @@ var is_running: bool = false
 
 var max_health: int = 100
 var current_health: int = max_health
-var attack_damage: int = 100  # Base arrow damage
+@export var attack_damage: int  # Base arrow damage (editable in Inspector)
 
 # Player state
 var is_alive: bool = true  # Track if player is alive for enemy targeting

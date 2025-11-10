@@ -87,6 +87,10 @@ func create_interaction_label() -> void:
 
 
 func _process(_delta: float) -> void:
+	# Update z_index every frame based on Y position for proper sorting with moving objects
+	# Use the base of the building (the Node2D root position) for sorting
+	z_index = int(global_position.y)
+	
 	# Check for interaction input from players in range
 	for player in players_in_range:
 		if not is_instance_valid(player):

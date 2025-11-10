@@ -1686,9 +1686,6 @@ position = Vector2(424, 872)
 [node name="Tree5" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(56, 655)
 
-[node name="Tree6" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(235, 413)
-
 [node name="Tree7" parent="." instance=ExtResource("6_ydsdc")]
 position = Vector2(824, 901)
 
@@ -1702,6 +1699,7 @@ position = Vector2(1507, 877)
 position = Vector2(531, 461)
 
 [node name="DebugOverlay" parent="." instance=ExtResource("7_debug")]
+visible = false
 
 [node name="01" type="Sprite2D" parent="."]
 position = Vector2(693, 407)
@@ -1743,12 +1741,17 @@ texture = ExtResource("8_lfjhb")
 position = Vector2(59, -86)
 texture = ExtResource("9_1f1uy")
 
-[node name="ShopBuilding" parent="." instance=ExtResource("7_shop")]
-position = Vector2(128, -15)
-
 [node name="Tree10" parent="." instance=ExtResource("6_ydsdc")]
-position = Vector2(208, 103)
+position = Vector2(279, 124)
+
+[node name="ShopBuilding" parent="." instance=ExtResource("7_shop")]
+position = Vector2(186, 97)
+
+[node name="Tree6" parent="." instance=ExtResource("6_ydsdc")]
+position = Vector2(84, 205)
 
 [node name="RestWaveOverlay" parent="." instance=ExtResource("13_rh1hg")]
+visible = false
 
 [node name="WaveNotification" parent="." instance=ExtResource("14_q1hcx")]
+visible = false
