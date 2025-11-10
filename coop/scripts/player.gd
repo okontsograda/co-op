@@ -1145,9 +1145,10 @@ func show_melee_hits(attacker_peer_id: int, hits: Array) -> void:
 	if not validate_rpc_authority(sender_id, "show_melee_hits"):
 		return
 
-	# Show damage numbers and effects for each hit
-	for hit in hits:
-		spawn_damage_number(hit.position, hit.damage, hit.is_crit)
+	# Note: Damage numbers are shown by enemy's show_damage_number RPC to avoid duplicates
+	# This function is kept for potential future VFX (blood splatters, hit effects, etc.)
+	# for hit in hits:
+	# 	spawn_damage_number(hit.position, hit.damage, hit.is_crit)
 
 
 ## DEPRECATED: Old client-authoritative network RPC
