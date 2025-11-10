@@ -50,4 +50,3 @@ func update_display() -> void:
 			# Display wave number
 			wave_label.text = "Wave " + str(current_wave)
 			wave_label.modulate = Color(1.0, 1.0, 1.0)  # White
-

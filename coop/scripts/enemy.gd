@@ -52,6 +52,13 @@ const poison_tick_rate: float = 1.0  # Apply poison damage every 1 second
 # Sound effects
 var hit_sound_player: AudioStreamPlayer2D = null
 
+# Multiplayer synchronization
+var sync_node: MultiplayerSynchronizer = null
+
+# RPC Security - Rate limiting
+var rpc_rate_limits: Dictionary = {}  # Track RPC calls: {rpc_name: last_call_time}
+const RPC_MIN_INTERVAL: float = 0.05  # Minimum 50ms between same RPC
+
 
 func _ready() -> void:
 	# Add to enemies group
@@ -86,6 +93,9 @@ func _ready() -> void:
 		# On clients, set authority to 1 (server) so they sync from server
 		set_multiplayer_authority(1)
 
+	# Configure MultiplayerSynchronizer for efficient network sync
+	setup_multiplayer_sync()
+
 	# Initialize sync position
 	last_sync_position = global_position
 
@@ -100,6 +110,80 @@ func _ready() -> void:
 	# Only initialize AI on server
 	if not is_multiplayer_authority():
 		return
+
+
+## Configure MultiplayerSynchronizer for automatic property syncing
+func setup_multiplayer_sync() -> void:
+	# Check if we already have a MultiplayerSynchronizer (from scene)
+	sync_node = get_node_or_null("MultiplayerSynchronizer")
+
+	if not sync_node:
+		# Create MultiplayerSynchronizer programmatically
+		sync_node = MultiplayerSynchronizer.new()
+		sync_node.name = "MultiplayerSynchronizer"
+		add_child(sync_node)
+
+	# Set root path to this enemy node
+	sync_node.root_path = NodePath("..")
+
+	# Configure replication
+	sync_node.replication_interval = 0.1  # Sync 10 times per second
+	sync_node.delta_interval = 0.05  # Delta compression checks every 50ms
+
+	# Configure which properties to sync (only essential ones)
+	var config = SceneReplicationConfig.new()
+
+	# Sync position (most important for smooth movement)
+	config.add_property(".:global_position")
+	config.property_set_spawn(".:global_position", true)
+	config.property_set_replication_mode(".:global_position", SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
+
+	# Sync health (for health bars)
+	config.add_property(".:current_health")
+	config.property_set_replication_mode(".:current_health", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	# Sync animation state (for visual consistency)
+	config.add_property(".:is_attacking")
+	config.property_set_replication_mode(".:is_attacking", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	config.add_property(".:is_hit")
+	config.property_set_replication_mode(".:is_hit", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	# Apply configuration
+	sync_node.replication_config = config
+
+	print("Enemy ", name, " MultiplayerSynchronizer configured")
+
+
+## ============================================================================
+## RPC SECURITY VALIDATION HELPERS
+## ============================================================================
+
+## Validate RPC call is not being spammed (rate limiting)
+func validate_rpc_rate_limit(rpc_name: String, min_interval: float = RPC_MIN_INTERVAL) -> bool:
+	var current_time = Time.get_ticks_msec() / 1000.0
+
+	# Check if this RPC was called too recently
+	if rpc_rate_limits.has(rpc_name):
+		var time_since_last_call = current_time - rpc_rate_limits[rpc_name]
+		if time_since_last_call < min_interval:
+			push_warning("Enemy ", name, " RPC rate limit exceeded for ", rpc_name,
+				" (", time_since_last_call, "s since last call)")
+			return false
+
+	# Update last call time
+	rpc_rate_limits[rpc_name] = current_time
+	return true
+
+
+## Validate RPC caller has server authority
+func validate_rpc_authority(rpc_name: String) -> bool:
+	var sender_id = multiplayer.get_remote_sender_id()
+	# Authority RPCs must come from server (peer 1)
+	if sender_id != 1 and not multiplayer.is_server():
+		push_warning("Enemy ", name, " unauthorized RPC: ", rpc_name, " from peer ", sender_id)
+		return false
+	return true
 
 
 func set_enemy_size(size: EnemySize) -> void:
@@ -416,16 +500,28 @@ func take_damage_rpc(amount: int, attacker_name: String) -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func sync_health(health: int) -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("sync_health"):
+		return
+
+	# SECURITY: Rate limiting
+	if not validate_rpc_rate_limit("sync_health"):
+		return
+
 	current_health = health
 	update_health_display()
 
 
 @rpc("any_peer", "reliable", "call_local")
 func die_rpc() -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("die_rpc"):
+		return
+
 	# Random chance to drop a coin (only on server to prevent duplicate drops)
 	if multiplayer.is_server():
 		spawn_coin_drop()
-	
+
 	# Immediately queue for deletion
 	queue_free()
 
@@ -462,19 +558,35 @@ func spawn_coin_drop() -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func spawn_coin_rpc(spawn_position: Vector2, coin_value: int) -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("spawn_coin_rpc"):
+		return
+
+	# SECURITY: Rate limiting
+	if not validate_rpc_rate_limit("spawn_coin_rpc", 0.5):  # Max once per 500ms
+		return
+
 	# Spawn coin at the specified position on all clients
 	var coin_scene = load("res://coop/scenes/coin.tscn")
 	if coin_scene:
 		var coin = coin_scene.instantiate()
 		coin.global_position = spawn_position
 		coin.coin_value = coin_value
-		
+
 		# Add coin to the scene
 		get_tree().current_scene.add_child(coin)
 
 
 @rpc("any_peer", "reliable", "call_local")
 func play_hit_animation() -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("play_hit_animation"):
+		return
+
+	# SECURITY: Rate limiting
+	if not validate_rpc_rate_limit("play_hit_animation"):
+		return
+
 	# Play hit animation on all clients
 	is_hit = true
 	hit_timer = hit_animation_duration
@@ -509,6 +621,14 @@ func setup_hit_sound() -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func play_hit_sound() -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("play_hit_sound"):
+		return
+
+	# SECURITY: Rate limiting
+	if not validate_rpc_rate_limit("play_hit_sound"):
+		return
+
 	# Play hit sound - always create a new sound instance to allow overlapping sounds
 	var temp_sound = AudioStreamPlayer2D.new()
 	var hit_sound = null
@@ -630,6 +750,14 @@ func spawn_miss_text() -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func play_attack_animation() -> void:
+	# SECURITY: Verify this RPC came from server
+	if not validate_rpc_authority("play_attack_animation"):
+		return
+
+	# SECURITY: Rate limiting
+	if not validate_rpc_rate_limit("play_attack_animation"):
+		return
+
 	# Play attack animation on all clients
 	var sprite = get_node_or_null("AnimatedSprite2D")
 	if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("attack"):

@@ -105,6 +105,9 @@ var last_melee_attack_time: float = 0.0  # Track last melee attack for validatio
 var last_dash_strike_time: float = 0.0  # Track last dash strike for validation
 var last_projectile_spawn_time: float = 0.0  # Track last projectile spawn for validation
 
+# Multiplayer synchronization
+var sync_node: MultiplayerSynchronizer = null
+
 # Upgrade tracking - how many times each upgrade has been taken
 var upgrade_stacks = {}
 
@@ -154,6 +157,9 @@ func _ready() -> void:
 
 	# Add to players group so it can be found by other players
 	add_to_group("players")
+
+	# Configure MultiplayerSynchronizer for efficient network sync
+	setup_multiplayer_sync()
 
 	# Initialize health bar, XP display, stamina bar, coin display, wave display, and combo UI
 	update_health_display()
@@ -782,8 +788,12 @@ func perform_dash_combo(world_target: Vector2, dash_direction: Vector2) -> void:
 
 ## Client requests dash strike from server
 func request_dash_strike(target_pos: Vector2, strike_range: float) -> void:
-	# Send dash strike request to server
-	rpc_id(1, "process_dash_strike_on_server", global_position, target_pos, strike_range)
+	# If we're the server, call directly instead of RPC
+	if multiplayer.is_server():
+		process_dash_strike_on_server(global_position, target_pos, strike_range)
+	else:
+		# Send dash strike request to server
+		rpc_id(1, "process_dash_strike_on_server", global_position, target_pos, strike_range)
 
 ## Server processes dash strike (authoritative)
 @rpc("any_peer", "reliable")
@@ -793,6 +803,9 @@ func process_dash_strike_on_server(attacker_pos: Vector2, target_pos: Vector2, s
 
 	# Get attacker
 	var attacker_peer_id = multiplayer.get_remote_sender_id()
+	# If called directly (not via RPC), use the caller's unique ID
+	if attacker_peer_id == 0:
+		attacker_peer_id = multiplayer.get_unique_id()
 
 	# SECURITY: Rate limiting - prevent dash strike spam
 	if not validate_rpc_rate_limit(attacker_peer_id, "process_dash_strike_on_server", ATTACK_RPC_MIN_INTERVAL):
@@ -952,13 +965,70 @@ func validate_float_bounds(value: float, min_val: float = -10000.0, max_val: flo
 
 
 ## ============================================================================
+## MULTIPLAYER SYNCHRONIZATION
+## ============================================================================
+
+## Configure MultiplayerSynchronizer for automatic property syncing
+func setup_multiplayer_sync() -> void:
+	# Check if we already have a MultiplayerSynchronizer (from scene)
+	sync_node = get_node_or_null("MultiplayerSynchronizer")
+
+	if not sync_node:
+		# Create MultiplayerSynchronizer programmatically
+		sync_node = MultiplayerSynchronizer.new()
+		sync_node.name = "MultiplayerSynchronizer"
+		add_child(sync_node)
+
+	# Set root path to this player node
+	sync_node.root_path = NodePath("..")
+
+	# Configure replication
+	sync_node.replication_interval = 0.1  # Sync 10 times per second
+	sync_node.delta_interval = 0.05  # Delta compression checks every 50ms
+
+	# Configure which properties to sync (only essential ones)
+	var config = SceneReplicationConfig.new()
+
+	# Sync position (most important for smooth movement)
+	config.add_property(".:global_position")
+	config.property_set_spawn(".:global_position", true)
+	config.property_set_replication_mode(".:global_position", SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
+
+	# Sync health (for health bars on other clients)
+	config.add_property(".:current_health")
+	config.property_set_replication_mode(".:current_health", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	# Sync animation states (for visual consistency)
+	config.add_property(".:is_firing")
+	config.property_set_replication_mode(".:is_firing", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	config.add_property(".:is_attacking")
+	config.property_set_replication_mode(".:is_attacking", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	config.add_property(".:is_dodging")
+	config.property_set_replication_mode(".:is_dodging", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	config.add_property(".:is_downed")
+	config.property_set_replication_mode(".:is_downed", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+	# Apply configuration
+	sync_node.replication_config = config
+
+	print("Player ", name, " MultiplayerSynchronizer configured")
+
+
+## ============================================================================
 ## CLIENT REQUEST FUNCTIONS
 ## ============================================================================
 
 ## Client requests melee attack from server
 func request_melee_attack(target_pos: Vector2) -> void:
-	# Send attack request to server with attacker's position and target
-	rpc_id(1, "process_melee_attack_on_server", global_position, target_pos)
+	# If we're the server, call directly instead of RPC
+	if multiplayer.is_server():
+		process_melee_attack_on_server(global_position, target_pos)
+	else:
+		# Send attack request to server with attacker's position and target
+		rpc_id(1, "process_melee_attack_on_server", global_position, target_pos)
 
 ## Server processes melee attack (authoritative hit detection)
 @rpc("any_peer", "reliable")
@@ -968,6 +1038,9 @@ func process_melee_attack_on_server(attacker_pos: Vector2, target_pos: Vector2) 
 
 	# Get attacker peer ID and find their player
 	var attacker_peer_id = multiplayer.get_remote_sender_id()
+	# If called directly (not via RPC), use the caller's unique ID
+	if attacker_peer_id == 0:
+		attacker_peer_id = multiplayer.get_unique_id()
 
 	# SECURITY: Rate limiting - prevent attack spam
 	if not validate_rpc_rate_limit(attacker_peer_id, "process_melee_attack_on_server", ATTACK_RPC_MIN_INTERVAL):
@@ -2500,8 +2573,12 @@ func request_projectile_spawn(target_pos: Vector2) -> void:
 	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
 	var direction = (target_pos - sprite_position).normalized()
 
-	# Send request to server
-	rpc_id(1, "spawn_projectile_on_server", sprite_position, direction, multiplayer.get_unique_id())
+	# If we're the server, call directly instead of RPC
+	if multiplayer.is_server():
+		spawn_projectile_on_server(sprite_position, direction, multiplayer.get_unique_id())
+	else:
+		# Send request to server
+		rpc_id(1, "spawn_projectile_on_server", sprite_position, direction, multiplayer.get_unique_id())
 
 
 ## SERVER: Validate and spawn authoritative projectile, broadcast to all clients
@@ -2512,8 +2589,13 @@ func spawn_projectile_on_server(spawn_pos: Vector2, direction: Vector2, shooter_
 		push_warning("Client attempted to call spawn_projectile_on_server directly")
 		return
 
+	# Get the actual sender (handle direct calls)
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:  # Called directly, not via RPC
+		sender_id = shooter_peer_id
+
 	# SECURITY: Rate limiting - prevent projectile spam
-	if not validate_rpc_rate_limit(shooter_peer_id, "spawn_projectile_on_server", ATTACK_RPC_MIN_INTERVAL):
+	if not validate_rpc_rate_limit(sender_id, "spawn_projectile_on_server", ATTACK_RPC_MIN_INTERVAL):
 		return
 
 	# SECURITY: Validate vector bounds
