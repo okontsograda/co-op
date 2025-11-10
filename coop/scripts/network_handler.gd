@@ -360,8 +360,14 @@ func start_wave_system() -> void:
 	# Update wave display on all clients
 	rpc("update_wave_display", current_wave)
 
-	# Start spawning enemies for this wave
-	spawn_wave_enemies()
+	# Check if this wave should be a rest wave
+	var next_wave_type = GameDirector.next_wave_type
+	if next_wave_type == GameDirector.WaveType.REST:
+		# Start rest wave instead of spawning enemies
+		start_rest_wave()
+	else:
+		# Start spawning enemies for this wave
+		spawn_wave_enemies()
 
 
 func spawn_wave_enemies() -> void:
