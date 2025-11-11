@@ -146,6 +146,11 @@ func _process(delta):
 	if not multiplayer.is_server():
 		return
 
+	# Skip processing if in hub scene (no combat/waves)
+	var current_scene = get_tree().current_scene
+	if current_scene and current_scene.name == "Hub":
+		return
+
 	# Update performance tracking
 	performance_update_timer += delta
 	if performance_update_timer >= PERFORMANCE_UPDATE_INTERVAL:
@@ -627,3 +632,36 @@ func get_intensity_color() -> Color:
 			return Color(0.3, 0.6, 0.9)  # Blue
 		_:
 			return Color.WHITE
+
+
+## Reset all game state (called when returning to hub)
+func reset_game() -> void:
+	print("[GameDirector] Resetting game state")
+	
+	# Reset intensity system
+	current_intensity = IntensityPhase.CALM
+	intensity_phase_timer = 0.0
+	intensity_phase_duration = 0.0
+	
+	# Reset wave system
+	current_wave = 1
+	current_event = SpecialEventType.NONE
+	
+	# Reset player tracking
+	player_count = 1
+	player_performance.clear()
+	group_stress_level = 0.0
+	
+	# Reset spawn tracking
+	spawn_rate_multiplier = 1.0
+	enemies_to_spawn_this_wave = 0
+	enemies_spawned_count = 0
+	
+	# Reset performance tracking
+	performance_update_timer = 0.0
+	
+	# Reset rest wave system
+	waves_since_last_rest = 0
+	rest_wave_threshold = 3
+	
+	print("[GameDirector] Game state reset complete")

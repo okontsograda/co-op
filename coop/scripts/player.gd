@@ -22,6 +22,7 @@ var current_health: int = max_health
 var is_alive: bool = true  # Track if player is alive for enemy targeting
 var is_downed: bool = false  # Track if player is downed (can be revived)
 var player_name: String = "Player"  # Player's name loaded from save system
+var combat_enabled: bool = true  # Can be disabled in hub or safe zones
 
 # Revive system
 const REVIVE_RADIUS: float = 80.0  # Distance required to revive
@@ -207,6 +208,19 @@ func _ready() -> void:
 		GameDirector.update_player_health(player_peer_id, current_health, max_health)
 
 
+## Enable or disable combat (used in hub/safe zones)
+func set_combat_enabled(enabled: bool) -> void:
+	combat_enabled = enabled
+	if not enabled:
+		# Reset combat state when disabling
+		is_fire_button_held = false
+		is_firing = false
+		is_dodging = false
+		print("[Player] Combat disabled for player %s" % name)
+	else:
+		print("[Player] Combat enabled for player %s" % name)
+
+
 func _input(event: InputEvent) -> void:
 	# Only handle input for the local player
 	var peer_id = name.to_int()
@@ -217,8 +231,8 @@ func _input(event: InputEvent) -> void:
 	if current_health <= 0 or is_downed:
 		return
 
-	# Handle dodge roll (Spacebar only, not Enter)
-	if event is InputEventKey and event.pressed and not event.is_echo():
+	# Handle dodge roll (Spacebar only, not Enter) - only if combat enabled
+	if combat_enabled and event is InputEventKey and event.pressed and not event.is_echo():
 		if event.keycode == KEY_SPACE:
 			if can_dodge and not is_dodging:
 				perform_dodge_roll()
@@ -249,8 +263,8 @@ func _input(event: InputEvent) -> void:
 			print("ERROR: ChatUI not found for player ", name)
 		return
 
-	# Handle consumable usage (1 and 2 keys)
-	if event is InputEventKey and event.pressed and not event.is_echo():
+	# Handle consumable usage (1 and 2 keys) - only if combat enabled
+	if combat_enabled and event is InputEventKey and event.pressed and not event.is_echo():
 		# Check if UI is blocking (don't use consumables while in shop/menus)
 		if not is_ui_blocking_combat():
 			if event.keycode == KEY_1:
@@ -260,8 +274,8 @@ func _input(event: InputEvent) -> void:
 				use_consumable(2)
 				return
 
-	# Handle fire button state (left mouse button)
-	if event is InputEventMouseButton:
+	# Handle fire button state (left mouse button) - only if combat enabled
+	if combat_enabled and event is InputEventMouseButton:
 		var mouse_event = event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT:
 			# Check if any UI is blocking combat

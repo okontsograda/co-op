@@ -14,6 +14,21 @@ var player_data = {
 	"total_kills": 0,  # Lifetime enemy kills
 	"highest_wave": 0,  # Highest wave reached
 	"total_coins_earned": 0,  # Lifetime coins earned
+
+	# Meta progression (persistent hub currency and unlocks)
+	"meta_coins": 0,  # Currency earned from missions, spent in hub
+	"unlocked_classes": ["Archer"],  # Default: Archer unlocked
+	"unlocked_weapons": ["bow"],  # Default: bow unlocked
+	"unlocked_cosmetics": [],  # Future: cosmetic items
+	"permanent_upgrades": {},  # Future: permanent stat boosts {upgrade_id: level}
+	"achievements": [],  # Future: achievement tracking
+
+	# Loadout preferences (saved from hub)
+	"last_loadout": {
+		"class": "Archer",
+		"weapon": "bow"
+	},
+
 	"settings": {
 		"master_volume": 1.0,
 		"music_volume": 1.0,
@@ -187,6 +202,93 @@ func set_sfx_volume(volume: float) -> void:
 	save_data()
 
 
+# === META PROGRESSION FUNCTIONS ===
+
+func get_meta_coins() -> int:
+	return player_data.meta_coins
+
+
+func add_meta_currency(amount: int) -> void:
+	player_data.meta_coins += amount
+	print("[SaveSystem] Earned %d meta coins (Total: %d)" % [amount, player_data.meta_coins])
+	save_data()
+
+
+func spend_meta_currency(amount: int) -> bool:
+	if player_data.meta_coins >= amount:
+		player_data.meta_coins -= amount
+		print("[SaveSystem] Spent %d meta coins (Remaining: %d)" % [amount, player_data.meta_coins])
+		save_data()
+		return true
+	print("[SaveSystem] Not enough meta coins. Need %d, have %d" % [amount, player_data.meta_coins])
+	return false
+
+
+func is_class_unlocked(p_class_name: String) -> bool:
+	return p_class_name in player_data.unlocked_classes
+
+
+func unlock_class(p_class_name: String) -> void:
+	if not is_class_unlocked(p_class_name):
+		player_data.unlocked_classes.append(p_class_name)
+		print("[SaveSystem] Unlocked class: %s" % p_class_name)
+		save_data()
+
+
+func get_unlocked_classes() -> Array:
+	return player_data.unlocked_classes.duplicate()
+
+
+func is_weapon_unlocked(p_weapon_name: String) -> bool:
+	return p_weapon_name in player_data.unlocked_weapons
+
+
+func unlock_weapon(p_weapon_name: String) -> void:
+	if not is_weapon_unlocked(p_weapon_name):
+		player_data.unlocked_weapons.append(p_weapon_name)
+		print("[SaveSystem] Unlocked weapon: %s" % p_weapon_name)
+		save_data()
+
+
+func get_unlocked_weapons() -> Array:
+	return player_data.unlocked_weapons.duplicate()
+
+
+func save_loadout(p_class_name: String, p_weapon_name: String) -> void:
+	player_data.last_loadout.class = p_class_name
+	player_data.last_loadout.weapon = p_weapon_name
+	save_data()
+
+
+func get_last_loadout() -> Dictionary:
+	return player_data.last_loadout.duplicate()
+
+
+func add_achievement(achievement_id: String) -> void:
+	if achievement_id not in player_data.achievements:
+		player_data.achievements.append(achievement_id)
+		print("[SaveSystem] Achievement unlocked: %s" % achievement_id)
+		save_data()
+
+
+func has_achievement(achievement_id: String) -> bool:
+	return achievement_id in player_data.achievements
+
+
+func get_permanent_upgrade_level(upgrade_id: String) -> int:
+	return player_data.permanent_upgrades.get(upgrade_id, 0)
+
+
+func upgrade_permanent_stat(upgrade_id: String, max_level: int = -1) -> bool:
+	var current_level = get_permanent_upgrade_level(upgrade_id)
+	if max_level > 0 and current_level >= max_level:
+		return false
+	player_data.permanent_upgrades[upgrade_id] = current_level + 1
+	print("[SaveSystem] Upgraded %s to level %d" % [upgrade_id, current_level + 1])
+	save_data()
+	return true
+
+
 # === UTILITY FUNCTIONS ===
 
 # Reset all save data (useful for testing or implementing a "reset progress" feature)
@@ -198,6 +300,16 @@ func reset_save_data() -> void:
 		"total_kills": 0,
 		"highest_wave": 0,
 		"total_coins_earned": 0,
+		"meta_coins": 0,
+		"unlocked_classes": ["Archer"],
+		"unlocked_weapons": ["bow"],
+		"unlocked_cosmetics": [],
+		"permanent_upgrades": {},
+		"achievements": [],
+		"last_loadout": {
+			"class": "Archer",
+			"weapon": "bow"
+		},
 		"settings": {
 			"master_volume": 1.0,
 			"music_volume": 1.0,
@@ -225,5 +337,3 @@ func save_file_exists() -> bool:
 # Get the full path to the save file (for debugging)
 func get_save_file_path() -> String:
 	return ProjectSettings.globalize_path(SAVE_FILE_PATH)
-
-

@@ -1106,3 +1106,121 @@ func get_spawn_position_at_index(index: int) -> Vector2:
 
 	print("No spawn points found, using origin")
 	return Vector2.ZERO
+
+
+# ============================================================================
+# HUB FUNCTIONS
+# ============================================================================
+
+## Start server and enter hub
+func start_server_to_hub() -> void:
+	print("Starting server, transitioning to hub...")
+
+	# Ensure relay connection
+	if peer.connection_state != 2:
+		print("Waiting for relay connection...")
+		await peer.relay_connected
+
+	# Host the game
+	peer.host()
+	await peer.hosting
+	print("Hosting successful, online ID: ", peer.online_id)
+
+	DisplayServer.clipboard_set(peer.online_id)
+
+	# Connect multiplayer signals
+	multiplayer.peer_connected.connect(_on_peer_connected_to_hub)
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+
+	# Initialize LobbyManager with host
+	LobbyManager.enter_lobby(peer.online_id)
+
+	# Go to hub scene
+	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+
+
+## Join existing server and enter hub
+func start_client_to_hub(host_id: String) -> void:
+	if not host_id or host_id.is_empty():
+		print("No host ID provided")
+		return
+
+	print("Starting client, joining hub...")
+
+	# Ensure relay connection
+	if peer.connection_state != 2:
+		print("Waiting for relay connection...")
+		await peer.relay_connected
+
+	# Join the host
+	peer.join(host_id)
+	await peer.joined
+	print("Client successfully connected to ", host_id)
+
+	# Initialize LobbyManager with host ID
+	LobbyManager.enter_lobby(host_id)
+
+	# Go to hub scene
+	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+
+
+## Start solo hub (offline mode)
+func start_solo_hub() -> void:
+	print("Starting solo hub (offline mode)")
+
+	# Clear any existing multiplayer peer
+	if multiplayer.has_multiplayer_peer():
+		multiplayer.multiplayer_peer = null
+
+	# Initialize LobbyManager for solo play
+	var peer_id = 1
+	LobbyManager.players[peer_id] = {
+		"class": SaveSystem.get_last_loadout().class,
+		"weapon": SaveSystem.get_last_loadout().weapon,
+		"ready": false,
+		"is_host": true,
+		"player_name": SaveSystem.get_player_name()
+	}
+
+	# Go to hub scene
+	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+
+
+## Handler when peer connects to hub
+func _on_peer_connected_to_hub(peer_id: int) -> void:
+	print("Peer %d connected to hub" % peer_id)
+	# HubManager will handle registration
+
+
+## Return to hub after game over
+func return_to_hub_after_game(wave_reached: int, kills: int) -> void:
+	print("Game over - returning to hub")
+
+	# Calculate meta currency reward
+	var meta_coins_earned = _calculate_meta_currency_reward(wave_reached, kills)
+
+	# Award meta currency
+	if meta_coins_earned > 0:
+		SaveSystem.add_meta_currency(meta_coins_earned)
+
+	# Update career stats
+	SaveSystem.update_highest_wave(wave_reached)
+	SaveSystem.add_kills(kills)
+	SaveSystem.increment_games_played()
+
+	# Reset game state
+	GameDirector.reset_game()
+
+	# Return to hub
+	HubManager.return_to_hub(meta_coins_earned)
+
+
+## Calculate meta currency based on performance
+func _calculate_meta_currency_reward(wave: int, kills: int) -> int:
+	# Base reward: 50 per wave
+	var reward = wave * 50
+
+	# Bonus for kills (1 meta coin per 5 kills)
+	reward += int(kills / 5)
+
+	return reward

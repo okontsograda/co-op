@@ -1,0 +1,247 @@
+[gd_scene load_steps=2 format=4 uid="uid://hub_ui_001"]
+
+[ext_resource type="Script" path="res://coop/scripts/ui/hub_ui.gd" id="1_hub_ui"]
+
+[node name="HubUI" type="CanvasLayer"]
+script = ExtResource("1_hub_ui")
+
+[node name="InteractionPrompt" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -100.0
+offset_right = 150.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="InteractionPrompt"]
+layout_mode = 2
+
+[node name="ZoneLabel" type="Label" parent="InteractionPrompt/VBoxContainer"]
+layout_mode = 2
+text = "Character Selection"
+horizontal_alignment = 1
+
+[node name="PromptLabel" type="Label" parent="InteractionPrompt/VBoxContainer"]
+layout_mode = 2
+text = "Press E to interact"
+horizontal_alignment = 1
+
+[node name="MetaCoinsDisplay" type="PanelContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 60.0
+grow_horizontal = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MetaCoinsDisplay"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MetaCoinsDisplay/HBoxContainer"]
+layout_mode = 2
+text = "Meta Coins:"
+
+[node name="Amount" type="Label" parent="MetaCoinsDisplay/HBoxContainer"]
+layout_mode = 2
+text = "0"
+
+[node name="ReadyStatus" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 10.0
+offset_right = 100.0
+offset_bottom = 60.0
+grow_horizontal = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ReadyStatus"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="ReadyStatus/VBoxContainer"]
+layout_mode = 2
+text = "0 / 0 Ready"
+horizontal_alignment = 1
+
+[node name="ReadyButton" type="Button" parent="ReadyStatus/VBoxContainer"]
+layout_mode = 2
+text = "Ready"
+
+[node name="CharacterCustomizationUI" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -200.0
+offset_right = 300.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="CharacterCustomizationUI"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CharacterCustomizationUI/MarginContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CharacterCustomizationUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Character Customization"
+horizontal_alignment = 1
+
+[node name="Content" type="VBoxContainer" parent="CharacterCustomizationUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ClassLabel" type="Label" parent="CharacterCustomizationUI/MarginContainer/VBoxContainer/Content"]
+layout_mode = 2
+text = "Select Class:"
+
+[node name="ClassButtons" type="HBoxContainer" parent="CharacterCustomizationUI/MarginContainer/VBoxContainer/Content"]
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="CharacterCustomizationUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Close"
+
+[node name="MetaShopUI" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -250.0
+offset_right = 300.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="MetaShopUI"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MetaShopUI/MarginContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="MetaShopUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Meta Shop"
+horizontal_alignment = 1
+
+[node name="ShopContent" type="ScrollContainer" parent="MetaShopUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ItemList" type="VBoxContainer" parent="MetaShopUI/MarginContainer/VBoxContainer/ShopContent"]
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="MetaShopUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Close"
+
+[node name="StatsDisplayUI" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -250.0
+offset_right = 300.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="StatsDisplayUI"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="StatsDisplayUI/MarginContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="StatsDisplayUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Career Statistics"
+horizontal_alignment = 1
+
+[node name="StatsContent" type="VBoxContainer" parent="StatsDisplayUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CloseButton" type="Button" parent="StatsDisplayUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Close"
+
+[node name="MissionBoardUI" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -200.0
+offset_right = 300.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="MissionBoardUI"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MissionBoardUI/MarginContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="MissionBoardUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Mission Selection"
+horizontal_alignment = 1
+
+[node name="MissionContent" type="VBoxContainer" parent="MissionBoardUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MissionLabel" type="Label" parent="MissionBoardUI/MarginContainer/VBoxContainer/MissionContent"]
+layout_mode = 2
+text = "Available Missions:"
+
+[node name="StartMissionButton" type="Button" parent="MissionBoardUI/MarginContainer/VBoxContainer/MissionContent"]
+layout_mode = 2
+text = "Start Mission"
+
+[node name="ReadyToggle" type="CheckButton" parent="MissionBoardUI/MarginContainer/VBoxContainer/MissionContent"]
+layout_mode = 2
+text = "Ready"
+
+[node name="CloseButton" type="Button" parent="MissionBoardUI/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Close"

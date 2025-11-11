@@ -1,0 +1,143 @@
+[gd_scene load_steps=5 format=4 uid="uid://hub_scene_001"]
+
+[ext_resource type="Script" path="res://coop/scripts/hub_scene.gd" id="1_hub"]
+[ext_resource type="PackedScene" path="res://coop/scenes/ui/hub_ui.tscn" id="4_hub_ui"]
+[ext_resource type="PackedScene" uid="uid://c28e7e3l0hneh" path="res://coop/scenes/tree_1.tscn" id="7_tree"]
+[ext_resource type="PackedScene" uid="uid://c7y8qm5jh3dpb" path="res://coop/scenes/shop_building.tscn" id="8_shop"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_interact"]
+size = Vector2(150, 150)
+
+[node name="Hub" type="Node2D"]
+script = ExtResource("1_hub")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(576, 324)
+zoom = Vector2(1.5, 1.5)
+
+[node name="Background" type="ColorRect" parent="."]
+z_index = -100
+offset_right = 1920.0
+offset_bottom = 1080.0
+color = Color(0.2, 0.35, 0.5, 1)
+
+[node name="Land" type="ColorRect" parent="."]
+z_index = -40
+offset_left = 200.0
+offset_top = 150.0
+offset_right = 920.0
+offset_bottom = 700.0
+color = Color(0.4, 0.6, 0.35, 1)
+
+[node name="SpawnPoints" type="Node2D" parent="."]
+
+[node name="SpawnPoint1" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(550, 425)
+
+[node name="Decorations" type="Node2D" parent="."]
+
+[node name="Tree1" parent="Decorations" instance=ExtResource("7_tree")]
+position = Vector2(250, 200)
+
+[node name="Tree2" parent="Decorations" instance=ExtResource("7_tree")]
+position = Vector2(850, 200)
+
+[node name="Tree3" parent="Decorations" instance=ExtResource("7_tree")]
+position = Vector2(250, 650)
+
+[node name="Tree4" parent="Decorations" instance=ExtResource("7_tree")]
+position = Vector2(850, 650)
+
+[node name="Tree5" parent="Decorations" instance=ExtResource("7_tree")]
+position = Vector2(150, 400)
+
+[node name="Tree6" parent="Decorations" instance=ExtResource("7_tree")]
+position = Vector2(950, 400)
+
+[node name="Buildings" type="Node2D" parent="."]
+
+[node name="CharacterHouse" parent="Buildings" instance=ExtResource("8_shop")]
+position = Vector2(300, 250)
+
+[node name="ShopBuilding" parent="Buildings" instance=ExtResource("8_shop")]
+position = Vector2(800, 250)
+
+[node name="StatsHouse" parent="Buildings" instance=ExtResource("8_shop")]
+position = Vector2(300, 600)
+
+[node name="MissionHall" parent="Buildings" instance=ExtResource("8_shop")]
+position = Vector2(800, 600)
+
+[node name="InteractiveZones" type="Node2D" parent="."]
+
+[node name="CharacterStation" type="Area2D" parent="InteractiveZones"]
+position = Vector2(300, 250)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/CharacterStation"]
+shape = SubResource("RectangleShape2D_interact")
+
+[node name="Label" type="Label" parent="InteractiveZones/CharacterStation"]
+offset_left = -75.0
+offset_top = -100.0
+offset_right = 75.0
+offset_bottom = -70.0
+text = "Character Selection"
+horizontal_alignment = 1
+
+[node name="MetaShop" type="Area2D" parent="InteractiveZones"]
+position = Vector2(800, 250)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/MetaShop"]
+shape = SubResource("RectangleShape2D_interact")
+
+[node name="Label" type="Label" parent="InteractiveZones/MetaShop"]
+offset_left = -75.0
+offset_top = -100.0
+offset_right = 75.0
+offset_bottom = -70.0
+text = "Meta Shop"
+horizontal_alignment = 1
+
+[node name="StatsDisplay" type="Area2D" parent="InteractiveZones"]
+position = Vector2(300, 600)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/StatsDisplay"]
+shape = SubResource("RectangleShape2D_interact")
+
+[node name="Label" type="Label" parent="InteractiveZones/StatsDisplay"]
+offset_left = -75.0
+offset_top = -100.0
+offset_right = 75.0
+offset_bottom = -70.0
+text = "Statistics"
+horizontal_alignment = 1
+
+[node name="MissionBoard" type="Area2D" parent="InteractiveZones"]
+position = Vector2(800, 600)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/MissionBoard"]
+shape = SubResource("RectangleShape2D_interact")
+
+[node name="Label" type="Label" parent="InteractiveZones/MissionBoard"]
+offset_left = -75.0
+offset_top = -100.0
+offset_right = 75.0
+offset_bottom = -70.0
+text = "Mission Board"
+horizontal_alignment = 1
+
+[node name="SkillTree" type="Area2D" parent="InteractiveZones"]
+position = Vector2(550, 425)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/SkillTree"]
+shape = SubResource("RectangleShape2D_interact")
+
+[node name="Label" type="Label" parent="InteractiveZones/SkillTree"]
+offset_left = -75.0
+offset_top = -100.0
+offset_right = 75.0
+offset_bottom = -70.0
+text = "Skill Tree (Coming Soon)"
+horizontal_alignment = 1
+
+[node name="HubUI" parent="." instance=ExtResource("4_hub_ui")]

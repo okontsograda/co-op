@@ -37,18 +37,17 @@ func display_stats() -> void:
 func _on_restart_pressed() -> void:
 	# Remove all game over screens from root before restarting
 	_remove_all_game_over_screens()
-	
+
+	# Award meta currency and return to hub
+	var wave = GameStats.highest_wave_reached if GameStats else 0
+	var kills = GameStats.total_enemies_killed if GameStats else 0
+
 	# Reset stats
 	if GameStats:
 		GameStats.reset_stats()
-	
-	# If we're in multiplayer and not the server, disconnect and go to main menu
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
-		# Peer can't restart - send them to main menu
-		get_tree().change_scene_to_file("res://coop/scenes/main_menu.tscn")
-	else:
-		# Host/server can restart the game with current configuration
-		NetworkHandler.restart_game_with_current_config()
+
+	# Return to hub with rewards
+	NetworkHandler.return_to_hub_after_game(wave, kills)
 
 
 func _remove_all_game_over_screens() -> void:
@@ -64,10 +63,14 @@ func _remove_all_game_over_screens() -> void:
 func _on_main_menu_pressed() -> void:
 	# Remove all game over screens from root
 	_remove_all_game_over_screens()
-	
+
+	# Award meta currency and return to hub
+	var wave = GameStats.highest_wave_reached if GameStats else 0
+	var kills = GameStats.total_enemies_killed if GameStats else 0
+
 	# Reset stats
 	if GameStats:
 		GameStats.reset_stats()
-	
-	# Go back to main menu (disconnects from multiplayer)
-	get_tree().change_scene_to_file("res://coop/scenes/main_menu.tscn")
+
+	# Return to hub with rewards
+	NetworkHandler.return_to_hub_after_game(wave, kills)

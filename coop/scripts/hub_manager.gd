@@ -1,0 +1,149 @@
+extends Node
+
+## HubManager - Manages the central hub scene state and player coordination
+## Autoload singleton that handles hub-specific logic, player spawning, and mission transitions
+
+signal player_ready_changed(peer_id: int, is_ready: bool)
+signal all_players_ready()
+signal mission_starting()
+
+## Dictionary tracking hub players: {peer_id: {is_ready: bool, position: Vector2}}
+var hub_players: Dictionary = {}
+
+## Current mission selected (for future mission selection system)
+var selected_mission: String = "example"
+
+## Track if hub is multiplayer or solo
+var is_multiplayer: bool = false
+
+## Players ready count
+var ready_count: int = 0
+
+
+func _ready():
+	multiplayer.peer_connected.connect(_on_peer_connected)
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+
+
+## Initialize hub for a new session
+func initialize_hub(multiplayer_mode: bool = false):
+	hub_players.clear()
+	ready_count = 0
+	is_multiplayer = multiplayer_mode
+	selected_mission = "example"
+	print("[HubManager] Hub initialized (Multiplayer: %s)" % multiplayer_mode)
+
+
+## Register a player in the hub
+func register_player(peer_id: int):
+	if peer_id not in hub_players:
+		hub_players[peer_id] = {
+			"is_ready": false,
+			"position": Vector2.ZERO
+		}
+		print("[HubManager] Player %d registered in hub" % peer_id)
+
+
+## Unregister a player from the hub
+func unregister_player(peer_id: int):
+	if peer_id in hub_players:
+		if hub_players[peer_id]["is_ready"]:
+			ready_count -= 1
+		hub_players.erase(peer_id)
+		print("[HubManager] Player %d unregistered from hub" % peer_id)
+
+
+## Toggle player ready status
+func set_player_ready(peer_id: int, is_ready: bool):
+	if peer_id not in hub_players:
+		return
+
+	var was_ready = hub_players[peer_id]["is_ready"]
+	hub_players[peer_id]["is_ready"] = is_ready
+
+	if was_ready != is_ready:
+		if is_ready:
+			ready_count += 1
+		else:
+			ready_count -= 1
+
+		player_ready_changed.emit(peer_id, is_ready)
+		print("[HubManager] Player %d ready status: %s (%d/%d)" % [peer_id, is_ready, ready_count, hub_players.size()])
+
+	# Check if all players are ready
+	if ready_count == hub_players.size() and hub_players.size() > 0:
+		all_players_ready.emit()
+
+
+## Check if all players are ready
+func are_all_players_ready() -> bool:
+	if hub_players.is_empty():
+		return false
+	return ready_count == hub_players.size()
+
+
+## Start the mission (host only)
+func start_mission():
+	if not multiplayer.is_server():
+		print("[HubManager] Only host can start mission")
+		return
+
+	if not are_all_players_ready():
+		print("[HubManager] Not all players are ready")
+		return
+
+	print("[HubManager] Starting mission: %s" % selected_mission)
+	mission_starting.emit()
+	_start_mission_for_all.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _start_mission_for_all():
+	print("[HubManager] Transitioning to mission scene")
+	# Preserve player loadouts from hub
+	var peer_id = multiplayer.get_unique_id()
+
+	# Store current selections before scene change
+	if LobbyManager.players.has(peer_id):
+		var player_data = LobbyManager.players[peer_id]
+		# Loadout is already in LobbyManager, just transition
+		pass
+
+	# Load mission scene
+	match selected_mission:
+		"example":
+			get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
+		_:
+			print("[HubManager] Unknown mission: %s" % selected_mission)
+
+
+## Return to hub after mission (with rewards)
+func return_to_hub(meta_coins_earned: int = 0):
+	print("[HubManager] Returning to hub (Earned %d meta coins)" % meta_coins_earned)
+
+	# Award meta currency
+	if meta_coins_earned > 0:
+		SaveSystem.add_meta_currency(meta_coins_earned)
+
+	# Clear mission state
+	GameDirector.reset_game()
+
+	# Return to hub scene
+	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+
+
+func _on_peer_connected(id: int):
+	if is_multiplayer:
+		print("[HubManager] Peer %d connected to hub" % id)
+		register_player(id)
+
+
+func _on_peer_disconnected(id: int):
+	if is_multiplayer:
+		print("[HubManager] Peer %d disconnected from hub" % id)
+		unregister_player(id)
+
+
+## Get ready player count as string (for UI)
+func get_ready_status_text() -> String:
+	return "%d / %d Ready" % [ready_count, hub_players.size()]

@@ -51,8 +51,8 @@ func _on_name_submitted(new_text: String) -> void:
 
 func _on_host_pressed() -> void:
 	print("Host button pressed")
-	# Start server which will transition to lobby
-	NetworkHandler.start_server()
+	# Start server which will transition to hub
+	NetworkHandler.start_server_to_hub()
 
 
 func _on_join_pressed() -> void:
@@ -64,14 +64,14 @@ func _on_join_pressed() -> void:
 		return
 
 	print("Join button pressed with host ID: ", host_id)
-	# Join server which will transition to lobby
-	NetworkHandler.start_client(host_id)
+	# Join server which will transition to hub
+	NetworkHandler.start_client_to_hub(host_id)
 
 
 func _on_play_local_pressed() -> void:
 	print("Play Local button pressed")
-	# Go to class selection screen
-	get_tree().change_scene_to_file("res://coop/scenes/local_class_selection.tscn")
+	# Go to solo hub (offline mode)
+	NetworkHandler.start_solo_hub()
 
 
 func _on_exit_pressed() -> void:
