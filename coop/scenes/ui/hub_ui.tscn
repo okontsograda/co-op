@@ -53,6 +53,36 @@ text = "Meta Coins:"
 layout_mode = 2
 text = "0"
 
+[node name="HostIDDisplay" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -300.0
+offset_top = 70.0
+offset_right = -10.0
+offset_bottom = 140.0
+grow_horizontal = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HostIDDisplay"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HostIDDisplay/VBoxContainer"]
+layout_mode = 2
+text = "Host ID (copied to clipboard):"
+horizontal_alignment = 1
+
+[node name="OnlineID" type="Label" parent="HostIDDisplay/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "waiting..."
+horizontal_alignment = 1
+
+[node name="CopyButton" type="Button" parent="HostIDDisplay/VBoxContainer"]
+layout_mode = 2
+text = "Copy to Clipboard"
+
 [node name="ReadyStatus" type="PanelContainer" parent="."]
 visible = false
 anchors_preset = 5

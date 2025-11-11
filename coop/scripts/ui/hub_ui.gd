@@ -7,6 +7,8 @@ extends CanvasLayer
 @onready var zone_label: Label = $InteractionPrompt/VBoxContainer/ZoneLabel
 @onready var meta_coins_display: PanelContainer = $MetaCoinsDisplay
 @onready var meta_coins_amount: Label = $MetaCoinsDisplay/HBoxContainer/Amount
+@onready var host_id_display: PanelContainer = $HostIDDisplay
+@onready var copy_button: Button = $HostIDDisplay/VBoxContainer/CopyButton
 @onready var ready_status: PanelContainer = $ReadyStatus
 @onready var ready_status_label: Label = $ReadyStatus/VBoxContainer/StatusLabel
 @onready var ready_button: Button = $ReadyStatus/VBoxContainer/ReadyButton
@@ -53,6 +55,9 @@ func _ready():
 	ready_toggle.toggled.connect(_on_ready_toggled)
 	ready_button.pressed.connect(_on_ready_button_pressed)
 
+	# Connect copy button
+	copy_button.pressed.connect(_on_copy_host_id_pressed)
+
 	# Update meta coins display
 	_update_meta_coins()
 
@@ -61,6 +66,11 @@ func _ready():
 		ready_status.visible = true
 		_update_ready_status()
 		HubManager.player_ready_changed.connect(_on_player_ready_changed)
+
+		# Show host ID display if server/host
+		if multiplayer.is_server():
+			host_id_display.visible = true
+			_update_host_id()
 
 	# Build class selection buttons
 	_build_class_buttons()
@@ -302,3 +312,34 @@ func _on_player_ready_changed(_peer_id: int, _is_ready: bool):
 	_update_ready_status()
 	if mission_ui.visible:
 		_update_mission_ui()
+
+
+func _update_host_id():
+	# Wait a moment for NetworkHandler to establish connection
+	await get_tree().create_timer(0.5).timeout
+	
+	# Get the online ID from NetworkHandler
+	if NetworkHandler and NetworkHandler.peer:
+		var online_id = NetworkHandler.peer.online_id
+		if online_id and not online_id.is_empty():
+			%OnlineID.text = online_id
+			print("[HubUI] Host ID displayed: %s" % online_id)
+		else:
+			%OnlineID.text = "Connecting..."
+			# Try again after a delay
+			await get_tree().create_timer(1.0).timeout
+			_update_host_id()
+	else:
+		%OnlineID.text = "Error: No peer connection"
+
+
+func _on_copy_host_id_pressed():
+	if NetworkHandler and NetworkHandler.peer:
+		var online_id = NetworkHandler.peer.online_id
+		if online_id and not online_id.is_empty():
+			DisplayServer.clipboard_set(online_id)
+			print("[HubUI] Host ID copied to clipboard: %s" % online_id)
+			# Show brief feedback
+			copy_button.text = "Copied!"
+			await get_tree().create_timer(1.0).timeout
+			copy_button.text = "Copy to Clipboard"
