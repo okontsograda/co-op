@@ -2791,8 +2791,6 @@ func request_projectile_spawn(target_pos: Vector2) -> void:
 	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
 	var direction = (target_pos - sprite_position).normalized()
 
-	print("Player: Requesting server projectile spawn - type: ", _get_projectile_type())
-
 	# Use ProjectileManager RPC
 	ProjectileManager.spawn_projectile.rpc(
 		sprite_position,
@@ -2801,8 +2799,6 @@ func request_projectile_spawn(target_pos: Vector2) -> void:
 		multiplayer.get_unique_id(),
 		_get_weapon_stats_dict()
 	)
-
-	print("Player: RPC call completed")
 
 
 ## DEPRECATED: Use ProjectileManager.spawn_projectile.rpc() instead

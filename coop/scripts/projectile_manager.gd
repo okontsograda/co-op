@@ -37,8 +37,6 @@ func spawn_visual_projectile(
 	projectile_type: String,
 	weapon_stats: Dictionary
 ) -> void:
-	print("ProjectileManager: Spawning VISUAL ", projectile_type)
-
 	# Get projectile config
 	if not projectile_configs.has(projectile_type):
 		push_error("Unknown projectile type: ", projectile_type)
@@ -81,14 +79,9 @@ func spawn_projectile(
 	shooter_peer_id: int,
 	weapon_stats: Dictionary
 ) -> void:
-	print("ProjectileManager: spawn_projectile RPC called - type: ", projectile_type, " is_server: ", multiplayer.is_server())
-
 	# Only server processes projectile spawning
 	if not multiplayer.is_server():
-		push_warning("Client attempted to call spawn_projectile directly")
 		return
-
-	print("ProjectileManager: Server processing spawn_projectile RPC")
 
 	# Get actual sender (handle direct calls vs RPC)
 	var sender_id = multiplayer.get_remote_sender_id()
