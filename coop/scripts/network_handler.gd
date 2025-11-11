@@ -84,30 +84,19 @@ func start_local_game_with_class(selected_class: String) -> void:
 	}
 	
 	print("Local player registered with class: ", selected_class, " and weapon: ", weapon)
-	
-	# Go directly to game scene
-	get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
-	
-	# Wait for scene to load, then spawn player and start game
+
+	# Go to village scene first
+	get_tree().change_scene_to_file("res://coop/scenes/village.tscn")
+
+	# Wait for scene to load
 	await get_tree().create_timer(0.3).timeout
-	
-	# Start fade-in effect (runs in parallel with spawning)
+
+	# Start fade-in effect
 	_fade_in_scene(1.2)
-	
-	# Spawn the local player
-	spawn_local_player()
-	
-	# Find enemy spawn points
-	find_enemy_spawn_points()
-	
-	# Start wave system
-	await get_tree().create_timer(0.5).timeout
-	start_wave_system()
-	
-	# Initialize GameDirector with player count
-	GameDirector.update_player_count(1)
-	
-	print("Local game started successfully!")
+
+	# Village scene will handle spawning via spawn_village_players()
+
+	print("Local game started in village!")
 
 
 func spawn_local_player() -> void:
@@ -1106,3 +1095,119 @@ func get_spawn_position_at_index(index: int) -> Vector2:
 
 	print("No spawn points found, using origin")
 	return Vector2.ZERO
+
+
+# ===== VILLAGE SCENE SPAWNING =====
+
+func spawn_players_in_village() -> void:
+	# Spawn players in the village scene
+	if not multiplayer.is_server():
+		return
+
+	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
+	var spawn_index = 0
+	var current_scene := get_tree().current_scene
+	if current_scene == null:
+		print("ERROR: No current scene available for spawning players")
+		return
+
+	for peer_id in LobbyManager.players:
+		# Avoid spawning duplicates
+		if current_scene.get_node_or_null(str(peer_id)):
+			continue
+
+		var player = player_scene.instantiate()
+		player.name = str(peer_id)
+
+		# Set spawn position
+		player.position = get_spawn_position_at_index(spawn_index)
+		spawn_index += 1
+
+		# Store the player's selected class
+		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
+
+		# Store the player's selected weapon
+		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
+
+		# Add player to scene
+		current_scene.add_child(player)
+
+		print("Spawned player ", peer_id, " in village with class ", LobbyManager.players[peer_id]["class"])
+
+
+func spawn_peer_in_village(peer_id: int) -> void:
+	# Spawn a specific peer in the village (when they join mid-game)
+	if not multiplayer.is_server():
+		return
+
+	var current_scene := get_tree().current_scene
+	if current_scene == null or current_scene.name != "Village":
+		print("Not in village scene, ignoring spawn request")
+		return
+
+	# Check if player is already spawned
+	if current_scene.get_node_or_null(str(peer_id)):
+		print("Player ", peer_id, " already spawned in village")
+		return
+
+	# Check if player data exists
+	if not LobbyManager.players.has(peer_id):
+		print("No player data for peer ", peer_id)
+		return
+
+	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
+	var player = player_scene.instantiate()
+	player.name = str(peer_id)
+
+	# Find next available spawn position
+	var spawn_index = current_scene.get_node("SpawnPoints").get_child_count() - 1
+	player.position = get_spawn_position_at_index(spawn_index)
+
+	# Store the player's selected class and weapon
+	player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
+	player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
+
+	# Add player to scene
+	current_scene.add_child(player)
+
+	print("Spawned new peer ", peer_id, " in village")
+
+
+func transition_from_village_to_game() -> void:
+	# Transition from village to the main game scene
+	print("Transitioning from village to game scene...")
+
+	# Remove all players from the current scene (they'll be respawned in the game scene)
+	var current_scene := get_tree().current_scene
+	if current_scene:
+		for child in current_scene.get_children():
+			if child.name.is_valid_int():  # Player nodes are named by peer_id
+				child.queue_free()
+
+	# Change to game scene
+	get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
+
+	# Wait for scene to load
+	await get_tree().create_timer(0.3).timeout
+
+	# Start fade-in effect
+	_fade_in_scene(1.2)
+
+	# Spawn players in the game scene
+	if multiplayer.is_server():
+		spawn_players_with_classes()
+
+	# Find enemy spawn points
+	find_enemy_spawn_points()
+
+	# Start wave system (only on server)
+	if multiplayer.is_server():
+		await get_tree().create_timer(0.5).timeout
+		start_wave_system()
+
+		# Update GameDirector with player count
+		var player_count = LobbyManager.players.size()
+		GameDirector.update_player_count(player_count)
+		print("GameDirector: Updated player count to ", player_count)
+
+	print("Village to game transition complete!")

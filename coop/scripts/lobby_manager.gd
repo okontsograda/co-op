@@ -267,9 +267,13 @@ func start_game():
 @rpc("any_peer", "call_local", "reliable")
 func _start_game_for_all():
 	is_in_lobby = false
-	# Change to game scene
-	get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
+	# Change to village scene first
+	get_tree().change_scene_to_file("res://coop/scenes/village.tscn")
 
-	# Wait for scene to load, then spawn players and start game
+	# Wait for scene to load, then spawn players in village
 	await get_tree().create_timer(0.2).timeout
-	NetworkHandler.start_game_from_lobby()
+	NetworkHandler._fade_in_scene(1.2)
+
+	# Spawn players in village (server only)
+	if multiplayer.is_server():
+		NetworkHandler.spawn_players_in_village()

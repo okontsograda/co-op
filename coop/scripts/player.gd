@@ -251,7 +251,7 @@ func _input(event: InputEvent) -> void:
 
 	# Handle consumable usage (1 and 2 keys)
 	if event is InputEventKey and event.pressed and not event.is_echo():
-		# Check if UI is blocking (don't use consumables while in shop/menus)
+		# Check if UI is blocking (don't use consumables while in shop/teleport/menus)
 		if not is_ui_blocking_combat():
 			if event.keycode == KEY_1:
 				use_consumable(1)
@@ -321,14 +321,14 @@ func _physics_process(_delta: float) -> void:
 		move_and_slide()
 		return
 
-	# Check if any UI is blocking movement (shop blocks movement, upgrade overlay doesn't)
+	# Check if any UI is blocking movement (shop/teleport block movement, upgrade overlay doesn't)
 	if is_ui_blocking_movement():
 		is_fire_button_held = false  # Reset fire button when UI is active
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
 
-	# Check if UI is blocking combat (both shop and upgrade overlay block combat)
+	# Check if UI is blocking combat (shop, teleport, and upgrade overlay block combat)
 	if is_ui_blocking_combat():
 		is_fire_button_held = false  # Reset fire button when UI is active
 		# Don't return here - allow movement to continue
@@ -337,7 +337,7 @@ func _physics_process(_delta: float) -> void:
 	if is_performing_combo:
 		# During combo dash, movement is handled by perform_dash_combo
 		# Just update z_index
-		# IGNORE all UI/shop blocking during combo - nothing stops the combo!
+		# IGNORE all UI/shop/teleport blocking during combo - nothing stops the combo!
 		z_index = int(global_position.y)
 		return
 
@@ -457,30 +457,39 @@ func is_ui_blocking_combat() -> bool:
 	if shop_ui and shop_ui.visible:
 		return true
 
+	# Check if teleport UI is open
+	var teleport_ui = get_tree().root.get_node_or_null("TeleportUI")
+	if teleport_ui and teleport_ui.visible:
+		return true
+
 	# Check if upgrade overlay is open
 	var upgrade_overlay = get_tree().root.get_node_or_null("UpgradeOverlay")
 	if upgrade_overlay and upgrade_overlay.visible:
 		return true
 
-	# Check for any CanvasLayer with ShopUI or UpgradeOverlay
+	# Check for any CanvasLayer with ShopUI, TeleportUI, or UpgradeOverlay
 	for node in get_tree().get_nodes_in_group("ui"):
 		if node is CanvasLayer and node.visible:
-			if "ShopUI" in node.name or "UpgradeOverlay" in node.name:
+			if "ShopUI" in node.name or "TeleportUI" in node.name or "UpgradeOverlay" in node.name:
 				return true
 
 	return false
 
 
 func is_ui_blocking_movement() -> bool:
-	# Only shop UI blocks movement, upgrade overlay allows movement
+	# Only shop UI and teleport UI block movement, upgrade overlay allows movement
 	var shop_ui = get_tree().root.get_node_or_null("ShopUI")
 	if shop_ui and shop_ui.visible:
 		return true
 
-	# Check for any CanvasLayer with ShopUI (but NOT UpgradeOverlay)
+	var teleport_ui = get_tree().root.get_node_or_null("TeleportUI")
+	if teleport_ui and teleport_ui.visible:
+		return true
+
+	# Check for any CanvasLayer with ShopUI or TeleportUI (but NOT UpgradeOverlay)
 	for node in get_tree().get_nodes_in_group("ui"):
 		if node is CanvasLayer and node.visible:
-			if "ShopUI" in node.name:
+			if "ShopUI" in node.name or "TeleportUI" in node.name:
 				return true
 
 	return false
