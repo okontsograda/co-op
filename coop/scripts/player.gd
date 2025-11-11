@@ -1792,6 +1792,13 @@ func handle_death() -> void:
 	# Handle death on authority/server
 	print("Player ", name, " has been downed!")
 
+	# Check if there are any other alive players who could revive this player
+	# If no other alive players exist, skip downed state and go straight to permanent death
+	if not are_there_other_alive_players():
+		print("Player ", name, " is the last player alive - skipping revive state")
+		handle_permanent_death()
+		return
+
 	# Set downed state instead of immediate death
 	is_downed = true
 	is_alive = false  # Still mark as not alive for enemy targeting
@@ -1860,6 +1867,18 @@ func handle_permanent_death() -> void:
 	if is_multiplayer_authority() and are_all_players_dead():
 		# Show game over to everyone
 		rpc("show_game_over_screen_rpc")
+
+
+func are_there_other_alive_players() -> bool:
+	# Check if there are any OTHER alive players (excluding this player)
+	# who could potentially revive this player
+	var players = get_tree().get_nodes_in_group("players")
+	for player in players:
+		if player == self:
+			continue  # Skip ourselves
+		if "is_alive" in player and player.is_alive:
+			return true  # Found at least one other alive player
+	return false  # No other alive players to revive this player
 
 
 func are_all_players_dead() -> bool:
