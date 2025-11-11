@@ -32,6 +32,9 @@ func update_stamina(current: float, maximum: float) -> void:
 
 	# Update the fill bar width based on actual background width
 	# Background goes from offset_left to offset_right, Fill starts at offset_left
+	if not fill or not background:
+		return
+
 	var fill_left = background.offset_left if background else -30.0
 	fill.offset_left = fill_left
 	fill.offset_right = fill_left + (stamina_percent * background_width)

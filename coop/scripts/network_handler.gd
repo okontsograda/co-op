@@ -229,7 +229,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 		player_ready_states.erase(peer_id)
 		print("Removed disconnected player from rest wave ready states")
 		# Check if all remaining players are ready
-		rpc("sync_ready_states", player_ready_states)
+		sync_ready_states(player_ready_states)
 		check_all_players_ready()
 
 	# Find and remove the player node with this peer ID
@@ -337,7 +337,7 @@ func start_wave_system() -> void:
 		GameStats.record_wave_reached(current_wave)
 
 	# Update wave display on all clients
-	rpc("update_wave_display", current_wave)
+	update_wave_display(current_wave)
 
 	# Ask GameDirector what type this wave should be
 	var wave_type = GameDirector.get_wave_type_for_wave(current_wave)
@@ -389,7 +389,7 @@ func check_wave_completion() -> void:
 		GameDirector.on_wave_complete()
 
 		# Show wave completion message
-		rpc("show_wave_completion", current_wave)
+		show_wave_completion(current_wave)
 
 		# Ask GameDirector what type the next wave should be
 		var next_wave_type = GameDirector.get_wave_type_for_wave(current_wave + 1)
@@ -418,11 +418,11 @@ func start_wave_countdown() -> void:
 	# Show countdown (duration from GameDirector)
 	var countdown_seconds = GameDirector.WAVE_COUNTDOWN_SECONDS
 	for i in range(countdown_seconds, 0, -1):
-		rpc("show_countdown", i)
+		show_countdown(i)
 		await get_tree().create_timer(1.0).timeout
 
 	# Show wave start message
-	rpc("show_wave_start", current_wave + 1)
+	show_wave_start(current_wave + 1)
 
 	# Start next wave
 	start_next_wave()
@@ -457,10 +457,10 @@ func start_rest_wave() -> void:
 	print("[NetworkHandler] Initialized ready states for %d players" % player_ready_states.size())
 
 	# Broadcast rest wave start to all clients
-	rpc("on_rest_wave_started")
+	on_rest_wave_started()
 
 	# Sync initial ready states to all clients
-	rpc("sync_ready_states", player_ready_states)
+	sync_ready_states(player_ready_states)
 
 
 @rpc("authority", "reliable", "call_local")
@@ -498,7 +498,7 @@ func request_ready_up() -> void:
 		print("[NetworkHandler] Available peer IDs: ", player_ready_states.keys())
 
 	# Broadcast updated ready states to all clients
-	rpc("sync_ready_states", player_ready_states)
+	sync_ready_states(player_ready_states)
 
 	# Check if all players are ready
 	check_all_players_ready()
@@ -554,7 +554,7 @@ func end_rest_wave() -> void:
 	is_rest_wave = false
 
 	# Broadcast rest wave end to all clients
-	rpc("on_rest_wave_ended")
+	on_rest_wave_ended()
 
 	# Small delay before wave countdown (from GameDirector)
 	await get_tree().create_timer(GameDirector.PRE_COUNTDOWN_DELAY).timeout
