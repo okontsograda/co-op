@@ -2739,35 +2739,77 @@ func toggle_stats_screen() -> void:
 	print("Stats screen shown for player ", name)
 
 
+## Convert weapon name to projectile type for ProjectileManager
+func _get_projectile_type() -> String:
+	# Map weapon names to projectile types
+	match equipped_weapon:
+		"bow":
+			return "arrow"
+		"rocket":
+			return "rocket"
+		_:
+			push_warning("Unknown weapon type: ", equipped_weapon, " - defaulting to arrow")
+			return "arrow"
+
+
+## Get weapon stats as dictionary for ProjectileManager
+func _get_weapon_stats_dict() -> Dictionary:
+	# Calculate final damage (base + flat + multiplier)
+	var final_damage = (attack_damage + weapon_stats.damage) * weapon_stats.damage_multiplier
+
+	return {
+		"damage": final_damage,
+		"speed": weapon_stats.arrow_speed,
+		"pierce_count": weapon_stats.pierce_count,
+		"crit_chance": weapon_stats.crit_chance,
+		"crit_multiplier": weapon_stats.crit_multiplier,
+		"explosion_chance": weapon_stats.explosion_chance,
+		"explosion_radius": weapon_stats.explosion_radius,
+		"explosion_damage": weapon_stats.explosion_damage if weapon_stats.explosion_damage > 0 else final_damage * 0.75,
+		"lifesteal": weapon_stats.lifesteal,
+		"poison_damage": weapon_stats.poison_damage,
+		"poison_duration": weapon_stats.poison_duration,
+		"homing_strength": weapon_stats.homing_strength
+	}
+
+
 ## CLIENT: Spawn visual-only projectile for instant feedback
 func spawn_projectile_visual(target_pos: Vector2) -> void:
-	# Calculate direction
-	var animated_sprite = get_node("AnimatedSprite2D")
-	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
-	var direction = (target_pos - sprite_position).normalized()
-
-	# Spawn visual projectile with is_visual_only flag
-	_internal_spawn_projectile(direction, true)
+	# Use ProjectileManager for clean API
+	ProjectileManager.spawn_visual_projectile(
+		self,
+		target_pos,
+		_get_projectile_type(),
+		_get_weapon_stats_dict()
+	)
 
 
 ## CLIENT: Request server to spawn authoritative projectile
 func request_projectile_spawn(target_pos: Vector2) -> void:
-	# Calculate direction for server validation
+	# Calculate spawn position and direction
 	var animated_sprite = get_node("AnimatedSprite2D")
 	var sprite_position = animated_sprite.global_position if animated_sprite else global_position
 	var direction = (target_pos - sprite_position).normalized()
 
-	# If we're the server, call directly instead of RPC
-	if multiplayer.is_server():
-		spawn_projectile_on_server(sprite_position, direction, multiplayer.get_unique_id())
-	else:
-		# Send request to server
-		rpc_id(1, "spawn_projectile_on_server", sprite_position, direction, multiplayer.get_unique_id())
+	print("Player: Requesting server projectile spawn - type: ", _get_projectile_type())
+
+	# Use ProjectileManager RPC
+	ProjectileManager.spawn_projectile.rpc(
+		sprite_position,
+		direction,
+		_get_projectile_type(),
+		multiplayer.get_unique_id(),
+		_get_weapon_stats_dict()
+	)
+
+	print("Player: RPC call completed")
 
 
+## DEPRECATED: Use ProjectileManager.spawn_projectile.rpc() instead
 ## SERVER: Validate and spawn authoritative projectile, broadcast to all clients
 @rpc("any_peer", "reliable")
 func spawn_projectile_on_server(spawn_pos: Vector2, direction: Vector2, shooter_peer_id: int) -> void:
+	push_warning("DEPRECATED: spawn_projectile_on_server() - Use ProjectileManager instead")
 	# Only server processes projectile spawning
 	if not multiplayer.is_server():
 		push_warning("Client attempted to call spawn_projectile_on_server directly")
@@ -2823,9 +2865,11 @@ func spawn_projectile_on_server(spawn_pos: Vector2, direction: Vector2, shooter_
 	shooter._internal_spawn_projectile(direction, false)
 
 
+## DEPRECATED: Use ProjectileManager.spawn_visual_projectile() or ProjectileManager.spawn_projectile.rpc() instead
 ## INTERNAL: Spawn projectile with visual-only or authoritative mode
 ## @param is_visual_only: If true, projectile is client-side visual feedback only (no damage)
 func _internal_spawn_projectile(direction: Vector2, is_visual_only: bool = false) -> void:
+	push_warning("DEPRECATED: _internal_spawn_projectile() - Use ProjectileManager instead")
 	# Ensure weapon is initialized (safety check for multiplayer)
 	if not current_weapon_config:
 		print("WARNING: Weapon not initialized for player ", name, ", initializing now...")

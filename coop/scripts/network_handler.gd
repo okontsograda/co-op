@@ -706,10 +706,19 @@ func spawn_single_enemy() -> void:
 	# Get enemy size from GameDirector (handles special events and wave scaling)
 	var enemy_size = get_random_enemy_size()
 
-	# Use RPC to spawn enemy on all clients with unique ID
-	enemy_id_counter += 1
-	var enemy_id = "Enemy_" + str(enemy_id_counter)
-	rpc("spawn_enemy_rpc", spawn_position, enemy_id, enemy_size)
+	# Use EnemyManager for clean API
+	EnemyManager.spawn_enemy.rpc(
+		spawn_position,
+		"mushroom",  # Enemy type
+		enemy_size,
+		current_wave,
+		false,  # is_boss
+		0,      # boss_health (not boss)
+		""      # boss_name (not boss)
+	)
+
+	# Track enemy count locally (EnemyManager doesn't track this)
+	current_enemy_count += 1
 
 	# Notify GameDirector that an enemy was spawned
 	GameDirector.on_enemy_spawned()
@@ -725,19 +734,28 @@ func spawn_boss() -> void:
 	var boss_health = GameDirector.get_boss_health()
 	var boss_name = GameDirector.get_random_boss_name()
 
-	# Generate unique boss ID
-	enemy_id_counter += 1
-	var boss_id = "Boss_" + str(enemy_id_counter)
+	# Use EnemyManager for clean API
+	EnemyManager.spawn_enemy.rpc(
+		spawn_position,
+		"mushroom",  # Enemy type (bosses use same base type)
+		boss_size,
+		current_wave,
+		true,  # is_boss
+		boss_health,
+		boss_name
+	)
 
-	# Use RPC to spawn boss on all clients
-	rpc("spawn_boss_rpc", spawn_position, boss_id, boss_size, boss_health, boss_name)
+	# Track enemy count locally
+	current_enemy_count += 1
 
 	# Notify GameDirector that an enemy was spawned
 	GameDirector.on_enemy_spawned()
 
 
+## DEPRECATED: Use EnemyManager.spawn_enemy.rpc() instead
 @rpc("any_peer", "reliable", "call_local")
 func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int) -> void:
+	push_warning("DEPRECATED: spawn_enemy_rpc() - Use EnemyManager instead")
 	var enemy_scene = preload("res://coop/scenes/enemy.tscn")
 	var enemy = enemy_scene.instantiate()
 
@@ -763,8 +781,10 @@ func spawn_enemy_rpc(spawn_position: Vector2, enemy_id: String, enemy_size: int)
 	current_enemy_count += 1
 
 
+## DEPRECATED: Use EnemyManager.spawn_enemy.rpc() instead
 @rpc("any_peer", "reliable", "call_local")
 func spawn_boss_rpc(spawn_position: Vector2, boss_id: String, boss_size: int, boss_health: int, boss_name: String) -> void:
+	push_warning("DEPRECATED: spawn_boss_rpc() - Use EnemyManager instead")
 	var enemy_scene = preload("res://coop/scenes/enemy.tscn")
 	var boss = enemy_scene.instantiate()
 
