@@ -923,8 +923,10 @@ func spawn_players_with_classes() -> void:
 		player.name = str(peer_id)
 
 		# Set spawn position
-		player.position = get_spawn_position_at_index(spawn_index)
+		var spawn_pos = get_spawn_position_at_index(spawn_index)
+		player.position = spawn_pos
 		spawn_index += 1
+		print("  [Server] Setting player ", peer_id, " spawn position to: ", spawn_pos)
 
 		# Store the player's selected class so player.gd can read it
 		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
@@ -934,12 +936,13 @@ func spawn_players_with_classes() -> void:
 
 		# Add player to scene
 		current_scene.add_child(player)
+		print("  [Server] Player ", peer_id, " added to scene tree")
 
 		# Register player with GameDirector for performance tracking
 		GameDirector.register_player(peer_id)
 		player_count += 1
 
-		print("Spawned player ", peer_id, " with class ", LobbyManager.players[peer_id]["class"], " and weapon ", LobbyManager.players[peer_id]["weapon"])
+		print("Spawned player ", peer_id, " with class ", LobbyManager.players[peer_id]["class"], " and weapon ", LobbyManager.players[peer_id]["weapon"], " at position ", spawn_pos)
 
 	# Update GameDirector with total player count
 	GameDirector.update_player_count(player_count)

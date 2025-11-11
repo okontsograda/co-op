@@ -114,12 +114,8 @@ var last_melee_attack_time: float = 0.0  # Track last melee attack for validatio
 var last_dash_strike_time: float = 0.0  # Track last dash strike for validation
 var last_projectile_spawn_time: float = 0.0  # Track last projectile spawn for validation
 
-# Multiplayer synchronization
-var sync_node: MultiplayerSynchronizer = null
-
-# Client-side interpolation for remote players
-var server_position: Vector2 = Vector2.ZERO  # Last position from server
-var interpolation_speed: float = 20.0  # How fast to lerp to server position (faster than enemies)
+# Multiplayer synchronization (configured in scene file player.tscn)
+# No additional variables needed - MultiplayerSynchronizer handles everything
 
 # Upgrade tracking - how many times each upgrade has been taken
 var upgrade_stacks = {}
@@ -172,7 +168,25 @@ func _ready() -> void:
 	add_to_group("players")
 
 	# Configure MultiplayerSynchronizer for efficient network sync
-	setup_multiplayer_sync()
+	# NOTE: MultiplayerSynchronizer is configured in the scene file (player.tscn)
+	# We just need to ensure authority is set correctly (done in _enter_tree)
+
+	# Set up the MultiplayerSynchronizer authority (should match player authority)
+	var pos_sync = get_node_or_null("MultiplayerSynchronizer")
+	if pos_sync:
+		pos_sync.set_multiplayer_authority(peer_id)
+		print("Player ", name, " MultiplayerSynchronizer authority set to ", peer_id)
+		print("  - Replication config: ", pos_sync.replication_config)
+		print("  - Root path: ", pos_sync.root_path)
+
+	# Set up the AnimatedSpriteSynchronizer authority
+	var anim_sync = get_node_or_null("AnimatedSpriteSynchronizer")
+	if anim_sync:
+		anim_sync.set_multiplayer_authority(peer_id)
+		print("Player ", name, " AnimatedSpriteSynchronizer authority set to ", peer_id)
+
+	# Log spawn position
+	print("Player ", name, " spawned at global_position: ", global_position, " (is_authority: ", is_multiplayer_authority(), ")")
 
 	# Initialize health bar, XP display, stamina bar, coin display, wave display, combo UI, and consumables
 	# Initialize interpolation position
@@ -290,22 +304,12 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	# Client-side interpolation for remote players (non-authority)
+	# Remote players (non-authority): Don't process locally, MultiplayerSynchronizer handles it
 	if !is_multiplayer_authority():
-		# Remote players: lerp to server position for smooth movement
-		# MultiplayerSynchronizer updates our actual global_position from server
-		# We store that as server_position and smoothly interpolate to it
-
-		# If position changed significantly from server, update target
-		if global_position.distance_squared_to(server_position) > 1.0:
-			server_position = global_position
-
-		# Smoothly interpolate visual position toward server position
-		# This creates smooth movement between server updates
-		global_position = global_position.lerp(server_position, interpolation_speed * _delta)
-
-		# Update z_index for proper depth sorting
+		# MultiplayerSynchronizer automatically updates global_position from server
+		# We only need to update z_index for proper depth sorting
 		z_index = int(global_position.y)
+		print_debug("Remote player ", name, " at position: ", global_position)
 		return
 
 	# Handle spectator camera if player is dead (not downed and not alive)
@@ -433,10 +437,17 @@ func _physics_process(_delta: float) -> void:
 	#print("Player ", name, " input detected: ", direction)
 
 	velocity = direction * current_speed
+	# Store old position for debugging
+	var old_pos = global_position
+
 	move_and_slide()
 
 	# Update z_index based on Y position for proper depth sorting
 	z_index = int(global_position.y)
+
+	# Log position changes for debugging (only for authority)
+	if global_position.distance_squared_to(old_pos) > 0.1:
+		print_debug("Player ", name, " moved from ", old_pos, " to ", global_position, " (authority: ", is_multiplayer_authority(), ")")
 
 	# Update animation based on movement
 	update_animation(direction)
@@ -1029,54 +1040,8 @@ func validate_float_bounds(value: float, min_val: float = -10000.0, max_val: flo
 ## ============================================================================
 ## MULTIPLAYER SYNCHRONIZATION
 ## ============================================================================
-
-## Configure MultiplayerSynchronizer for automatic property syncing
-func setup_multiplayer_sync() -> void:
-	# Check if we already have a MultiplayerSynchronizer (from scene)
-	sync_node = get_node_or_null("MultiplayerSynchronizer")
-
-	if not sync_node:
-		# Create MultiplayerSynchronizer programmatically
-		sync_node = MultiplayerSynchronizer.new()
-		sync_node.name = "MultiplayerSynchronizer"
-		add_child(sync_node)
-
-	# Set root path to this player node
-	sync_node.root_path = NodePath("..")
-
-	# Configure replication for smooth movement
-	sync_node.replication_interval = 0.0  # Sync as fast as possible (no throttling)
-	sync_node.delta_interval = 0.0  # Always sync position changes
-
-	# Enable visibility culling to reduce bandwidth
-	sync_node.visibility_update_mode = MultiplayerSynchronizer.VISIBILITY_PROCESS_IDLE
-
-	# Configure which properties to sync (only essential ones)
-	var config = SceneReplicationConfig.new()
-
-	# Sync position (most important for smooth movement)
-	config.add_property(".:global_position")
-	config.property_set_spawn(".:global_position", true)
-	config.property_set_replication_mode(".:global_position", SceneReplicationConfig.REPLICATION_MODE_ALWAYS)
-
-	# Sync health (for health bars on other clients)
-	config.add_property(".:current_health")
-	config.property_set_replication_mode(".:current_health", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
-
-	# Sync animation states (for visual consistency)
-	config.add_property(".:is_firing")
-	config.property_set_replication_mode(".:is_firing", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
-
-	config.add_property(".:is_dodging")
-	config.property_set_replication_mode(".:is_dodging", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
-
-	config.add_property(".:is_downed")
-	config.property_set_replication_mode(".:is_downed", SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
-
-	# Apply configuration
-	sync_node.replication_config = config
-
-	print("Player ", name, " MultiplayerSynchronizer configured")
+## NOTE: MultiplayerSynchronizer configuration is now in the scene file (player.tscn)
+## This provides better visibility and prevents conflicts between scene and code configs
 
 
 ## ============================================================================
