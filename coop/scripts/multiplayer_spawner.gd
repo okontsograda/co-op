@@ -7,7 +7,8 @@ var next_spawn_index: int = 0
 
 
 func _ready() -> void:
-	multiplayer.peer_connected.connect(spawn_player)
+	# Don't auto-spawn on peer_connected - let hub_scene.gd control spawning
+	# multiplayer.peer_connected.connect(spawn_player)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	spawned.connect(_on_player_spawned)
 
@@ -17,8 +18,7 @@ func _ready() -> void:
 	# Find all spawn points in the scene
 	find_spawn_points()
 
-	# Only spawn server player when we actually start hosting
-	# This prevents spawning before the server is created
+	print("[MultiplayerSpawner] Ready in scene: ", get_tree().current_scene.name if get_tree().current_scene else "unknown")
 
 
 func _on_peer_connected(peer_id: int) -> void:
@@ -79,9 +79,17 @@ func get_next_spawn_position() -> Vector2:
 
 func spawn_player(peer_id: int) -> void:
 	if !multiplayer.is_server():
+		print("[MultiplayerSpawner] Not server, skipping spawn for peer: ", peer_id)
 		return
 
-	print("Spawning player for peer: ", peer_id)
+	print("[MultiplayerSpawner] Spawning player for peer: ", peer_id)
+
+	# Check if player already exists
+	var existing_player = get_node(spawn_path).get_node_or_null(str(peer_id))
+	if existing_player:
+		print("[MultiplayerSpawner] Player ", peer_id, " already exists, skipping spawn")
+		return
+
 	var player: Node = network_player.instantiate()
 	player.name = str(peer_id)
 
@@ -91,13 +99,18 @@ func spawn_player(peer_id: int) -> void:
 	# Attach class selection metadata if available so clients can apply modifiers.
 	if LobbyManager and LobbyManager.players.has(peer_id):
 		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
+		print("[MultiplayerSpawner] Set class metadata: ", LobbyManager.players[peer_id]["class"])
+	else:
+		print("[MultiplayerSpawner] Warning: No LobbyManager data for peer ", peer_id)
 
-	get_node(spawn_path).call_deferred("add_child", player)
+	# Add child immediately (not deferred) for proper MultiplayerSpawner replication
+	get_node(spawn_path).add_child(player, true)
 	print(
-		"Player spawned for peer: ",
+		"[MultiplayerSpawner] Player spawned for peer: ",
 		peer_id,
 		" with name: ",
 		player.name,
 		" at position: ",
 		player.position
 	)
+	print("[MultiplayerSpawner] Player added to scene tree, should replicate to all clients")

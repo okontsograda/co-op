@@ -133,6 +133,8 @@ func _enter_tree() -> void:
 	var peer_id = name.to_int()
 	set_multiplayer_authority(peer_id)
 	print("Player ", name, " (peer ", peer_id, ") authority set in _enter_tree()")
+	print("  - Local peer ID: ", multiplayer.get_unique_id())
+	print("  - Is authority after set: ", is_multiplayer_authority())
 
 
 func _ready() -> void:
@@ -309,7 +311,6 @@ func _physics_process(_delta: float) -> void:
 		# MultiplayerSynchronizer automatically updates global_position from server
 		# We only need to update z_index for proper depth sorting
 		z_index = int(global_position.y)
-		print_debug("Remote player ", name, " at position: ", global_position)
 		return
 
 	# Handle spectator camera if player is dead (not downed and not alive)
@@ -444,10 +445,6 @@ func _physics_process(_delta: float) -> void:
 
 	# Update z_index based on Y position for proper depth sorting
 	z_index = int(global_position.y)
-
-	# Log position changes for debugging (only for authority)
-	if global_position.distance_squared_to(old_pos) > 0.1:
-		print_debug("Player ", name, " moved from ", old_pos, " to ", global_position, " (authority: ", is_multiplayer_authority(), ")")
 
 	# Update animation based on movement
 	update_animation(direction)

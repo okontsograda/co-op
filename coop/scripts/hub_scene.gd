@@ -44,18 +44,100 @@ func _ready():
 	# Connect interaction zones
 	_connect_interaction_zones()
 
-	# Spawn player
+	# Spawn players
 	if not is_multiplayer:
-		# Solo mode - spawn local player
+		# Solo mode - spawn local player directly
 		_spawn_solo_player()
-	elif multiplayer.is_server():
-		# Multiplayer mode - spawn server player
-		_spawn_server_player()
-	# Clients will be spawned by MultiplayerSpawner automatically
+		# Wait for player to spawn
+		await get_tree().create_timer(0.5).timeout
+		_find_local_player()
+	else:
+		# Multiplayer mode - use MultiplayerSpawner
+		await get_tree().create_timer(0.1).timeout  # Wait for spawner to initialize
+		var spawner = get_node_or_null("MultiplayerSpawner")
+		if spawner and multiplayer.is_server():
+			# Server spawns all players that are already in the lobby
+			print("[Hub] Server spawning existing players in lobby")
+			for player_peer_id in LobbyManager.players:
+				spawner.spawn_player(player_peer_id)
+			# Wait for players to spawn
+			await get_tree().create_timer(0.5).timeout
+			_find_local_player()
 
-	# Wait for player to spawn
-	await get_tree().create_timer(0.5).timeout
-	_find_local_player()
+			# Connect signal to spawn players when they join
+			if not multiplayer.peer_connected.is_connected(_on_peer_connected_to_hub):
+				multiplayer.peer_connected.connect(_on_peer_connected_to_hub)
+		else:
+			# Client - request server to spawn our player
+			print("[Hub] Client requesting player spawn from server (peer ID: ", multiplayer.get_unique_id(), ")")
+			print("[Hub] Sending RPC to server (peer 1)")
+			_request_spawn.rpc_id(1)  # Send to server
+			print("[Hub] RPC sent, waiting for player to spawn...")
+			_wait_for_local_player()
+
+
+# Server receives spawn request from client
+@rpc("any_peer", "reliable")
+func _request_spawn():
+	var requesting_peer = multiplayer.get_remote_sender_id()
+	print("[Hub] Received spawn request from peer: ", requesting_peer)
+
+	if multiplayer.is_server():
+		# Give the client a moment to fully initialize their scene
+		await get_tree().create_timer(0.2).timeout
+
+		var spawner = get_node_or_null("MultiplayerSpawner")
+		if spawner:
+			print("[Hub] Server spawning player for peer: ", requesting_peer)
+			spawner.spawn_player(requesting_peer)
+		else:
+			print("[Hub] ERROR: MultiplayerSpawner not found!")
+	else:
+		print("[Hub] _request_spawn called on non-server (peer ", multiplayer.get_unique_id(), "), ignoring")
+
+
+# Called when a peer connects (server only)
+func _on_peer_connected_to_hub(peer_id: int):
+	print("[Hub] Peer %d connected to hub, waiting for their spawn request..." % peer_id)
+
+
+func _wait_for_local_player():
+	# Check multiple times with increasing intervals for clients
+	var local_peer_id = multiplayer.get_unique_id()
+	var max_attempts = 20
+	var attempt = 0
+
+	while attempt < max_attempts:
+		var player_node = get_node_or_null(str(local_peer_id))
+		if player_node:
+			local_player = player_node
+			print("[Hub] Local player found: %d (attempt %d)" % [local_peer_id, attempt + 1])
+
+			# Make camera follow local player
+			if camera:
+				camera.reparent(local_player)
+				camera.position = Vector2.ZERO
+
+			# Disable combat abilities for hub
+			_disable_player_combat(local_player)
+			return
+
+		attempt += 1
+		var wait_time = 0.2 if attempt < 5 else 0.5
+
+		# Debug: list all children to see what nodes exist
+		if attempt % 5 == 0:  # Log every 5 attempts
+			print("[Hub] Available children in scene:")
+			for child in get_children():
+				print("  - ", child.name, " (", child.get_class(), ")")
+
+		print("[Hub] Waiting for player node '%s' (attempt %d/%d)" % [str(local_peer_id), attempt, max_attempts])
+		await get_tree().create_timer(wait_time).timeout
+
+	print("[Hub] ERROR: Failed to find local player '%s' after %d attempts" % [str(local_peer_id), max_attempts])
+	print("[Hub] Final scene children:")
+	for child in get_children():
+		print("  - ", child.name, " (", child.get_class(), ")")
 
 
 func _connect_interaction_zones():

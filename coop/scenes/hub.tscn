@@ -1,6 +1,8 @@
-[gd_scene load_steps=5 format=4 uid="uid://hub_scene_001"]
+[gd_scene load_steps=7 format=4 uid="uid://hub_scene_001"]
 
 [ext_resource type="Script" path="res://coop/scripts/hub_scene.gd" id="1_hub"]
+[ext_resource type="Script" path="res://coop/scripts/multiplayer_spawner.gd" id="2_spawner"]
+[ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/Characters/player.tscn" id="3_player"]
 [ext_resource type="PackedScene" path="res://coop/scenes/ui/hub_ui.tscn" id="4_hub_ui"]
 [ext_resource type="PackedScene" uid="uid://c28e7e3l0hneh" path="res://coop/scenes/tree_1.tscn" id="7_tree"]
 [ext_resource type="PackedScene" uid="uid://c7y8qm5jh3dpb" path="res://coop/scenes/shop_building.tscn" id="8_shop"]
@@ -33,6 +35,12 @@ color = Color(0.4, 0.6, 0.35, 1)
 
 [node name="SpawnPoint1" type="Marker2D" parent="SpawnPoints"]
 position = Vector2(550, 425)
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("uid://ewcge3xong6o")
+spawn_path = NodePath("..")
+script = ExtResource("2_spawner")
+network_player = ExtResource("3_player")
 
 [node name="Decorations" type="Node2D" parent="."]
 
