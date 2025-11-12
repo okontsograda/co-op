@@ -1,10 +1,10 @@
 extends Node2D
 
-# References to UI elements
-@onready var start_adventure_button = %StartAdventureButton
-@onready var upgrades_button = %UpgradesButton
-@onready var class_selection_button = %ClassSelectionButton
-@onready var players_container = %PlayersContainer
+# References to optional UI elements (may not exist in scene)
+@onready var start_adventure_button = get_node_or_null("%StartAdventureButton")
+@onready var upgrades_button = get_node_or_null("%UpgradesButton")
+@onready var class_selection_button = get_node_or_null("%ClassSelectionButton")
+@onready var players_container = get_node_or_null("%PlayersContainer")
 
 var is_host: bool = false
 var adventure_started: bool = false
@@ -13,7 +13,7 @@ func _ready() -> void:
 	# Check if we're the host
 	is_host = multiplayer.is_server()
 
-	# Setup UI based on role
+	# Setup UI based on role (if UI elements exist)
 	setup_ui()
 
 	# Connect signals
@@ -25,13 +25,17 @@ func _ready() -> void:
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
-	# Update players list
+	# Update players list (if UI exists)
 	update_players_list()
 
 	# Call NetworkHandler to spawn players
 	call_deferred("spawn_village_players")
 
 func setup_ui() -> void:
+	# Only update UI if button exists
+	if not start_adventure_button:
+		return
+
 	# Only host can start adventure in multiplayer
 	if multiplayer.has_multiplayer_peer() and not is_host:
 		start_adventure_button.text = "Waiting for Host..."
@@ -75,6 +79,10 @@ func transition_to_game() -> void:
 		get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
 
 func update_players_list() -> void:
+	# Only update if players container exists
+	if not players_container:
+		return
+
 	# Clear existing player labels
 	for child in players_container.get_children():
 		child.queue_free()

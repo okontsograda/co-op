@@ -1,11 +1,10 @@
-[gd_scene load_steps=14 format=4 uid="uid://bp6eh14kp4f5u"]
+[gd_scene load_steps=13 format=4 uid="uid://bp6eh14kp4f5u"]
 
 [ext_resource type="Script" uid="uid://hwu7kfbbnu5o" path="res://coop/scripts/village.gd" id="1"]
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="2_3erh3"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="3_fkudx"]
 [ext_resource type="Texture2D" uid="uid://cahw3s4aldoc2" path="res://tileset/TX Props.png" id="4_fkudx"]
 [ext_resource type="Script" path="res://coop/scripts/teleport_pad.gd" id="5_ro7bh"]
-[ext_resource type="PackedScene" uid="uid://dw46rqb13phno" path="res://coop/scenes/invite_board.tscn" id="6_osm3e"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ro7bh"]
 texture = ExtResource("2_3erh3")
@@ -1178,7 +1177,3 @@ script = ExtResource("5_ro7bh")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="TeleportPad"]
 position = Vector2(303, 385)
 shape = SubResource("CircleShape2D_osm3e")
-
-[node name="InviteBoard" parent="." instance=ExtResource("6_osm3e")]
-z_index = 1
-position = Vector2(603, 359)

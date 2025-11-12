@@ -3,15 +3,13 @@ extends Control
 
 func _ready():
 	# Connect button signals
-	$VBoxContainer/PlayLocalButton.pressed.connect(_on_play_local_pressed)
-	$VBoxContainer/HostButton.pressed.connect(_on_host_pressed)
-	$VBoxContainer/JoinButton.pressed.connect(_on_join_pressed)
+	$VBoxContainer/StartGameButton.pressed.connect(_on_start_game_pressed)
 	$VBoxContainer/ExitButton.pressed.connect(_on_exit_pressed)
-	
+
 	# Connect name input signals
 	%NameInput.text_changed.connect(_on_name_changed)
 	%NameInput.text_submitted.connect(_on_name_submitted)
-	
+
 	# Load saved player name
 	_load_player_name()
 
@@ -49,29 +47,10 @@ func _on_name_submitted(new_text: String) -> void:
 		print("[MainMenu] Player name saved: ", sanitized)
 
 
-func _on_host_pressed() -> void:
-	print("Host button pressed")
-	# Start server which will transition to lobby
-	NetworkHandler.start_server()
-
-
-func _on_join_pressed() -> void:
-	var host_id = $VBoxContainer/HostIDInput.text.strip_edges()
-
-	if host_id.is_empty():
-		print("ERROR: No host ID provided")
-		# TODO: Show error message to user
-		return
-
-	print("Join button pressed with host ID: ", host_id)
-	# Join server which will transition to lobby
-	NetworkHandler.start_client(host_id)
-
-
-func _on_play_local_pressed() -> void:
-	print("Play Local button pressed")
-	# Go to class selection screen
-	get_tree().change_scene_to_file("res://coop/scenes/local_class_selection.tscn")
+func _on_start_game_pressed() -> void:
+	print("Start Game button pressed")
+	# Start local game in village with knight class
+	NetworkHandler.start_local_game_with_class("knight")
 
 
 func _on_exit_pressed() -> void:

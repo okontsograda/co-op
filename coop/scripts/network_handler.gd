@@ -1140,28 +1140,37 @@ func spawn_peer_in_village(peer_id: int) -> void:
 	if not multiplayer.is_server():
 		return
 
+	print("[HOST] spawn_peer_in_village called for peer ", peer_id)
+
 	var current_scene := get_tree().current_scene
 	if current_scene == null or current_scene.name != "Village":
-		print("Not in village scene, ignoring spawn request")
+		print("[HOST] Not in village scene, ignoring spawn request")
 		return
 
 	# Check if player is already spawned
 	if current_scene.get_node_or_null(str(peer_id)):
-		print("Player ", peer_id, " already spawned in village")
+		print("[HOST] Player ", peer_id, " already spawned in village")
 		return
 
 	# Check if player data exists
 	if not LobbyManager.players.has(peer_id):
-		print("No player data for peer ", peer_id)
-		return
+		print("[HOST] No player data for peer ", peer_id, " - waiting for registration...")
+		# Wait a bit and retry
+		await get_tree().create_timer(0.3).timeout
+		if not LobbyManager.players.has(peer_id):
+			print("[HOST] ERROR: Still no player data for peer ", peer_id)
+			return
+
+	print("[HOST] Spawning peer ", peer_id, " with data: ", LobbyManager.players[peer_id])
 
 	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
 	var player = player_scene.instantiate()
 	player.name = str(peer_id)
 
 	# Find next available spawn position
-	var spawn_index = current_scene.get_node("SpawnPoints").get_child_count() - 1
+	var spawn_index = LobbyManager.players.size() - 1
 	player.position = get_spawn_position_at_index(spawn_index)
+	print("[HOST] Spawn position for peer ", peer_id, ": ", player.position)
 
 	# Store the player's selected class and weapon
 	player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
@@ -1170,7 +1179,56 @@ func spawn_peer_in_village(peer_id: int) -> void:
 	# Add player to scene
 	current_scene.add_child(player)
 
-	print("Spawned new peer ", peer_id, " in village")
+	print("[HOST] Spawned new peer ", peer_id, " in village on host side")
+
+	# Sync LobbyManager data and tell all clients to spawn all players
+	var players_data = LobbyManager.players.duplicate(true)
+	sync_village_players.rpc(players_data)
+
+
+@rpc("authority", "call_local", "reliable")
+func sync_village_players(players_data: Dictionary) -> void:
+	# Called on all clients to sync LobbyManager and spawn all players
+	print("[CLIENT] sync_village_players called")
+	print("[CLIENT] Received players_data: ", players_data)
+
+	# Update local LobbyManager with server's player data
+	LobbyManager.players = players_data.duplicate(true)
+	print("[CLIENT] Updated LobbyManager.players: ", LobbyManager.players)
+
+	var current_scene := get_tree().current_scene
+	if not current_scene or current_scene.name != "Village":
+		print("[CLIENT] Not in village scene yet")
+		return
+
+	# Spawn all players that should exist
+	for peer_id in LobbyManager.players:
+		# Check if player is already spawned
+		if current_scene.get_node_or_null(str(peer_id)):
+			print("[CLIENT] Player ", peer_id, " already spawned")
+			continue
+
+		print("[CLIENT] Spawning player ", peer_id)
+		var player_scene = preload("res://coop/scenes/Characters/player.tscn")
+		var player = player_scene.instantiate()
+		player.name = str(peer_id)
+
+		# Calculate spawn position
+		var spawn_index = 0
+		var players_list = LobbyManager.players.keys()
+		players_list.sort()
+		spawn_index = players_list.find(peer_id)
+
+		player.position = get_spawn_position_at_index(spawn_index)
+
+		# Store the player's selected class and weapon
+		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
+		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
+
+		# Add player to scene
+		current_scene.add_child(player)
+
+		print("[CLIENT] Spawned player ", peer_id, " at ", player.position)
 
 
 func transition_from_village_to_game() -> void:
@@ -1211,3 +1269,208 @@ func transition_from_village_to_game() -> void:
 		print("GameDirector: Updated player count to ", player_count)
 
 	print("Village to game transition complete!")
+
+
+# ===== VILLAGE HOSTING =====
+
+func start_hosting_in_village() -> String:
+	# Start hosting while already in the village scene
+	# Returns the host ID for display
+	print("Starting hosting from village...")
+
+	# Check if already hosting on the NETWORK (not just offline)
+	var current_peer = multiplayer.multiplayer_peer
+	var is_network_host = current_peer != null and not (current_peer is OfflineMultiplayerPeer) and multiplayer.is_server()
+
+	if is_network_host:
+		print("Already hosting with ID: ", peer.online_id)
+		return peer.online_id
+
+	print("Converting local game to network host...")
+
+	# Ensure relay connection is established
+	if peer.connection_state != 2:
+		print("Waiting for relay connection...")
+		await peer.relay_connected
+		print("Relay connected!")
+
+	# Store current player data (knight class by default if not set)
+	var old_local_id = multiplayer.get_unique_id()
+	print("Old local peer ID: ", old_local_id)
+
+	# Get player data before switching peer
+	var player_name = SaveSystem.get_player_name()
+	var player_data = {
+		"class": "knight",
+		"weapon": "sword",
+		"ready": true,
+		"is_host": true,
+		"player_name": player_name
+	}
+
+	# Start hosting on the network
+	print("Starting host() call...")
+	print("Peer connection state before host(): ", peer.connection_state)
+	print("Current multiplayer peer type: ", multiplayer.multiplayer_peer)
+
+	# IMPORTANT: Set the NodeTunnelPeer as the active multiplayer peer BEFORE calling host()
+	print("Setting NodeTunnelPeer as multiplayer peer...")
+	multiplayer.multiplayer_peer = peer
+	print("Multiplayer peer set. Peer ID before hosting: ", multiplayer.get_unique_id())
+
+	peer.host()
+	print("host() called, waiting for hosting signal...")
+	await peer.hosting
+	print("Got hosting signal!")
+	print("New peer ID after hosting: ", multiplayer.get_unique_id())
+	print("Hosting successful in village, online ID: ", peer.online_id)
+
+	# Now we have a new peer ID (should be 1 for host)
+	var new_host_id = multiplayer.get_unique_id()
+	print("New host peer ID: ", new_host_id)
+
+	# Clear old lobby data and register with new ID
+	LobbyManager.players.clear()
+	LobbyManager.players[new_host_id] = player_data
+	print("Registered as network host with ID: ", new_host_id)
+
+	# Copy to clipboard for convenience
+	DisplayServer.clipboard_set(peer.online_id)
+
+	# Connect to peer signals
+	if not multiplayer.peer_connected.is_connected(_on_peer_connected_village):
+		multiplayer.peer_connected.connect(_on_peer_connected_village)
+	if not multiplayer.peer_disconnected.is_connected(_on_peer_disconnected):
+		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+
+	# Respawn the host player with new peer ID
+	print("Respawning host player...")
+	var current_scene = get_tree().current_scene
+	if current_scene:
+		# Remove old player node
+		var old_player = current_scene.get_node_or_null(str(old_local_id))
+		if old_player:
+			old_player.queue_free()
+
+		# Spawn with new host ID
+		await get_tree().create_timer(0.1).timeout
+		spawn_players_in_village()
+
+	print("Village hosting ready! Host ID: ", peer.online_id)
+	return peer.online_id
+
+
+func _on_peer_connected_village(peer_id: int) -> void:
+	# Handle new peer connecting to village
+	print("Peer ", peer_id, " connected to village host")
+
+	# Wait a moment for the peer to be fully registered
+	await get_tree().create_timer(0.5).timeout
+
+	# Check if we're in village scene
+	var current_scene = get_tree().current_scene
+	print("Current scene name: ", current_scene.name if current_scene else "null")
+	print("LobbyManager.players: ", LobbyManager.players)
+
+	if current_scene and current_scene.name == "Village":
+		# Spawn the new peer in the village
+		print("Calling spawn_peer_in_village for peer ", peer_id)
+		spawn_peer_in_village(peer_id)
+	else:
+		print("Not in village scene (scene: ", current_scene.name if current_scene else "null", "), peer will spawn when scene loads")
+
+
+func join_village_host(host_id: String) -> void:
+	# Join a host who is in the village
+	print("Joining village host: ", host_id)
+
+	# Validate host ID
+	if not host_id or host_id.is_empty():
+		print("ERROR: No host ID provided")
+		return
+
+	# Ensure relay connection is established
+	print("Checking relay connection state: ", peer.connection_state)
+	if peer.connection_state != 2:
+		print("Waiting for relay connection...")
+		await peer.relay_connected
+		print("Relay connected! State: ", peer.connection_state)
+	else:
+		print("Relay already connected")
+
+	# Store player data (knight class by default for now)
+	var player_name = SaveSystem.get_player_name()
+
+	# Get old peer ID before switching
+	var old_local_id = multiplayer.get_unique_id()
+	print("Old local peer ID: ", old_local_id)
+
+	# IMPORTANT: Set the NodeTunnelPeer as the active multiplayer peer BEFORE calling join()
+	print("Current multiplayer peer type: ", multiplayer.multiplayer_peer)
+	print("Setting NodeTunnelPeer as multiplayer peer...")
+	multiplayer.multiplayer_peer = peer
+	print("Multiplayer peer set. Peer ID before joining: ", multiplayer.get_unique_id())
+
+	# Join the host
+	print("Starting join() call with host ID: ", host_id)
+	print("Current peer online_id: ", peer.online_id)
+	peer.join(host_id)
+	print("join() called, waiting for 'joined' signal...")
+
+	await peer.joined
+	print("Got joined signal!")
+	print("Successfully joined village host! Peer ID: ", multiplayer.get_unique_id())
+
+	# Register player in LobbyManager
+	var local_id = multiplayer.get_unique_id()
+	LobbyManager.players[local_id] = {
+		"class": "knight",
+		"weapon": "sword",
+		"ready": true,
+		"is_host": false,
+		"player_name": player_name
+	}
+
+	# Notify server about player data
+	print("Sending player registration to host...")
+	register_player_with_host.rpc_id(1, local_id, player_name, "knight", "sword")
+
+	# Remove old local player from scene before transitioning
+	print("Removing old local player...")
+	var current_scene = get_tree().current_scene
+	if current_scene:
+		var old_player = current_scene.get_node_or_null(str(old_local_id))
+		if old_player:
+			old_player.queue_free()
+			print("Removed old player with ID: ", old_local_id)
+
+	# Change to village scene
+	print("Changing to village scene...")
+	get_tree().change_scene_to_file("res://coop/scenes/village.tscn")
+
+	# Wait for scene to load
+	await get_tree().create_timer(0.3).timeout
+
+	print("Joined village successfully! Waiting for host to spawn us...")
+
+
+@rpc("any_peer", "reliable")
+func register_player_with_host(peer_id: int, player_name: String, player_class: String, weapon: String) -> void:
+	# Server receives player data from joining client
+	if not multiplayer.is_server():
+		return
+
+	print("Registering player ", peer_id, " with host - Name: ", player_name, ", Class: ", player_class)
+
+	LobbyManager.players[peer_id] = {
+		"class": player_class,
+		"weapon": weapon,
+		"ready": true,
+		"is_host": false,
+		"player_name": player_name
+	}
+
+	# Update village UI if available
+	var current_scene = get_tree().current_scene
+	if current_scene and current_scene.has_method("update_players_list"):
+		current_scene.update_players_list()

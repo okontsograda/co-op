@@ -60,38 +60,10 @@ max_length = 20
 layout_mode = 2
 custom_minimum_size = Vector2(0, 20)
 
-[node name="PlayLocalButton" type="Button" parent="VBoxContainer"]
+[node name="StartGameButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 50)
-text = "Play Local"
-
-[node name="Spacer1c" type="Control" parent="VBoxContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 10)
-
-[node name="HostButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "Host Game"
-
-[node name="Spacer2" type="Control" parent="VBoxContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 10)
-
-[node name="JoinLabel" type="Label" parent="VBoxContainer"]
-layout_mode = 2
-text = "Join Game"
-horizontal_alignment = 1
-
-[node name="HostIDInput" type="LineEdit" parent="VBoxContainer"]
-layout_mode = 2
-placeholder_text = "Enter Host ID..."
-alignment = 1
-
-[node name="JoinButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "Join"
+text = "Start Game"
 
 [node name="Spacer3" type="Control" parent="VBoxContainer"]
 layout_mode = 2
