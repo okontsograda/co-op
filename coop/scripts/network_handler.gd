@@ -3,7 +3,12 @@ extends Node
 const IP_ADDRESS: String = "localhost"
 const PORT: int = 42069
 
+enum HubLaunchMode { NONE, HOSTING, CLIENT, SOLO }
+
 var peer = NodeTunnelPeer.new()
+var hub_launch_mode: HubLaunchMode = HubLaunchMode.NONE
+var pending_client_host_id: String = ""
+var current_hub_scene: Node = null
 
 # Enemy spawning variables
 var enemy_spawn_timer: Timer = null
@@ -1118,6 +1123,7 @@ func get_spawn_position_at_index(index: int) -> Vector2:
 ## Start server and enter hub
 func start_server_to_hub() -> void:
 	print("Starting server, transitioning to hub...")
+	hub_launch_mode = HubLaunchMode.HOSTING
 
 	# Ensure relay connection
 	if peer.connection_state != 2:
@@ -1148,28 +1154,18 @@ func start_client_to_hub(host_id: String) -> void:
 		print("No host ID provided")
 		return
 
-	print("Starting client, joining hub...")
+	print("Preparing to join host ", host_id, ", loading hub scene first...")
+	hub_launch_mode = HubLaunchMode.CLIENT
+	pending_client_host_id = host_id
 
-	# Ensure relay connection
-	if peer.connection_state != 2:
-		print("Waiting for relay connection...")
-		await peer.relay_connected
-
-	# Join the host
-	peer.join(host_id)
-	await peer.joined
-	print("Client successfully connected to ", host_id)
-
-	# Initialize LobbyManager with host ID
-	LobbyManager.enter_lobby(host_id)
-
-	# Go to hub scene
+	# Go to hub scene; actual network join will happen once the scene is ready
 	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
 
 
 ## Start solo hub (offline mode)
 func start_solo_hub() -> void:
 	print("Starting solo hub (offline mode)")
+	hub_launch_mode = HubLaunchMode.SOLO
 
 	# Clear any existing multiplayer peer
 	if multiplayer.has_multiplayer_peer():
@@ -1227,3 +1223,43 @@ func _calculate_meta_currency_reward(wave: int, kills: int) -> int:
 	reward += int(kills / 5)
 
 	return reward
+
+
+func notify_hub_scene_ready(hub_scene: Node) -> void:
+	current_hub_scene = hub_scene
+
+	match hub_launch_mode:
+		HubLaunchMode.SOLO:
+			hub_scene.call_deferred("initialize_solo_mode")
+		HubLaunchMode.HOSTING:
+			hub_scene.call_deferred("initialize_host_mode")
+		HubLaunchMode.CLIENT:
+			await _prepare_client_join_for_hub(hub_scene)
+		_:
+			print("[NetworkHandler] Hub scene ready with no launch mode set")
+
+	hub_launch_mode = HubLaunchMode.NONE
+
+
+func _prepare_client_join_for_hub(hub_scene: Node) -> void:
+	await _ensure_relay_connected()
+
+	print("Starting client, joining hub after scene is ready...")
+	peer.join(pending_client_host_id)
+	await peer.joined
+	print("Client successfully connected to ", pending_client_host_id)
+
+	# Initialize LobbyManager with host ID
+	LobbyManager.enter_lobby(pending_client_host_id)
+	pending_client_host_id = ""
+
+	# Now that networking is active, initialize multiplayer flow in the hub
+	hub_scene.call_deferred("initialize_client_mode")
+
+
+func _ensure_relay_connected() -> void:
+	if peer.connection_state == 2:
+		return
+
+	print("Waiting for relay connection...")
+	await peer.relay_connected

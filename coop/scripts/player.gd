@@ -125,20 +125,32 @@ var active_abilities = []
 
 # Sound effects
 var bow_sound_player: AudioStreamPlayer2D = null
+var owning_peer_id: int = 0
+
+
+func _determine_peer_id() -> int:
+	if has_meta("peer_id"):
+		return int(get_meta("peer_id"))
+
+	var node_name := str(name)
+	if node_name.is_valid_int():
+		return node_name.to_int()
+
+	return multiplayer.get_unique_id()
 
 
 func _enter_tree() -> void:
-	# Set authority based on the player's name (peer ID)
-	# This MUST happen in _enter_tree() for MultiplayerSynchronizers to work
-	var peer_id = name.to_int()
-	set_multiplayer_authority(peer_id)
-	print("Player ", name, " (peer ", peer_id, ") authority set in _enter_tree()")
+	# Set authority based on the owning peer ID (provided by MultiplayerSpawner)
+	owning_peer_id = _determine_peer_id()
+	set_multiplayer_authority(owning_peer_id)
+	set_meta("peer_id", owning_peer_id)
+	print("Player ", name, " (peer ", owning_peer_id, ") authority set in _enter_tree()")
 	print("  - Local peer ID: ", multiplayer.get_unique_id())
 	print("  - Is authority after set: ", is_multiplayer_authority())
 
 
 func _ready() -> void:
-	var peer_id = name.to_int()
+	var peer_id = owning_peer_id if owning_peer_id != 0 else _determine_peer_id()
 
 	# Load player name from save system (only for local player)
 	if is_multiplayer_authority():

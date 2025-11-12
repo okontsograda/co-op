@@ -19,61 +19,81 @@ var local_player: Node2D = null
 var active_ui: String = ""
 
 
+func _enter_tree():
+	# Ensure SceneMultiplayer resolves nodes relative to this scene on every peer
+	var tree_mp = get_tree().get_multiplayer()
+	if tree_mp:
+		tree_mp.root_path = NodePath("/root")
+
+
 func _ready():
 	print("[Hub] Hub scene initialized")
 
-	# Initialize HubManager
-	var is_multiplayer = multiplayer.has_multiplayer_peer()
-	HubManager.initialize_hub(is_multiplayer)
+	# Connect interaction zones
+	_connect_interaction_zones()
 
-	# Register local player in hub
+	await NetworkHandler.notify_hub_scene_ready(self)
+
+
+func initialize_host_mode():
+	print("[Hub] Initializing host hub mode")
 	var peer_id = multiplayer.get_unique_id()
+	_prepare_hub_state(true, peer_id, true)
+
+	await get_tree().create_timer(0.1).timeout
+	var spawner = get_node_or_null("MultiplayerSpawner")
+	if spawner and multiplayer.is_server():
+		print("[Hub] Server spawning existing players in lobby")
+		for player_peer_id in LobbyManager.players:
+			spawner.spawn_player(player_peer_id)
+
+		await get_tree().create_timer(0.5).timeout
+		await _find_local_player()
+
+		if not multiplayer.peer_connected.is_connected(_on_peer_connected_to_hub):
+			multiplayer.peer_connected.connect(_on_peer_connected_to_hub)
+	else:
+		push_error("[Hub] MultiplayerSpawner not available for host mode!")
+
+
+func initialize_client_mode():
+	print("[Hub] Initializing client hub mode")
+	var peer_id = multiplayer.get_unique_id()
+	_prepare_hub_state(true, peer_id, false)
+
+	await get_tree().create_timer(0.1).timeout
+
+	print("[Hub] Client requesting player spawn from server (peer ID: ", peer_id, ")")
+	print("[Hub] Sending RPC to server (peer 1)")
+	_request_spawn.rpc_id(1)
+	print("[Hub] RPC sent, waiting for player to spawn...")
+	await _wait_for_local_player()
+
+
+func initialize_solo_mode():
+	print("[Hub] Initializing solo hub mode")
+	var peer_id = multiplayer.get_unique_id()
+	_prepare_hub_state(false, peer_id, true)
+	_spawn_solo_player()
+	await get_tree().create_timer(0.5).timeout
+	await _find_local_player()
+
+
+func _prepare_hub_state(is_multiplayer: bool, peer_id: int, is_host: bool) -> void:
+	HubManager.initialize_hub(is_multiplayer)
 	HubManager.register_player(peer_id)
 
-	# Set up LobbyManager player data if not exists
 	if peer_id not in LobbyManager.players:
 		var loadout = SaveSystem.get_last_loadout()
 		LobbyManager.players[peer_id] = {
 			"class": loadout.class,
 			"weapon": loadout.weapon,
 			"ready": false,
-			"is_host": multiplayer.is_server(),
+			"is_host": is_host,
 			"player_name": SaveSystem.get_player_name()
 		}
-
-	# Connect interaction zones
-	_connect_interaction_zones()
-
-	# Spawn players
-	if not is_multiplayer:
-		# Solo mode - spawn local player directly
-		_spawn_solo_player()
-		# Wait for player to spawn
-		await get_tree().create_timer(0.5).timeout
-		_find_local_player()
 	else:
-		# Multiplayer mode - use MultiplayerSpawner
-		await get_tree().create_timer(0.1).timeout  # Wait for spawner to initialize
-		var spawner = get_node_or_null("MultiplayerSpawner")
-		if spawner and multiplayer.is_server():
-			# Server spawns all players that are already in the lobby
-			print("[Hub] Server spawning existing players in lobby")
-			for player_peer_id in LobbyManager.players:
-				spawner.spawn_player(player_peer_id)
-			# Wait for players to spawn
-			await get_tree().create_timer(0.5).timeout
-			_find_local_player()
-
-			# Connect signal to spawn players when they join
-			if not multiplayer.peer_connected.is_connected(_on_peer_connected_to_hub):
-				multiplayer.peer_connected.connect(_on_peer_connected_to_hub)
-		else:
-			# Client - request server to spawn our player
-			print("[Hub] Client requesting player spawn from server (peer ID: ", multiplayer.get_unique_id(), ")")
-			print("[Hub] Sending RPC to server (peer 1)")
-			_request_spawn.rpc_id(1)  # Send to server
-			print("[Hub] RPC sent, waiting for player to spawn...")
-			_wait_for_local_player()
+		LobbyManager.players[peer_id]["is_host"] = is_host
 
 
 # Server receives spawn request from client
@@ -108,7 +128,7 @@ func _wait_for_local_player():
 	var attempt = 0
 
 	while attempt < max_attempts:
-		var player_node = get_node_or_null(str(local_peer_id))
+		var player_node = _get_player_node_by_peer(local_peer_id)
 		if player_node:
 			local_player = player_node
 			print("[Hub] Local player found: %d (attempt %d)" % [local_peer_id, attempt + 1])
@@ -198,7 +218,7 @@ func _spawn_player_internal(peer_id: int):
 func _find_local_player():
 	# Find the player node that belongs to this peer
 	var peer_id = multiplayer.get_unique_id()
-	var player_node = get_node_or_null(str(peer_id))
+	var player_node = _get_player_node_by_peer(peer_id)
 
 	if player_node:
 		local_player = player_node
@@ -215,6 +235,20 @@ func _find_local_player():
 		print("[Hub] Warning: Local player not found. Retrying...")
 		await get_tree().create_timer(0.5).timeout
 		_find_local_player()
+
+
+func _get_player_node_by_peer(peer_id: int) -> Node2D:
+	var node = get_node_or_null(str(peer_id))
+	if node and node is Node2D:
+		return node
+
+	for player in get_tree().get_nodes_in_group("players"):
+		if str(player.name) == str(peer_id):
+			return player
+		if player.has_meta("peer_id") and int(player.get_meta("peer_id")) == peer_id:
+			return player
+
+	return null
 
 
 func _disable_player_combat(player: Node2D):

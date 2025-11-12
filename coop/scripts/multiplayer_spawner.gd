@@ -11,6 +11,8 @@ func _ready() -> void:
 	# multiplayer.peer_connected.connect(spawn_player)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	spawned.connect(_on_player_spawned)
+	if spawn_function.is_null():
+		spawn_function = Callable(self, "_custom_spawn")
 
 	# Add to group so it can be found by the initial UI
 	add_to_group("multiplayer_spawner")
@@ -52,6 +54,34 @@ func _on_player_spawned(node: Node) -> void:
 	print("Player visible: ", node.visible)
 
 
+func _custom_spawn(data: Dictionary) -> Node:
+	var player_scene: PackedScene = network_player
+	if player_scene == null:
+		if _spawnable_scenes.is_empty():
+			push_error("[MultiplayerSpawner] No player scene configured for spawning")
+			return null
+		player_scene = ResourceLoader.load(_spawnable_scenes[0])
+
+	var player = player_scene.instantiate()
+	_configure_spawned_player(player, data)
+	return player
+
+
+func _configure_spawned_player(player: Node, data: Dictionary) -> void:
+	var peer_id: int = data.get("peer_id", 0)
+	player.name = str(peer_id)
+	player.set_meta("peer_id", peer_id)
+
+	if player is Node2D:
+		var spawn_pos: Vector2 = data.get("position", Vector2.ZERO)
+		player.position = spawn_pos
+
+	if data.has("class"):
+		player.set_meta("selected_class", data["class"])
+	if data.has("weapon"):
+		player.set_meta("selected_weapon", data["weapon"])
+
+
 # Server player spawning is now handled by initial_ui.gd when hosting starts
 
 
@@ -90,27 +120,29 @@ func spawn_player(peer_id: int) -> void:
 		print("[MultiplayerSpawner] Player ", peer_id, " already exists, skipping spawn")
 		return
 
-	var player: Node = network_player.instantiate()
-	player.name = str(peer_id)
+	var spawn_pos = get_next_spawn_position()
 
-	# Set spawn position
-	player.position = get_next_spawn_position()
-
-	# Attach class selection metadata if available so clients can apply modifiers.
+	var selected_class := "archer"
+	var selected_weapon := "bow"
 	if LobbyManager and LobbyManager.players.has(peer_id):
-		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
-		print("[MultiplayerSpawner] Set class metadata: ", LobbyManager.players[peer_id]["class"])
+		var player_data: Dictionary = LobbyManager.players[peer_id]
+		selected_class = player_data.get("class", selected_class)
+		selected_weapon = player_data.get("weapon", selected_weapon)
 	else:
 		print("[MultiplayerSpawner] Warning: No LobbyManager data for peer ", peer_id)
 
-	# Add child immediately (not deferred) for proper MultiplayerSpawner replication
-	get_node(spawn_path).add_child(player, true)
-	print(
-		"[MultiplayerSpawner] Player spawned for peer: ",
-		peer_id,
-		" with name: ",
-		player.name,
-		" at position: ",
-		player.position
-	)
-	print("[MultiplayerSpawner] Player added to scene tree, should replicate to all clients")
+	var spawn_data = {
+		"peer_id": peer_id,
+		"position": spawn_pos,
+		"class": selected_class,
+		"weapon": selected_weapon
+	}
+
+	var player = spawn(spawn_data)
+	if player:
+		print("[MultiplayerSpawner] Player spawned for peer: ", peer_id, " with name: ", player.name, " at position: ", player.position)
+		player.set_meta("peer_id", peer_id)
+		player.set_meta("selected_class", selected_class)
+		player.set_meta("selected_weapon", selected_weapon)
+	else:
+		push_error("[MultiplayerSpawner] spawn() returned null for peer " + str(peer_id))
