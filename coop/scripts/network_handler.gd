@@ -1100,135 +1100,96 @@ func get_spawn_position_at_index(index: int) -> Vector2:
 # ===== VILLAGE SCENE SPAWNING =====
 
 func spawn_players_in_village() -> void:
-	# Spawn players in the village scene
+	# MultiplayerSpawner script handles spawning automatically via peer_connected signal
+	# We just need to trigger it for existing peers
 	if not multiplayer.is_server():
 		return
 
-	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
-	var spawn_index = 0
+	print("[HOST] spawn_players_in_village called - letting MultiplayerSpawner handle it")
+
 	var current_scene := get_tree().current_scene
 	if current_scene == null:
-		print("ERROR: No current scene available for spawning players")
+		print("ERROR: No current scene available")
 		return
 
+	# Get the MultiplayerSpawner
+	var spawner = current_scene.get_node_or_null("MultiplayerSpawner")
+	if not spawner:
+		print("ERROR: MultiplayerSpawner not found in village scene!")
+		return
+
+	print("[HOST] Found MultiplayerSpawner")
+
+	# The spawner script will handle spawning via the spawn_player() method
+	# We just need to call it for each peer
 	for peer_id in LobbyManager.players:
-		# Avoid spawning duplicates
-		if current_scene.get_node_or_null(str(peer_id)):
+		# Do thorough check for existing players to prevent duplicates
+		var existing_players = []
+		for child in current_scene.get_children():
+			if child.name == str(peer_id) or child.name.to_int() == peer_id:
+				existing_players.append(child)
+
+		if existing_players.size() > 0:
+			print("[HOST] Found ", existing_players.size(), " existing player(s) with ID ", peer_id)
+			# Remove duplicates, keeping only the first one
+			for i in range(1, existing_players.size()):
+				print("[HOST] Removing duplicate player: ", existing_players[i].name)
+				existing_players[i].queue_free()
+			print("[HOST] Player ", peer_id, " already spawned, skipping")
 			continue
 
-		var player = player_scene.instantiate()
-		player.name = str(peer_id)
-
-		# Set spawn position
-		player.position = get_spawn_position_at_index(spawn_index)
-		spawn_index += 1
-
-		# Store the player's selected class
-		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
-
-		# Store the player's selected weapon
-		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
-
-		# Add player to scene
-		current_scene.add_child(player)
-
-		print("Spawned player ", peer_id, " in village with class ", LobbyManager.players[peer_id]["class"])
+		print("[HOST] Triggering spawn for peer ", peer_id)
+		if spawner.has_method("spawn_player"):
+			spawner.spawn_player(peer_id)
+		else:
+			print("[HOST] ERROR: MultiplayerSpawner missing spawn_player method!")
 
 
 func spawn_peer_in_village(peer_id: int) -> void:
-	# Spawn a specific peer in the village (when they join mid-game)
+	# Manually trigger spawning for a peer that just joined
+	# The MultiplayerSpawner's peer_connected may have already fired before the peer loaded the scene
 	if not multiplayer.is_server():
 		return
 
 	print("[HOST] spawn_peer_in_village called for peer ", peer_id)
 
 	var current_scene := get_tree().current_scene
-	if current_scene == null or current_scene.name != "Village":
-		print("[HOST] Not in village scene, ignoring spawn request")
-		return
-
-	# Check if player is already spawned
-	if current_scene.get_node_or_null(str(peer_id)):
-		print("[HOST] Player ", peer_id, " already spawned in village")
+	if not current_scene or current_scene.name != "Village":
+		print("[HOST] Not in village scene")
 		return
 
 	# Check if player data exists
 	if not LobbyManager.players.has(peer_id):
-		print("[HOST] No player data for peer ", peer_id, " - waiting for registration...")
-		# Wait a bit and retry
+		print("[HOST] No player data for peer ", peer_id, " - waiting...")
 		await get_tree().create_timer(0.3).timeout
 		if not LobbyManager.players.has(peer_id):
-			print("[HOST] ERROR: Still no player data for peer ", peer_id)
+			print("[HOST] ERROR: Still no player data")
 			return
 
-	print("[HOST] Spawning peer ", peer_id, " with data: ", LobbyManager.players[peer_id])
+	# Do thorough check for existing players to prevent duplicates
+	var existing_players = []
+	for child in current_scene.get_children():
+		if child.name == str(peer_id) or child.name.to_int() == peer_id:
+			existing_players.append(child)
 
-	var player_scene = preload("res://coop/scenes/Characters/player.tscn")
-	var player = player_scene.instantiate()
-	player.name = str(peer_id)
-
-	# Find next available spawn position
-	var spawn_index = LobbyManager.players.size() - 1
-	player.position = get_spawn_position_at_index(spawn_index)
-	print("[HOST] Spawn position for peer ", peer_id, ": ", player.position)
-
-	# Store the player's selected class and weapon
-	player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
-	player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
-
-	# Add player to scene
-	current_scene.add_child(player)
-
-	print("[HOST] Spawned new peer ", peer_id, " in village on host side")
-
-	# Sync LobbyManager data and tell all clients to spawn all players
-	var players_data = LobbyManager.players.duplicate(true)
-	sync_village_players.rpc(players_data)
-
-
-@rpc("authority", "call_local", "reliable")
-func sync_village_players(players_data: Dictionary) -> void:
-	# Called on all clients to sync LobbyManager and spawn all players
-	print("[CLIENT] sync_village_players called")
-	print("[CLIENT] Received players_data: ", players_data)
-
-	# Update local LobbyManager with server's player data
-	LobbyManager.players = players_data.duplicate(true)
-	print("[CLIENT] Updated LobbyManager.players: ", LobbyManager.players)
-
-	var current_scene := get_tree().current_scene
-	if not current_scene or current_scene.name != "Village":
-		print("[CLIENT] Not in village scene yet")
+	if existing_players.size() > 0:
+		print("[HOST] Found ", existing_players.size(), " existing player(s) with ID ", peer_id)
+		# Remove duplicates, keeping only the first one
+		for i in range(1, existing_players.size()):
+			print("[HOST] Removing duplicate player: ", existing_players[i].name)
+			existing_players[i].queue_free()
+		print("[HOST] Player ", peer_id, " already spawned, skipping")
 		return
 
-	# Spawn all players that should exist
-	for peer_id in LobbyManager.players:
-		# Check if player is already spawned
-		if current_scene.get_node_or_null(str(peer_id)):
-			print("[CLIENT] Player ", peer_id, " already spawned")
-			continue
+	# Get the MultiplayerSpawner
+	var spawner = current_scene.get_node_or_null("MultiplayerSpawner")
+	if not spawner or not spawner.has_method("spawn_player"):
+		print("[HOST] ERROR: MultiplayerSpawner not found or missing spawn_player method")
+		return
 
-		print("[CLIENT] Spawning player ", peer_id)
-		var player_scene = preload("res://coop/scenes/Characters/player.tscn")
-		var player = player_scene.instantiate()
-		player.name = str(peer_id)
-
-		# Calculate spawn position
-		var spawn_index = 0
-		var players_list = LobbyManager.players.keys()
-		players_list.sort()
-		spawn_index = players_list.find(peer_id)
-
-		player.position = get_spawn_position_at_index(spawn_index)
-
-		# Store the player's selected class and weapon
-		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
-		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
-
-		# Add player to scene
-		current_scene.add_child(player)
-
-		print("[CLIENT] Spawned player ", peer_id, " at ", player.position)
+	# Manually trigger spawn
+	print("[HOST] Manually triggering spawn for peer ", peer_id)
+	spawner.spawn_player(peer_id)
 
 
 func transition_from_village_to_game() -> void:
@@ -1347,13 +1308,32 @@ func start_hosting_in_village() -> String:
 	print("Respawning host player...")
 	var current_scene = get_tree().current_scene
 	if current_scene:
-		# Remove old player node
+		# Move camera back to scene before removing old player
 		var old_player = current_scene.get_node_or_null(str(old_local_id))
 		if old_player:
+			# Check if camera is attached to this player
+			var camera = old_player.get_node_or_null("Camera2D")
+			if camera:
+				print("Moving camera back to scene root...")
+				# Reparent camera to scene so new player can pick it up
+				camera.reparent(current_scene)
+				camera.position = old_player.global_position
+
+			print("Removing old player node...")
 			old_player.queue_free()
 
-		# Spawn with new host ID
-		await get_tree().create_timer(0.1).timeout
+		# Wait for old player to be fully removed
+		await get_tree().create_timer(0.2).timeout
+
+		# Remove any stale player nodes with the old or new ID
+		for node in current_scene.get_children():
+			if node.name == str(old_local_id) or node.name == str(new_host_id):
+				print("Removing stale player node: ", node.name)
+				node.queue_free()
+
+		await get_tree().process_frame
+
+		# Spawn with new host ID - setup_camera() will automatically find and attach the camera
 		spawn_players_in_village()
 
 	print("Village hosting ready! Host ID: ", peer.online_id)
@@ -1435,12 +1415,20 @@ func join_village_host(host_id: String) -> void:
 	print("Sending player registration to host...")
 	register_player_with_host.rpc_id(1, local_id, player_name, "knight", "sword")
 
-	# Remove old local player from scene before transitioning
-	print("Removing old local player...")
+	# Store camera settings before removing old player
+	print("Storing camera settings and removing old local player...")
 	var current_scene = get_tree().current_scene
+	var camera_zoom = Vector2(1.15, 1.15)  # Default zoom
+
 	if current_scene:
 		var old_player = current_scene.get_node_or_null(str(old_local_id))
 		if old_player:
+			# Get camera zoom before destroying
+			var camera = old_player.get_node_or_null("Camera2D")
+			if camera:
+				camera_zoom = camera.zoom
+				print("Saved camera zoom: ", camera_zoom)
+
 			old_player.queue_free()
 			print("Removed old player with ID: ", old_local_id)
 
@@ -1449,9 +1437,23 @@ func join_village_host(host_id: String) -> void:
 	get_tree().change_scene_to_file("res://coop/scenes/village.tscn")
 
 	# Wait for scene to load
-	await get_tree().create_timer(0.3).timeout
+	await get_tree().create_timer(0.5).timeout
 
 	print("Joined village successfully! Waiting for host to spawn us...")
+
+	# Create a camera in the scene with proper zoom for the new player to pick up
+	var new_scene = get_tree().current_scene
+	if new_scene and not new_scene.get_node_or_null("Camera2D"):
+		print("Creating camera in scene with proper zoom...")
+		var camera = Camera2D.new()
+		camera.name = "Camera2D"
+		camera.zoom = camera_zoom
+		camera.enabled = false  # Will be enabled when player picks it up
+		new_scene.add_child(camera)
+
+	# Wait for player to be spawned by sync, then camera will attach automatically via setup_camera()
+	await get_tree().create_timer(0.5).timeout
+	print("Player should be spawned now with camera attached")
 
 
 @rpc("any_peer", "reliable")

@@ -7,7 +7,8 @@ var next_spawn_index: int = 0
 
 
 func _ready() -> void:
-	multiplayer.peer_connected.connect(spawn_player)
+	# Don't auto-connect peer_connected - let NetworkHandler handle spawning manually
+	# This prevents duplicate spawns (auto + manual)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	spawned.connect(_on_player_spawned)
 
@@ -91,6 +92,10 @@ func spawn_player(peer_id: int) -> void:
 	# Attach class selection metadata if available so clients can apply modifiers.
 	if LobbyManager and LobbyManager.players.has(peer_id):
 		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
+		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
+		print("Set player ", peer_id, " class: ", LobbyManager.players[peer_id]["class"], " weapon: ", LobbyManager.players[peer_id]["weapon"])
+	else:
+		print("WARNING: No LobbyManager data for peer ", peer_id, " - using defaults")
 
 	get_node(spawn_path).call_deferred("add_child", player)
 	print(

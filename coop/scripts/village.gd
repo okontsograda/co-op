@@ -13,6 +13,9 @@ func _ready() -> void:
 	# Check if we're the host
 	is_host = multiplayer.is_server()
 
+	# Setup multiplayer spawner for player replication
+	setup_multiplayer_spawner()
+
 	# Setup UI based on role (if UI elements exist)
 	setup_ui()
 
@@ -28,8 +31,9 @@ func _ready() -> void:
 	# Update players list (if UI exists)
 	update_players_list()
 
-	# Call NetworkHandler to spawn players
-	call_deferred("spawn_village_players")
+	# Wait a frame for MultiplayerSpawner to be fully ready, then spawn players
+	await get_tree().process_frame
+	spawn_village_players()
 
 func setup_ui() -> void:
 	# Only update UI if button exists
@@ -107,12 +111,40 @@ func _on_peer_connected(peer_id: int) -> void:
 	print("Peer connected to village: ", peer_id)
 	update_players_list()
 
-	# If we're the host, tell NetworkHandler to spawn the new peer
-	if is_host:
-		var network_handler = get_node_or_null("/root/NetworkHandler")
-		if network_handler:
-			network_handler.spawn_peer_in_village(peer_id)
+	# NetworkHandler already handles spawning via _on_peer_connected_village()
+	# We only need to update the UI here
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	print("Peer disconnected from village: ", peer_id)
 	update_players_list()
+
+
+func setup_multiplayer_spawner() -> void:
+	# Check if MultiplayerSpawner already exists
+	var existing_spawner = get_node_or_null("MultiplayerSpawner")
+	if existing_spawner:
+		print("MultiplayerSpawner already exists in village")
+		return
+
+	# Load and create the multiplayer spawner script
+	var spawner_script = load("res://coop/scripts/multiplayer_spawner.gd")
+	var spawner = MultiplayerSpawner.new()
+	spawner.set_script(spawner_script)
+	spawner.name = "MultiplayerSpawner"
+
+	# Set spawn path to the village scene root
+	spawner.spawn_path = NodePath(".")
+
+	# Add the player scene as a spawnable scene
+	spawner.add_spawnable_scene("res://coop/scenes/Characters/player.tscn")
+
+	# Set the network player scene for the script
+	var player_scene = load("res://coop/scenes/Characters/player.tscn")
+	spawner.set("network_player", player_scene)
+
+	# Set spawn limit (0 = unlimited)
+	spawner.spawn_limit = 0
+
+	add_child(spawner)
+
+	print("Created MultiplayerSpawner in village scene with script")

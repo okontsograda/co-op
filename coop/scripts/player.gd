@@ -276,21 +276,14 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	# Client-side interpolation for remote players (non-authority)
+	# Remote players: MultiplayerSynchronizer handles position sync automatically
 	if !is_multiplayer_authority():
-		# Remote players: lerp to server position for smooth movement
-		# MultiplayerSynchronizer updates our actual global_position from server
-		# We store that as server_position and smoothly interpolate to it
+		# Debug: Print position updates for remote players
+		if name == "1" and Engine.get_frames_drawn() % 60 == 0:  # Only player 1, once per second
+			print("[PEER] Remote player ", name, " position: ", global_position)
 
-		# If position changed significantly from server, update target
-		if global_position.distance_squared_to(server_position) > 1.0:
-			server_position = global_position
-
-		# Smoothly interpolate visual position toward server position
-		# This creates smooth movement between server updates
-		global_position = global_position.lerp(server_position, interpolation_speed * _delta)
-
-		# Update z_index for proper depth sorting
+		# Just update z_index for proper depth sorting
+		# Position is synced by MultiplayerSynchronizer with global_position
 		z_index = int(global_position.y)
 		return
 
