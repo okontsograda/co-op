@@ -94,32 +94,17 @@ func start_mission():
 
 	print("[HubManager] Starting mission: %s" % selected_mission)
 	mission_starting.emit()
-	_start_mission_for_all.rpc()
-
-
-@rpc("authority", "call_local", "reliable")
-func _start_mission_for_all():
-	print("[HubManager] Transitioning to mission scene")
-	# Preserve player loadouts from hub
-	var peer_id = multiplayer.get_unique_id()
-
-	# Store current selections before scene change
-	if LobbyManager.players.has(peer_id):
-		var player_data = LobbyManager.players[peer_id]
-		# Loadout is already in LobbyManager, just transition
-		pass
-
-	# Load mission scene
-	match selected_mission:
-		"example":
-			get_tree().change_scene_to_file("res://coop/scenes/example.tscn")
-		_:
-			print("[HubManager] Unknown mission: %s" % selected_mission)
+	var mission_scene_path = _get_mission_scene_path(selected_mission)
+	NetworkHandler.transition_to_scene(mission_scene_path, NetworkHandler.SceneType.MISSION, {"mission_id": selected_mission})
 
 
 ## Return to hub after mission (with rewards)
 func return_to_hub(meta_coins_earned: int = 0):
 	print("[HubManager] Returning to hub (Earned %d meta coins)" % meta_coins_earned)
+
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		print("[HubManager] Only host can trigger hub return")
+		return
 
 	# Award meta currency
 	if meta_coins_earned > 0:
@@ -128,8 +113,7 @@ func return_to_hub(meta_coins_earned: int = 0):
 	# Clear mission state
 	GameDirector.reset_game()
 
-	# Return to hub scene
-	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+	NetworkHandler.transition_to_scene(NetworkHandler.HUB_SCENE_PATH, NetworkHandler.SceneType.HUB, {"from_mission": true})
 
 
 func _on_peer_connected(id: int):
@@ -146,4 +130,15 @@ func _on_peer_disconnected(id: int):
 
 ## Get ready player count as string (for UI)
 func get_ready_status_text() -> String:
-	return "%d / %d Ready" % [ready_count, hub_players.size()]
+	var total := hub_players.size()
+	if total == 0 and multiplayer.is_server():
+		total = 1  # include host when alone
+	return "%d / %d Ready" % [ready_count, total]
+
+
+func _get_mission_scene_path(mission_id: String) -> String:
+	match mission_id:
+		"example":
+			return "res://coop/scenes/example.tscn"
+		_:
+			return "res://coop/scenes/example.tscn"

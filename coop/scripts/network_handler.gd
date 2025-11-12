@@ -2,13 +2,20 @@ extends Node
 
 const IP_ADDRESS: String = "localhost"
 const PORT: int = 42069
+const HUB_SCENE_PATH: String = "res://coop/scenes/hub.tscn"
 
-enum HubLaunchMode { NONE, HOSTING, CLIENT, SOLO }
+enum SceneType { NONE, HUB, MISSION, GAME_OVER }
+enum SceneEntryMode { NONE, HOST, CLIENT, SOLO }
 
 var peer = NodeTunnelPeer.new()
-var hub_launch_mode: HubLaunchMode = HubLaunchMode.NONE
-var pending_client_host_id: String = ""
-var current_hub_scene: Node = null
+
+var pending_scene_path: String = ""
+var pending_scene_type: SceneType = SceneType.NONE
+var pending_entry_mode: SceneEntryMode = SceneEntryMode.NONE
+var pending_scene_data: Dictionary = {}
+
+var loading_screen_scene: PackedScene = preload("res://coop/scenes/ui/loading_screen.tscn")
+var loading_screen: CanvasLayer = null
 
 # Enemy spawning variables
 var enemy_spawn_timer: Timer = null
@@ -55,6 +62,140 @@ func connect_to_relay_async() -> void:
 	var online_id_label = get_node_or_null("%OnlineID")
 	if online_id_label:
 		online_id_label.text = peer.online_id
+
+
+func _show_loading_screen(status: String = "Loading...") -> void:
+	if loading_screen_scene == null:
+		return
+
+	if loading_screen == null:
+		loading_screen = loading_screen_scene.instantiate()
+		get_tree().root.add_child(loading_screen)
+
+	if loading_screen.has_method("set_status"):
+		loading_screen.call("set_status", status)
+
+
+func _hide_loading_screen() -> void:
+	if loading_screen:
+		loading_screen.queue_free()
+		loading_screen = null
+
+
+func _prepare_local_scene_transition(scene_path: String, scene_type: SceneType, entry_mode: SceneEntryMode, data: Dictionary = {}) -> void:
+	pending_scene_path = scene_path
+	pending_scene_type = scene_type
+	pending_entry_mode = entry_mode
+	pending_scene_data = data.duplicate()
+
+	_show_loading_screen()
+	get_tree().change_scene_to_file(scene_path)
+
+
+@rpc("authority", "reliable")
+func _rpc_request_scene_transition(scene_path: String, scene_type: int, data: Dictionary) -> void:
+	if multiplayer.is_server():
+		return
+
+	var type_value: SceneType = SceneType.values()[scene_type]
+	_prepare_local_scene_transition(scene_path, type_value, SceneEntryMode.CLIENT, data)
+
+
+func transition_to_scene(scene_path: String, scene_type: SceneType, data: Dictionary = {}) -> void:
+	var entry_mode := SceneEntryMode.SOLO
+	if multiplayer.has_multiplayer_peer():
+		entry_mode = SceneEntryMode.HOST if multiplayer.is_server() else SceneEntryMode.CLIENT
+
+	_prepare_local_scene_transition(scene_path, scene_type, entry_mode, data)
+
+	if entry_mode == SceneEntryMode.HOST:
+		rpc("_rpc_request_scene_transition", scene_path, int(scene_type), data)
+
+
+func notify_scene_ready(scene: Node, scene_type: SceneType) -> void:
+	var entry_mode := pending_entry_mode
+	if entry_mode == SceneEntryMode.NONE:
+		if not multiplayer.has_multiplayer_peer():
+			entry_mode = SceneEntryMode.SOLO
+		else:
+			entry_mode = SceneEntryMode.HOST if multiplayer.is_server() else SceneEntryMode.CLIENT
+
+	var data := pending_scene_data.duplicate()
+	pending_scene_path = ""
+	pending_scene_type = SceneType.NONE
+	pending_entry_mode = SceneEntryMode.NONE
+	pending_scene_data.clear()
+
+	await _initialize_scene(scene, scene_type, entry_mode, data)
+	_hide_loading_screen()
+
+
+func _initialize_scene(scene: Node, scene_type: SceneType, entry_mode: SceneEntryMode, data: Dictionary) -> void:
+	match scene_type:
+		SceneType.HUB:
+			await _initialize_hub_scene(scene, entry_mode, data)
+		SceneType.MISSION:
+			await _initialize_mission_scene(scene, entry_mode, data)
+		SceneType.GAME_OVER:
+			if scene.has_method("initialize_game_over"):
+				var state = scene.call("initialize_game_over", entry_mode, data)
+				await _await_if_function_state(state)
+		_:
+			if scene.has_method("initialize_scene"):
+				var state = scene.call("initialize_scene", entry_mode, data)
+				await _await_if_function_state(state)
+
+
+func _initialize_hub_scene(scene: Node, entry_mode: SceneEntryMode, data: Dictionary) -> void:
+	match entry_mode:
+		SceneEntryMode.HOST:
+			if scene.has_method("initialize_host_mode"):
+				var state = scene.call("initialize_host_mode", data)
+				await _await_if_function_state(state)
+		SceneEntryMode.CLIENT:
+			await _prepare_client_join_to_hub(data)
+			if scene.has_method("initialize_client_mode"):
+				var state = scene.call("initialize_client_mode", data)
+				await _await_if_function_state(state)
+		SceneEntryMode.SOLO:
+			if scene.has_method("initialize_solo_mode"):
+				var state = scene.call("initialize_solo_mode", data)
+				await _await_if_function_state(state)
+		_:
+			pass
+
+
+func _initialize_mission_scene(scene: Node, entry_mode: SceneEntryMode, data: Dictionary) -> void:
+	match entry_mode:
+		SceneEntryMode.HOST:
+			if scene.has_method("initialize_host_mode"):
+				var state = scene.call("initialize_host_mode", data)
+				await _await_if_function_state(state)
+		SceneEntryMode.CLIENT:
+			if scene.has_method("initialize_client_mode"):
+				var state = scene.call("initialize_client_mode", data)
+				await _await_if_function_state(state)
+		SceneEntryMode.SOLO:
+			if scene.has_method("initialize_solo_mode"):
+				var state = scene.call("initialize_solo_mode", data)
+				await _await_if_function_state(state)
+
+
+func _prepare_client_join_to_hub(data: Dictionary) -> void:
+	var host_id: String = data.get("host_id", "")
+
+	if not multiplayer.has_multiplayer_peer():
+		multiplayer.multiplayer_peer = peer
+
+	if host_id.is_empty():
+		return  # Already connected (returning from mission)
+
+	await _ensure_relay_connected()
+	if peer.connection_status != MultiplayerPeer.CONNECTION_CONNECTED:
+		peer.join(host_id)
+		await peer.joined
+
+	LobbyManager.enter_lobby(host_id)
 
 
 # Chat system signals
@@ -1123,55 +1264,42 @@ func get_spawn_position_at_index(index: int) -> Vector2:
 ## Start server and enter hub
 func start_server_to_hub() -> void:
 	print("Starting server, transitioning to hub...")
-	hub_launch_mode = HubLaunchMode.HOSTING
 
-	# Ensure relay connection
 	if peer.connection_state != 2:
 		print("Waiting for relay connection...")
 		await peer.relay_connected
 
-	# Host the game
 	peer.host()
 	await peer.hosting
 	print("Hosting successful, online ID: ", peer.online_id)
 
 	DisplayServer.clipboard_set(peer.online_id)
 
-	# Connect multiplayer signals
 	multiplayer.peer_connected.connect(_on_peer_connected_to_hub)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
-	# Initialize LobbyManager with host
 	LobbyManager.enter_lobby(peer.online_id)
 
-	# Go to hub scene
-	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+	_prepare_local_scene_transition(HUB_SCENE_PATH, SceneType.HUB, SceneEntryMode.HOST, {"host_id": peer.online_id})
 
 
 ## Join existing server and enter hub
 func start_client_to_hub(host_id: String) -> void:
-	if not host_id or host_id.is_empty():
+	if host_id.is_empty():
 		print("No host ID provided")
 		return
 
 	print("Preparing to join host ", host_id, ", loading hub scene first...")
-	hub_launch_mode = HubLaunchMode.CLIENT
-	pending_client_host_id = host_id
-
-	# Go to hub scene; actual network join will happen once the scene is ready
-	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+	_prepare_local_scene_transition(HUB_SCENE_PATH, SceneType.HUB, SceneEntryMode.CLIENT, {"host_id": host_id})
 
 
 ## Start solo hub (offline mode)
 func start_solo_hub() -> void:
 	print("Starting solo hub (offline mode)")
-	hub_launch_mode = HubLaunchMode.SOLO
 
-	# Clear any existing multiplayer peer
 	if multiplayer.has_multiplayer_peer():
 		multiplayer.multiplayer_peer = null
 
-	# Initialize LobbyManager for solo play
 	var peer_id = 1
 	LobbyManager.players[peer_id] = {
 		"class": SaveSystem.get_last_loadout().class,
@@ -1181,8 +1309,7 @@ func start_solo_hub() -> void:
 		"player_name": SaveSystem.get_player_name()
 	}
 
-	# Go to hub scene
-	get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
+	_prepare_local_scene_transition(HUB_SCENE_PATH, SceneType.HUB, SceneEntryMode.SOLO)
 
 
 ## Handler when peer connects to hub
@@ -1224,42 +1351,14 @@ func _calculate_meta_currency_reward(wave: int, kills: int) -> int:
 
 	return reward
 
-
-func notify_hub_scene_ready(hub_scene: Node) -> void:
-	current_hub_scene = hub_scene
-
-	match hub_launch_mode:
-		HubLaunchMode.SOLO:
-			hub_scene.call_deferred("initialize_solo_mode")
-		HubLaunchMode.HOSTING:
-			hub_scene.call_deferred("initialize_host_mode")
-		HubLaunchMode.CLIENT:
-			await _prepare_client_join_for_hub(hub_scene)
-		_:
-			print("[NetworkHandler] Hub scene ready with no launch mode set")
-
-	hub_launch_mode = HubLaunchMode.NONE
-
-
-func _prepare_client_join_for_hub(hub_scene: Node) -> void:
-	await _ensure_relay_connected()
-
-	print("Starting client, joining hub after scene is ready...")
-	peer.join(pending_client_host_id)
-	await peer.joined
-	print("Client successfully connected to ", pending_client_host_id)
-
-	# Initialize LobbyManager with host ID
-	LobbyManager.enter_lobby(pending_client_host_id)
-	pending_client_host_id = ""
-
-	# Now that networking is active, initialize multiplayer flow in the hub
-	hub_scene.call_deferred("initialize_client_mode")
-
-
 func _ensure_relay_connected() -> void:
 	if peer.connection_state == 2:
 		return
 
 	print("Waiting for relay connection...")
 	await peer.relay_connected
+
+
+func _await_if_function_state(result) -> void:
+	if result is Object and result.get_class() == "GDScriptFunctionState":
+		await result

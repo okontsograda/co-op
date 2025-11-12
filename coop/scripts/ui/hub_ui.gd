@@ -37,6 +37,7 @@ const ZONE_NAMES = {
 	"shop": "Meta Shop",
 	"stats": "Statistics",
 	"mission": "Mission Board",
+	"teleporter": "Mission Teleporter",
 	"skill": "Skill Tree (Coming Soon)"
 }
 
@@ -100,7 +101,7 @@ func open_ui(zone_type: String):
 		"stats":
 			stats_ui.visible = true
 			_build_stats_display()  # Refresh stats
-		"mission":
+		"mission", "teleporter":
 			mission_ui.visible = true
 			_update_mission_ui()
 		"skill":

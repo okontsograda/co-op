@@ -1,6 +1,6 @@
 [gd_scene load_steps=15 format=4 uid="uid://drphd0ik0flog"]
 
-[ext_resource type="Script" path="res://coop/scripts/hub_scene.gd" id="1_hub"]
+[ext_resource type="Script" uid="uid://n2kt6ejxhh06" path="res://coop/scripts/hub_scene.gd" id="1_hub"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="2_dq8il"]
 [ext_resource type="Script" uid="uid://dxhnfj6uhslxp" path="res://coop/scripts/multiplayer_spawner.gd" id="2_spawner"]
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="3_0jtoe"]
@@ -1089,7 +1089,7 @@ sources/2 = SubResource("TileSetAtlasSource_6gr1y")
 size = Vector2(150, 150)
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_v0mpi"]
-radius = 29.0
+radius = 51.971146
 
 [node name="Hub" type="Node2D"]
 script = ExtResource("1_hub")
@@ -1205,16 +1205,23 @@ offset_bottom = -70.0
 text = "Skill Tree (Coming Soon)"
 horizontal_alignment = 1
 
-[node name="HubUI" parent="." instance=ExtResource("4_hub_ui")]
+[node name="TeleportPad" type="Area2D" parent="InteractiveZones"]
+position = Vector2(-74, 392)
 
-[node name="TeleportRuin" type="TileMapLayer" parent="."]
-position = Vector2(-2, 339)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/TeleportPad"]
+position = Vector2(449, -79)
+shape = SubResource("CircleShape2D_v0mpi")
+
+[node name="Label" type="Label" parent="InteractiveZones/TeleportPad"]
+offset_left = 376.0
+offset_top = -150.0
+offset_right = 526.0
+offset_bottom = -100.0
+text = "Mission Teleporter"
+horizontal_alignment = 1
+
+[node name="TeleportRuin" type="TileMapLayer" parent="InteractiveZones/TeleportPad"]
 tile_map_data = PackedByteArray("AAAZAPn/AgAWABEAAAAZAPr/AgAWABIAAAAZAPv/AgAWABMAAAAZAPz/AgAWABQAAAAaAPn/AgAXABEAAAAaAPr/AgAXABIAAAAaAPv/AgAXABMAAAAaAPz/AgAXABQAAAAaAP3/AgAXABUAAAAbAPj/AgAYABAAAAAbAPn/AgAYABEAAAAbAPr/AgAYABIAAAAbAPv/AgAYABMAAAAbAPz/AgAYABQAAAAbAP3/AgAYABUAAAAcAPj/AgAZABAAAAAcAPn/AgAZABEAAAAcAPr/AgAZABIAAAAcAPv/AgAZABMAAAAcAPz/AgAZABQAAAAcAP3/AgAZABUAAAAdAPn/AgAaABEAAAAdAPr/AgAaABIAAAAdAPv/AgAaABMAAAAdAPz/AgAaABQAAAAdAP3/AgAaABUAAAAeAPn/AgAbABEAAAAeAPr/AgAbABIAAAAeAPv/AgAbABMAAAAeAPz/AgAbABQAAAA=")
 tile_set = SubResource("TileSet_6gr1y")
 
-[node name="TeleportPad" type="Area2D" parent="."]
-position = Vector2(-2, 3)
-
-[node name="TeleportArea" type="CollisionShape2D" parent="TeleportPad"]
-position = Vector2(447, 259)
-shape = SubResource("CircleShape2D_v0mpi")
+[node name="HubUI" parent="." instance=ExtResource("4_hub_ui")]

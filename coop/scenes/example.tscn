@@ -14,6 +14,7 @@
 [ext_resource type="Texture2D" uid="uid://dmyfxyhhw8kfx" path="res://tileset/03.png" id="10_tyu68"]
 [ext_resource type="PackedScene" path="res://coop/scenes/ui/rest_wave_overlay.tscn" id="13_rh1hg"]
 [ext_resource type="PackedScene" path="res://coop/scenes/ui/wave_notification.tscn" id="14_q1hcx"]
+[ext_resource type="Script" path="res://coop/scripts/mission_scene.gd" id="15_mission"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ydsdc"]
 texture = ExtResource("1_ewl3q")
@@ -1613,6 +1614,7 @@ texture = ExtResource("6_mnf6x")
 sources/0 = SubResource("TileSetAtlasSource_3qnia")
 
 [node name="Example" type="Node2D"]
+script = ExtResource("15_mission")
 
 [node name="PlayerSpawnPoints" type="Node2D" parent="."]
 position = Vector2(242, 293)

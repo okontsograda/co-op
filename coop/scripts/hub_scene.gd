@@ -11,6 +11,7 @@ extends Node2D
 @onready var stats_display: Area2D = $InteractiveZones/StatsDisplay
 @onready var mission_board: Area2D = $InteractiveZones/MissionBoard
 @onready var skill_tree: Area2D = $InteractiveZones/SkillTree
+@onready var teleporter_pad: Area2D = $InteractiveZones/TeleportPad
 
 # Local player reference
 var local_player: Node2D = null
@@ -32,10 +33,10 @@ func _ready():
 	# Connect interaction zones
 	_connect_interaction_zones()
 
-	await NetworkHandler.notify_hub_scene_ready(self)
+	await NetworkHandler.notify_scene_ready(self, NetworkHandler.SceneType.HUB)
 
 
-func initialize_host_mode():
+func initialize_host_mode(_data: Dictionary = {}):
 	print("[Hub] Initializing host hub mode")
 	var peer_id = multiplayer.get_unique_id()
 	_prepare_hub_state(true, peer_id, true)
@@ -56,7 +57,7 @@ func initialize_host_mode():
 		push_error("[Hub] MultiplayerSpawner not available for host mode!")
 
 
-func initialize_client_mode():
+func initialize_client_mode(_data: Dictionary = {}):
 	print("[Hub] Initializing client hub mode")
 	var peer_id = multiplayer.get_unique_id()
 	_prepare_hub_state(true, peer_id, false)
@@ -175,6 +176,9 @@ func _connect_interaction_zones():
 
 	skill_tree.body_entered.connect(_on_zone_entered.bind("skill"))
 	skill_tree.body_exited.connect(_on_zone_exited.bind("skill"))
+	if teleporter_pad:
+		teleporter_pad.body_entered.connect(_on_zone_entered.bind("teleporter"))
+		teleporter_pad.body_exited.connect(_on_zone_exited.bind("teleporter"))
 
 
 func _spawn_solo_player():
@@ -296,16 +300,19 @@ func _try_interact():
 		return
 
 	# Check which zone the player is in
-	var zones = {
+	var zones: Dictionary = {
 		"character": character_station,
 		"shop": meta_shop,
 		"stats": stats_display,
 		"mission": mission_board,
-		"skill": skill_tree
+		"skill": skill_tree,
+		"teleporter": teleporter_pad
 	}
 
-	for zone_name in zones:
-		var zone = zones[zone_name]
+	for zone_name in zones.keys():
+		var zone: Area2D = zones[zone_name]
+		if zone == null:
+			continue
 		if zone.overlaps_body(local_player):
 			_open_zone_ui(zone_name)
 			return
