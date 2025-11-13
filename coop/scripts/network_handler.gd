@@ -113,6 +113,10 @@ func transition_to_scene(scene_path: String, scene_type: SceneType, data: Dictio
 
 
 func notify_scene_ready(scene: Node, scene_type: SceneType) -> void:
+	var tree_mp: MultiplayerAPI = scene.get_tree().get_multiplayer()
+	if tree_mp and tree_mp.multiplayer_peer == null:
+		tree_mp.multiplayer_peer = peer
+
 	var entry_mode := pending_entry_mode
 	if entry_mode == SceneEntryMode.NONE:
 		if not multiplayer.has_multiplayer_peer():
@@ -184,16 +188,14 @@ func _initialize_mission_scene(scene: Node, entry_mode: SceneEntryMode, data: Di
 func _prepare_client_join_to_hub(data: Dictionary) -> void:
 	var host_id: String = data.get("host_id", "")
 
-	if not multiplayer.has_multiplayer_peer():
-		multiplayer.multiplayer_peer = peer
+	multiplayer.multiplayer_peer = peer
 
 	if host_id.is_empty():
 		return  # Already connected (returning from mission)
 
 	await _ensure_relay_connected()
-	if peer.connection_status != MultiplayerPeer.CONNECTION_CONNECTED:
-		peer.join(host_id)
-		await peer.joined
+	if peer.connection_state != NodeTunnelPeer.ConnectionState.JOINED:
+		await peer.join(host_id)
 
 	LobbyManager.enter_lobby(host_id)
 
@@ -1357,6 +1359,28 @@ func _ensure_relay_connected() -> void:
 
 	print("Waiting for relay connection...")
 	await peer.relay_connected
+
+
+func _await_client_peer_id(timeout_seconds: float = 5.0) -> bool:
+	if multiplayer.is_server():
+		return true
+
+	if not multiplayer.has_multiplayer_peer() or peer == null:
+		return false
+
+	var poll_interval := 0.1
+	var elapsed := 0.0
+	while elapsed < timeout_seconds:
+		var peer_id := multiplayer.get_unique_id()
+		if peer_id > 1:
+			return true
+		if peer.connection_status == MultiplayerPeer.CONNECTION_DISCONNECTED:
+			break
+		await get_tree().create_timer(poll_interval).timeout
+		elapsed += poll_interval
+
+	# Final check in case the ID updated during the last await
+	return multiplayer.get_unique_id() > 1
 
 
 func _await_if_function_state(result) -> void:

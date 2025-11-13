@@ -38,9 +38,10 @@ func enter_lobby(host_online_id: String = ""):
 
 	# Register the local player
 	var local_id = multiplayer.get_unique_id()
+	var is_host = multiplayer.is_server()
 	print("Local peer ID: ", local_id)
-	print("Is server: ", multiplayer.is_server())
-	register_player(local_id, local_id == 1)
+	print("Is server: ", is_host)
+	register_player(local_id, is_host)
 	print("After register_player, players dict: ", players)
 
 	# If we're the server, set up multiplayer signals

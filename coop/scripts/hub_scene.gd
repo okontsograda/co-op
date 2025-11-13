@@ -59,13 +59,23 @@ func initialize_host_mode(_data: Dictionary = {}):
 
 func initialize_client_mode(_data: Dictionary = {}):
 	print("[Hub] Initializing client hub mode")
+	if multiplayer.is_server():
+		push_warning("[Hub] Client mode initialization detected server authority, skipping spawn request")
+		return
+
+	print("[Hub] Waiting for client peer ID assignment before requesting spawn")
+	var has_peer_id := await NetworkHandler._await_client_peer_id(10.0)
+	if not has_peer_id:
+		push_error("[Hub] Client never received a non-host peer ID; cannot request spawn")
+		return
 	var peer_id = multiplayer.get_unique_id()
+
 	_prepare_hub_state(true, peer_id, false)
 
 	await get_tree().create_timer(0.1).timeout
 
 	print("[Hub] Client requesting player spawn from server (peer ID: ", peer_id, ")")
-	print("[Hub] Sending RPC to server (peer 1)")
+	print("[Hub] Sending RPC to server")
 	_request_spawn.rpc_id(1)
 	print("[Hub] RPC sent, waiting for player to spawn...")
 	await _wait_for_local_player()
@@ -253,6 +263,8 @@ func _get_player_node_by_peer(peer_id: int) -> Node2D:
 			return player
 
 	return null
+
+
 
 
 func _disable_player_combat(player: Node2D):

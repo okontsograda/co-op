@@ -9,8 +9,7 @@ func _ready():
 
 func initialize_host_mode(data: Dictionary = {}):
 	print("[Mission] Host initializing mission scene: ", data)
-	var state = NetworkHandler.start_game_from_lobby()
-	await _await_if_function_state(state)
+	await NetworkHandler.start_game_from_lobby()
 
 
 func initialize_client_mode(_data: Dictionary = {}):
@@ -20,8 +19,7 @@ func initialize_client_mode(_data: Dictionary = {}):
 
 func initialize_solo_mode(data: Dictionary = {}):
 	print("[Mission] Solo mission initialization")
-	var state = NetworkHandler.start_game_from_lobby()
-	await _await_if_function_state(state)
+	await NetworkHandler.start_game_from_lobby()
 
 
 func _wait_for_local_player():
@@ -52,8 +50,3 @@ func _get_player_node_by_peer(peer_id: int) -> Node2D:
 			return player
 
 	return null
-
-
-func _await_if_function_state(result) -> void:
-	if result is Object and result.get_class() == "GDScriptFunctionState":
-		await result
