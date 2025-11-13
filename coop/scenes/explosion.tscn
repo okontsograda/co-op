@@ -52,3 +52,4 @@ libraries = {
 autoplay = "explode"
 
 [node name="ExplosionSound" type="AudioStreamPlayer2D" parent="."]
+bus = &"SFX"

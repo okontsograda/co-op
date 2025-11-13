@@ -635,6 +635,7 @@ func setup_hit_sound() -> void:
 		hit_sound_player = AudioStreamPlayer2D.new()
 		hit_sound_player.name = "HitSoundPlayer"
 		hit_sound_player.stream = hit_sound
+		hit_sound_player.bus = "SFX"
 		add_child(hit_sound_player)
 	else:
 		print("WARNING: No hit sound found. Tried: ", possible_names)
@@ -672,6 +673,7 @@ func play_hit_sound() -> void:
 
 	if hit_sound:
 		temp_sound.stream = hit_sound
+		temp_sound.bus = "SFX"
 		temp_sound.position = global_position
 		# Randomly vary the pitch slightly for variation (0.9 to 1.1 = 10% variation)
 		temp_sound.pitch_scale = randf_range(0.9, 1.1)
@@ -899,6 +901,7 @@ func play_mushroom_hit_sound() -> void:
 	if attack_sound:
 		var temp_sound = AudioStreamPlayer2D.new()
 		temp_sound.stream = attack_sound
+		temp_sound.bus = "SFX"
 		temp_sound.position = global_position
 		# Add to scene tree and play
 		get_tree().current_scene.add_child(temp_sound)

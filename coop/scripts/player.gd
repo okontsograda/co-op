@@ -3029,6 +3029,7 @@ func setup_weapon_sound() -> void:
 		bow_sound_player = AudioStreamPlayer2D.new()
 		bow_sound_player.name = "WeaponSoundPlayer"
 		bow_sound_player.stream = weapon_sound
+		bow_sound_player.bus = "SFX"
 		add_child(bow_sound_player)
 	else:
 		print("ERROR: Failed to load weapon sound from ", current_weapon_config.sound_path)
@@ -3043,6 +3044,7 @@ func setup_bow_sound() -> void:
 		bow_sound_player = AudioStreamPlayer2D.new()
 		bow_sound_player.name = "BowSoundPlayer"
 		bow_sound_player.stream = bow_sound
+		bow_sound_player.bus = "SFX"
 		add_child(bow_sound_player)
 	else:
 		print(
@@ -3069,6 +3071,7 @@ func play_weapon_sound(shooter: Node2D) -> void:
 
 	if weapon_sound:
 		temp_sound.stream = weapon_sound
+		temp_sound.bus = "SFX"
 		temp_sound.position = shooter.global_position
 		# Add to scene tree and play
 		get_tree().current_scene.add_child(temp_sound)
@@ -3090,6 +3093,7 @@ func play_pickup_sound() -> void:
 	if pickup_sound:
 		var temp_sound = AudioStreamPlayer2D.new()
 		temp_sound.stream = pickup_sound
+		temp_sound.bus = "SFX"
 		temp_sound.position = global_position
 		# Add to scene tree and play
 		get_tree().current_scene.add_child(temp_sound)
@@ -3104,6 +3108,7 @@ func play_levelup_sound() -> void:
 	if levelup_sound:
 		var temp_sound = AudioStreamPlayer2D.new()
 		temp_sound.stream = levelup_sound
+		temp_sound.bus = "SFX"
 		temp_sound.position = global_position
 		# Add to scene tree and play
 		get_tree().current_scene.add_child(temp_sound)

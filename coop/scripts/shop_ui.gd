@@ -236,6 +236,7 @@ func play_purchase_sound() -> void:
 	if pickup_sound:
 		var temp_sound = AudioStreamPlayer2D.new()
 		temp_sound.stream = pickup_sound
+		temp_sound.bus = "SFX"
 		# Add to scene tree and play
 		add_child(temp_sound)
 		temp_sound.play()

@@ -9,7 +9,6 @@
 [ext_resource type="PackedScene" path="res://coop/scenes/xp_bar.tscn" id="7_d7lt4"]
 [ext_resource type="PackedScene" path="res://coop/scenes/stamina_bar.tscn" id="8_cs4c4"]
 [ext_resource type="PackedScene" path="res://coop/scenes/health_bar.tscn" id="9_dklcx"]
-[ext_resource type="AudioStream" uid="uid://bsrbgbqnpjnka" path="res://assets/Sounds/Music/Intro.wav" id="10_yfvd0"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_af8pa"]
 atlas = ExtResource("2_v5c7p")
@@ -244,8 +243,3 @@ offset_bottom = -62.0
 text = "Lv.1"
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("10_yfvd0")
-volume_db = -19.024
-autoplay = true

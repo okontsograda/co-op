@@ -28,6 +28,7 @@ var level_up_sound: AudioStreamPlayer
 func _ready() -> void:
 	# Create level up sound player
 	level_up_sound = AudioStreamPlayer.new()
+	level_up_sound.bus = "SFX"
 	add_child(level_up_sound)
 
 	# Load level up sound if it exists
