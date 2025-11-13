@@ -1,4 +1,4 @@
-[gd_scene load_steps=33 format=3 uid="uid://ewcge3xong6o"]
+[gd_scene load_steps=32 format=3 uid="uid://ewcge3xong6o"]
 
 [ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_epkag"]
 [ext_resource type="Texture2D" uid="uid://bkmrhxpq8yuwi" path="res://assets/Characters/Archer/Archer_Shoot.png" id="2_v5c7p"]

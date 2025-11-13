@@ -1267,7 +1267,7 @@ func setup_camera() -> void:
 			# Move camera to follow this player
 			scene_camera.reparent(self)
 			scene_camera.position = Vector2.ZERO
-			scene_camera.zoom = Vector2(1.15, 1.15)
+			scene_camera.zoom = Vector2(.85, .85)
 			scene_camera.enabled = true
 			print("Attached camera to player ", name)
 		else:
@@ -1277,7 +1277,7 @@ func setup_camera() -> void:
 			camera.limit_top = -2000
 			camera.limit_right = 2000
 			camera.limit_bottom = 2000
-			camera.zoom = Vector2(0.5, 0.5)  # Zoom in to 50% (2x closer)
+			camera.zoom = Vector2(1, 1)  # Zoom in to 50% (2x closer)
 			camera.enabled = true
 			add_child(camera)
 			print("Created camera for player ", name)

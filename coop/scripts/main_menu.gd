@@ -3,7 +3,6 @@ extends Control
 
 func _ready():
 	# Connect button signals
-	$VBoxContainer/PlayLocalButton.pressed.connect(_on_play_local_pressed)
 	$VBoxContainer/HostButton.pressed.connect(_on_host_pressed)
 	$VBoxContainer/JoinButton.pressed.connect(_on_join_pressed)
 	$VBoxContainer/ExitButton.pressed.connect(_on_exit_pressed)

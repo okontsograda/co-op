@@ -26,13 +26,17 @@ func _ready() -> void:
 func update_health(current: int, maximum: int) -> void:
 	current_health = current
 	max_health = maximum
+	
+	# Don't update if nodes aren't ready yet
+	if not fill or not background:
+		return
 
 	# Calculate health percentage
 	var health_percent = float(current_health) / float(max_health) if max_health > 0 else 0.0
 
 	# Update the fill bar width based on actual background width
 	# Background goes from offset_left to offset_right, Fill starts at offset_left
-	var fill_left = background.offset_left if background else -30.0
+	var fill_left = background.offset_left
 	fill.offset_left = fill_left
 	fill.offset_right = fill_left + (health_percent * background_width)
 
