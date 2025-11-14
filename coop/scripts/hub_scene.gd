@@ -12,12 +12,23 @@ extends Node2D
 @onready var mission_board: Area2D = $InteractiveZones/MissionBoard
 @onready var skill_tree: Area2D = $InteractiveZones/SkillTree
 @onready var teleporter_pad: Area2D = $InteractiveZones/TeleportPad
+@onready var stairs_up: Area2D = $InteractiveZones/StairsUp
+@onready var stairs_down: Area2D = $InteractiveZones/StairsDown
 
 # Local player reference
 var local_player: Node2D = null
 
 # Currently active UI
 var active_ui: String = ""
+
+# Stair system
+var original_player_y: float = 0.0
+var on_stairs: bool = false
+var current_stair_type: String = ""
+var stair_cooldown_timer: float = 0.0
+var last_player_y: float = 0.0
+var player_stair_level: int = 0  # 0 = ground level, positive = up levels, negative = down levels
+var last_stair_action: String = ""  # "up" or "down" to track last direction
 
 
 func _enter_tree():
@@ -189,6 +200,11 @@ func _connect_interaction_zones():
 	if teleporter_pad:
 		teleporter_pad.body_entered.connect(_on_zone_entered.bind("teleporter"))
 		teleporter_pad.body_exited.connect(_on_zone_exited.bind("teleporter"))
+	
+	stairs_up.body_entered.connect(_on_stairs_entered.bind("up"))
+	stairs_up.body_exited.connect(_on_stairs_exited.bind("up"))
+	stairs_down.body_entered.connect(_on_stairs_entered.bind("down"))
+	stairs_down.body_exited.connect(_on_stairs_exited.bind("down"))
 
 
 func _spawn_solo_player():
@@ -305,6 +321,14 @@ func _process(_delta):
 	# Handle interaction input
 	if Input.is_action_just_pressed("ui_accept"):  # E or Enter key
 		_try_interact()
+	
+	# Update stair cooldown timer
+	if stair_cooldown_timer > 0:
+		stair_cooldown_timer -= _delta
+	
+	# Track player movement direction
+	if local_player:
+		last_player_y = local_player.global_position.y
 
 
 func _try_interact():
@@ -348,3 +372,68 @@ func close_active_ui():
 			active_ui = ""
 
 
+func _on_stairs_entered(body: Node2D, stair_type: String):
+	if body != local_player:
+		return
+	
+	# If in cooldown period, ignore all entries
+	if stair_cooldown_timer > 0:
+		return
+	
+	# If already on stairs, completely ignore new entries
+	if on_stairs:
+		return
+	
+	# Prevent same stair action twice in a row
+	if last_stair_action == stair_type:
+		print("[Hub] Player tried to go ", stair_type, " again (ignored - already went ", stair_type, ")")
+		return
+	
+	print("[Hub] Player entered stairs: ", stair_type, " (current level: ", player_stair_level, ")")
+	
+	original_player_y = body.position.y
+	on_stairs = true
+	current_stair_type = stair_type
+	stair_cooldown_timer = 2  # cooldown after completing stairs
+	last_stair_action = stair_type
+	
+	# Determine actual direction based on which collision area
+	# StairsUp collision is at bottom of stairs (player going up)
+	# StairsDown collision is at top of stairs (player going down)
+	var going_up = (stair_type == "up")
+	
+	# Update stair level
+	if going_up:
+		player_stair_level += 1
+	else:
+		player_stair_level -= 1
+	
+	var tween = create_tween()
+	var target_y = original_player_y
+	
+	if going_up:
+		target_y -= 50  # Go higher visually
+	else:
+		target_y += 50  # Go lower visually
+	
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(body, "position:y", target_y, 1.8)
+	
+	print("[Hub] Player stair level now: ", player_stair_level)
+
+
+func _on_stairs_exited(body: Node2D, stair_type: String):
+	if body != local_player:
+		return
+	
+	print("[Hub] Player exited stairs: ", stair_type)
+	
+	# Use a timer to delay the check, allowing all overlaps to be processed
+	await get_tree().create_timer(0.1).timeout
+	
+	if not stairs_up.overlaps_body(body) and not stairs_down.overlaps_body(body):
+		on_stairs = false
+		current_stair_type = ""
+		# Don't reset position - player should maintain their height after using stairs
+		# They will return to normal height by using the opposite stairs or other means

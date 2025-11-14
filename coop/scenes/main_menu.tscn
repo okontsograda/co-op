@@ -1,9 +1,15 @@
-[gd_scene load_steps=5 format=3 uid="uid://chrbvpe5ouhwm"]
+[gd_scene load_steps=7 format=3 uid="uid://chrbvpe5ouhwm"]
 
 [ext_resource type="Script" uid="uid://cs7y7b5xuukal" path="res://coop/scripts/main_menu.gd" id="1"]
 [ext_resource type="Texture2D" uid="uid://b8gxvda03xlpq" path="res://assets/Backgrounds/start_menu.png" id="2_e0llw"]
 
 [sub_resource type="Theme" id="Theme_e0llw"]
+
+[sub_resource type="Theme" id="Theme_edqeb"]
+default_font_size = 45
+
+[sub_resource type="Theme" id="Theme_lymr1"]
+default_font_size = 22
 
 [sub_resource type="Theme" id="Theme_uguab"]
 
@@ -49,7 +55,8 @@ theme = SubResource("Theme_e0llw")
 
 [node name="TitleLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-text = "CO-OP GAME"
+theme = SubResource("Theme_edqeb")
+text = "Kingdom Calls"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -59,6 +66,7 @@ layout_mode = 2
 
 [node name="NameLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
+theme = SubResource("Theme_lymr1")
 text = "Player Name"
 horizontal_alignment = 1
 

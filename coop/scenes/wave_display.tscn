@@ -1,34 +1,35 @@
-[gd_scene load_steps=2 format=3 uid="uid://dmq6ywaxch60e"]
+[gd_scene load_steps=3 format=3 uid="uid://dmq6ywaxch60e"]
 
-[ext_resource type="Script" path="res://coop/scripts/wave_display.gd" id="1_wave_display"]
+[ext_resource type="Script" uid="uid://b04advvs2mua0" path="res://coop/scripts/wave_display.gd" id="1_wave_display"]
+[ext_resource type="Texture2D" uid="uid://b8vjo1cktgop" path="res://assets/UI/Banners/Carved_3Slides.png" id="2_7ypbq"]
 
 [node name="WaveDisplay" type="CanvasLayer"]
 script = ExtResource("1_wave_display")
 
 [node name="Control" type="Control" parent="."]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
-[node name="Background" type="Panel" parent="Control"]
+[node name="NinePatchRect" type="NinePatchRect" parent="Control"]
 layout_mode = 0
-offset_left = 10.0
-offset_top = 50.0
-offset_right = 110.0
-offset_bottom = 80.0
+offset_left = 4.0
+offset_top = 44.0
+offset_right = 127.0
+offset_bottom = 84.0
+texture = ExtResource("2_7ypbq")
 
 [node name="WaveLabel" type="Label" parent="Control"]
 layout_mode = 0
-offset_left = 15.0
-offset_top = 52.0
-offset_right = 105.0
-offset_bottom = 78.0
+offset_left = 35.0
+offset_top = 55.0
+offset_right = 115.0
+offset_bottom = 74.0
 theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 18
 text = "Wave 1"
 vertical_alignment = 1
-

@@ -1,29 +1,31 @@
-[gd_scene load_steps=2 format=3 uid="uid://bjm5xv8h3n2yd"]
+[gd_scene load_steps=3 format=3 uid="uid://vp17ppixl6pi"]
 
-[ext_resource type="Script" path="res://coop/scripts/coin_display.gd" id="1_coin_display"]
+[ext_resource type="Script" uid="uid://d1hody0uhcwas" path="res://coop/scripts/coin_display.gd" id="1_coin_display"]
+[ext_resource type="Texture2D" uid="uid://b8vjo1cktgop" path="res://assets/UI/Banners/Carved_3Slides.png" id="2_cs8tx"]
 
 [node name="CoinDisplay" type="CanvasLayer"]
 script = ExtResource("1_coin_display")
 
 [node name="Control" type="Control" parent="."]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
-[node name="Background" type="Panel" parent="Control"]
+[node name="NinePatchRect" type="NinePatchRect" parent="Control"]
 layout_mode = 0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 110.0
-offset_bottom = 40.0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = 126.0
+offset_bottom = 43.0
+texture = ExtResource("2_cs8tx")
 
 [node name="CoinLabel" type="Label" parent="Control"]
 layout_mode = 0
-offset_left = 15.0
+offset_left = 17.0
 offset_top = 12.0
-offset_right = 105.0
+offset_right = 107.0
 offset_bottom = 38.0
 theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
@@ -31,4 +33,3 @@ theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 18
 text = "💰 0"
 vertical_alignment = 1
-

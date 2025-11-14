@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=4 uid="uid://hub_ui_001"]
+[gd_scene load_steps=3 format=3 uid="uid://cbgqfnnq7h54a"]
 
-[ext_resource type="Script" path="res://coop/scripts/ui/hub_ui.gd" id="1_hub_ui"]
+[ext_resource type="Script" uid="uid://b3jwvke86iiwe" path="res://coop/scripts/ui/hub_ui.gd" id="1_hub_ui"]
+[ext_resource type="Texture2D" uid="uid://b8vjo1cktgop" path="res://assets/UI/Banners/Carved_3Slides.png" id="2_n38jk"]
 
 [node name="HubUI" type="CanvasLayer"]
 script = ExtResource("1_hub_ui")
@@ -42,8 +43,14 @@ offset_right = -10.0
 offset_bottom = 60.0
 grow_horizontal = 0
 
+[node name="NinePatchRect" type="NinePatchRect" parent="MetaCoinsDisplay"]
+layout_mode = 2
+texture = ExtResource("2_n38jk")
+
 [node name="HBoxContainer" type="HBoxContainer" parent="MetaCoinsDisplay"]
 layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 
 [node name="Label" type="Label" parent="MetaCoinsDisplay/HBoxContainer"]
 layout_mode = 2
