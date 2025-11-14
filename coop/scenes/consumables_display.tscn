@@ -1,13 +1,13 @@
 [gd_scene load_steps=2 format=3 uid="uid://cmq6ywaxch61f"]
 
-[ext_resource type="Script" path="res://coop/scripts/consumables_display.gd" id="1_consumables_display"]
+[ext_resource type="Script" uid="uid://brou5tp6xl10c" path="res://coop/scripts/consumables_display.gd" id="1_consumables_display"]
 
 [node name="ConsumablesDisplay" type="CanvasLayer"]
 script = ExtResource("1_consumables_display")
 
 [node name="Control" type="Control" parent="."]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
@@ -16,7 +16,7 @@ mouse_filter = 2
 layout_mode = 0
 offset_left = 10.0
 offset_top = 90.0
-offset_right = 160.0
+offset_right = 89.0
 offset_bottom = 140.0
 
 [node name="KeyLabel" type="Label" parent="Control/Slot1Container"]
@@ -55,15 +55,14 @@ theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 12
-text = ""
 vertical_alignment = 1
 
 [node name="Slot2Container" type="Panel" parent="Control"]
 layout_mode = 0
 offset_left = 10.0
-offset_top = 150.0
-offset_right = 160.0
-offset_bottom = 200.0
+offset_top = 144.0
+offset_right = 90.0
+offset_bottom = 194.0
 
 [node name="KeyLabel" type="Label" parent="Control/Slot2Container"]
 layout_mode = 0
@@ -101,6 +100,4 @@ theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 12
-text = ""
 vertical_alignment = 1
-

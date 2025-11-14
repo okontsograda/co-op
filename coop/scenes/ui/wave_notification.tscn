@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=2 format=3 uid="uid://ccis3peu5c2f"]
 
-[ext_resource type="Script" path="res://coop/scripts/wave_notification.gd" id="1"]
+[ext_resource type="Script" uid="uid://l84qvr6qo28f" path="res://coop/scripts/wave_notification.gd" id="1"]
 
 [node name="WaveNotification" type="CanvasLayer"]
 layer = 99
@@ -12,16 +12,16 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -200.0
+offset_left = -205.5
 offset_top = -100.0
-offset_right = 200.0
-offset_bottom = -50.0
+offset_right = 205.5
+offset_bottom = -52.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="NotificationLabel" type="Label" parent="CenterContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 25
 text = "WAVE COMPLETE!"
 horizontal_alignment = 1
 vertical_alignment = 1

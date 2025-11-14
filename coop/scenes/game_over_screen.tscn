@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://game_over_screen"]
+[gd_scene load_steps=2 format=3 uid="uid://b8xxc2pd03yps"]
 
-[ext_resource type="Script" path="res://coop/scripts/game_over_screen.gd" id="1_game_over"]
+[ext_resource type="Script" uid="uid://cd7q5kn367ewa" path="res://coop/scripts/game_over_screen.gd" id="1_game_over"]
 
 [node name="GameOverScreen" type="CanvasLayer"]
 process_mode = 3
@@ -22,7 +22,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.8)
+color = Color(0, 0, 0, 0.28235295)
 
 [node name="Panel" type="PanelContainer" parent="Control"]
 layout_mode = 1
@@ -135,4 +135,3 @@ custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "🏠 Main Menu"
-

@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=2 format=3 uid="uid://cwyp2b4jfyvoo"]
 
-[ext_resource type="Script" path="res://coop/scripts/upgrade_overlay.gd" id="1"]
+[ext_resource type="Script" uid="uid://bxewbeol28n4i" path="res://coop/scripts/upgrade_overlay.gd" id="1"]
 
 [node name="UpgradeOverlay" type="CanvasLayer"]
 layer = 100
@@ -12,7 +12,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.6)
+color = Color(0, 0, 0, 0.2627451)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 anchors_preset = 8
@@ -158,5 +158,5 @@ layout_mode = 2
 custom_minimum_size = Vector2(200, 40)
 layout_mode = 2
 size_flags_horizontal = 4
-text = "ACCEPT"
 disabled = true
+text = "ACCEPT"
