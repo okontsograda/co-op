@@ -6,7 +6,7 @@ signal shop_opened(player: Node)
 
 var players_in_range: Array = []
 var interaction_hint_visible: bool = false
-
+ 
 @onready var interaction_label: Label = null
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var area_2d: Area2D = $Area2D

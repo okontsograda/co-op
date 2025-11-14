@@ -418,7 +418,7 @@ func _on_stairs_entered(body: Node2D, stair_type: String):
 	
 	tween.set_ease(Tween.EASE_OUT)
 	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(body, "position:y", target_y, 1.8)
+	tween.tween_property(body, "position:y", target_y, 1.3)
 	
 	print("[Hub] Player stair level now: ", player_stair_level)
 

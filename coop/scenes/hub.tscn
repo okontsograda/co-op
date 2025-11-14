@@ -6,7 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://bhsufdmkuf1iq" path="res://tileset/water.png" id="3_0jtoe"]
 [ext_resource type="PackedScene" uid="uid://ewcge3xong6o" path="res://coop/scenes/Characters/player.tscn" id="3_player"]
 [ext_resource type="Texture2D" uid="uid://4lf3tr8bint8" path="res://tileset/TX Props.png" id="4_0jtoe"]
-[ext_resource type="PackedScene" path="res://coop/scenes/ui/hub_ui.tscn" id="4_hub_ui"]
+[ext_resource type="PackedScene" uid="uid://cbgqfnnq7h54a" path="res://coop/scenes/ui/hub_ui.tscn" id="4_hub_ui"]
 [ext_resource type="PackedScene" uid="uid://c7y8qm5jh3dpb" path="res://coop/scenes/shop_building.tscn" id="8_shop"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_nk86r"]
