@@ -243,10 +243,7 @@ func set_combat_enabled(enabled: bool) -> void:
 		# Reset combat state when disabling
 		is_fire_button_held = false
 		is_firing = false
-		is_dodging = false
-		print("[Player] Combat disabled for player %s" % name)
-	else:
-		print("[Player] Combat enabled for player %s" % name)
+
 
 
 func _input(event: InputEvent) -> void:

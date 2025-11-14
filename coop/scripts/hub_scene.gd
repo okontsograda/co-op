@@ -346,3 +346,5 @@ func close_active_ui():
 		if hub_ui.has_method("close_ui"):
 			hub_ui.close_ui()
 			active_ui = ""
+
+
