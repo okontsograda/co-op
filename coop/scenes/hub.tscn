@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=4 uid="uid://drphd0ik0flog"]
+[gd_scene load_steps=14 format=4 uid="uid://drphd0ik0flog"]
 
 [ext_resource type="Script" uid="uid://n2kt6ejxhh06" path="res://coop/scripts/hub_scene.gd" id="1_hub"]
 [ext_resource type="Texture2D" uid="uid://c2yr8abhun5sd" path="res://tileset/Tilemap_color2.png" id="2_dq8il"]
@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" uid="uid://4lf3tr8bint8" path="res://tileset/TX Props.png" id="4_0jtoe"]
 [ext_resource type="PackedScene" path="res://coop/scenes/ui/hub_ui.tscn" id="4_hub_ui"]
 [ext_resource type="PackedScene" uid="uid://c7y8qm5jh3dpb" path="res://coop/scenes/shop_building.tscn" id="8_shop"]
+[ext_resource type="PackedScene" uid="uid://cnrk8t3kawh8m" path="res://coop/scenes/teleporter_building.tscn" id="9_teleporter"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_nk86r"]
 texture = ExtResource("2_dq8il")
@@ -1085,12 +1086,6 @@ sources/0 = SubResource("TileSetAtlasSource_nk86r")
 sources/1 = SubResource("TileSetAtlasSource_bhm40")
 sources/2 = SubResource("TileSetAtlasSource_6gr1y")
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_interact"]
-size = Vector2(150, 150)
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_v0mpi"]
-radius = 51.971146
-
 [node name="Hub" type="Node2D"]
 script = ExtResource("1_hub")
 
@@ -1123,8 +1118,8 @@ position = Vector2(72, -53)
 [node name="CharacterHouse" parent="Buildings" instance=ExtResource("8_shop")]
 position = Vector2(124, 237)
 
-[node name="ShopBuilding" parent="Buildings" instance=ExtResource("8_shop")]
-position = Vector2(800, 250)
+[node name="MetaShop" parent="Buildings" instance=ExtResource("8_shop")]
+position = Vector2(807, 226)
 
 [node name="StatsHouse" parent="Buildings" instance=ExtResource("8_shop")]
 position = Vector2(300, 600)
@@ -1132,96 +1127,7 @@ position = Vector2(300, 600)
 [node name="MissionHall" parent="Buildings" instance=ExtResource("8_shop")]
 position = Vector2(800, 600)
 
-[node name="InteractiveZones" type="Node2D" parent="."]
-position = Vector2(72, -53)
-
-[node name="CharacterStation" type="Area2D" parent="InteractiveZones"]
-position = Vector2(128, 261)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/CharacterStation"]
-shape = SubResource("RectangleShape2D_interact")
-
-[node name="Label" type="Label" parent="InteractiveZones/CharacterStation"]
-offset_left = -75.0
-offset_top = -100.0
-offset_right = 75.0
-offset_bottom = -70.0
-text = "Character Selection"
-horizontal_alignment = 1
-
-[node name="MetaShop" type="Area2D" parent="InteractiveZones"]
-position = Vector2(800, 250)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/MetaShop"]
-shape = SubResource("RectangleShape2D_interact")
-
-[node name="Label" type="Label" parent="InteractiveZones/MetaShop"]
-offset_left = -75.0
-offset_top = -100.0
-offset_right = 75.0
-offset_bottom = -70.0
-text = "Meta Shop"
-horizontal_alignment = 1
-
-[node name="StatsDisplay" type="Area2D" parent="InteractiveZones"]
-position = Vector2(300, 600)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/StatsDisplay"]
-shape = SubResource("RectangleShape2D_interact")
-
-[node name="Label" type="Label" parent="InteractiveZones/StatsDisplay"]
-offset_left = -75.0
-offset_top = -100.0
-offset_right = 75.0
-offset_bottom = -70.0
-text = "Statistics"
-horizontal_alignment = 1
-
-[node name="MissionBoard" type="Area2D" parent="InteractiveZones"]
-position = Vector2(800, 600)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/MissionBoard"]
-shape = SubResource("RectangleShape2D_interact")
-
-[node name="Label" type="Label" parent="InteractiveZones/MissionBoard"]
-offset_left = -75.0
-offset_top = -100.0
-offset_right = 75.0
-offset_bottom = -70.0
-text = "Mission Board"
-horizontal_alignment = 1
-
-[node name="SkillTree" type="Area2D" parent="InteractiveZones"]
-position = Vector2(550, 425)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/SkillTree"]
-shape = SubResource("RectangleShape2D_interact")
-
-[node name="Label" type="Label" parent="InteractiveZones/SkillTree"]
-offset_left = -75.0
-offset_top = -100.0
-offset_right = 75.0
-offset_bottom = -70.0
-text = "Skill Tree (Coming Soon)"
-horizontal_alignment = 1
-
-[node name="TeleportPad" type="Area2D" parent="InteractiveZones"]
-position = Vector2(-74, 392)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractiveZones/TeleportPad"]
-position = Vector2(449, -79)
-shape = SubResource("CircleShape2D_v0mpi")
-
-[node name="Label" type="Label" parent="InteractiveZones/TeleportPad"]
-offset_left = 376.0
-offset_top = -150.0
-offset_right = 526.0
-offset_bottom = -100.0
-text = "Mission Teleporter"
-horizontal_alignment = 1
-
-[node name="TeleportRuin" type="TileMapLayer" parent="InteractiveZones/TeleportPad"]
-tile_map_data = PackedByteArray("AAAZAPn/AgAWABEAAAAZAPr/AgAWABIAAAAZAPv/AgAWABMAAAAZAPz/AgAWABQAAAAaAPn/AgAXABEAAAAaAPr/AgAXABIAAAAaAPv/AgAXABMAAAAaAPz/AgAXABQAAAAaAP3/AgAXABUAAAAbAPj/AgAYABAAAAAbAPn/AgAYABEAAAAbAPr/AgAYABIAAAAbAPv/AgAYABMAAAAbAPz/AgAYABQAAAAbAP3/AgAYABUAAAAcAPj/AgAZABAAAAAcAPn/AgAZABEAAAAcAPr/AgAZABIAAAAcAPv/AgAZABMAAAAcAPz/AgAZABQAAAAcAP3/AgAZABUAAAAdAPn/AgAaABEAAAAdAPr/AgAaABIAAAAdAPv/AgAaABMAAAAdAPz/AgAaABQAAAAdAP3/AgAaABUAAAAeAPn/AgAbABEAAAAeAPr/AgAbABIAAAAeAPv/AgAbABMAAAAeAPz/AgAbABQAAAA=")
-tile_set = SubResource("TileSet_6gr1y")
+[node name="Teleporter" parent="Buildings" instance=ExtResource("9_teleporter")]
+position = Vector2(375, 313)
 
 [node name="HubUI" parent="." instance=ExtResource("4_hub_ui")]

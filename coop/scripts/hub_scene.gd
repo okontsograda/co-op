@@ -3,15 +3,14 @@ extends Node2D
 ## Hub Scene Script - Manages hub scene logic and player interactions
 
 @onready var camera: Camera2D = $Camera2D
-@onready var interactive_zones: Node2D = $InteractiveZones
 
-# Interactive zone references
-@onready var character_station: Area2D = $InteractiveZones/CharacterStation
-@onready var meta_shop: Area2D = $InteractiveZones/MetaShop
-@onready var stats_display: Area2D = $InteractiveZones/StatsDisplay
-@onready var mission_board: Area2D = $InteractiveZones/MissionBoard
-@onready var skill_tree: Area2D = $InteractiveZones/SkillTree
-@onready var teleporter_pad: Area2D = $InteractiveZones/TeleportPad
+# Interactive zone references - now pointing to building Area2D nodes
+@onready var character_station: Area2D = $Buildings/CharacterHouse/Area2D
+@onready var meta_shop: Area2D = $Buildings/MetaShop/Area2D
+@onready var stats_display: Area2D = $Buildings/StatsHouse/Area2D
+@onready var mission_board: Area2D = $Buildings/MissionHall/Area2D
+@onready var skill_tree: Area2D = null  # SkillTree building doesn't exist yet
+@onready var teleporter_pad: Area2D = $Buildings/Teleporter/Area2D
 
 # Local player reference
 var local_player: Node2D = null
@@ -184,8 +183,9 @@ func _connect_interaction_zones():
 	mission_board.body_entered.connect(_on_zone_entered.bind("mission"))
 	mission_board.body_exited.connect(_on_zone_exited.bind("mission"))
 
-	skill_tree.body_entered.connect(_on_zone_entered.bind("skill"))
-	skill_tree.body_exited.connect(_on_zone_exited.bind("skill"))
+	if skill_tree:
+		skill_tree.body_entered.connect(_on_zone_entered.bind("skill"))
+		skill_tree.body_exited.connect(_on_zone_exited.bind("skill"))
 	if teleporter_pad:
 		teleporter_pad.body_entered.connect(_on_zone_entered.bind("teleporter"))
 		teleporter_pad.body_exited.connect(_on_zone_exited.bind("teleporter"))
@@ -281,8 +281,8 @@ func _on_zone_entered(body: Node2D, zone_type: String):
 		return
 
 	print("[Hub] Entered %s zone" % zone_type)
-	# Show interaction prompt
-	_show_interaction_prompt(zone_type, true)
+	# Disabled bottom interaction prompt - using building labels instead
+	# _show_interaction_prompt(zone_type, true)
 
 
 func _on_zone_exited(body: Node2D, zone_type: String):
@@ -290,7 +290,8 @@ func _on_zone_exited(body: Node2D, zone_type: String):
 		return
 
 	print("[Hub] Exited %s zone" % zone_type)
-	_show_interaction_prompt(zone_type, false)
+	# Disabled bottom interaction prompt - using building labels instead
+	# _show_interaction_prompt(zone_type, false)
 
 
 func _show_interaction_prompt(zone_type: String, show: bool):
