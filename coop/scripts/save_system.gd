@@ -22,6 +22,12 @@ var player_data = {
 	"unlocked_cosmetics": [],  # Future: cosmetic items
 	"permanent_upgrades": {},  # Future: permanent stat boosts {upgrade_id: level}
 	"achievements": [],  # Future: achievement tracking
+	"selected_class": "Archer",  # Currently selected class
+
+	# Combat stats
+	"boss_kills": 0,
+	"deaths": 0,
+	"damage_dealt": 0,
 
 	# Loadout preferences (saved from hub)
 	"last_loadout": {
@@ -289,6 +295,54 @@ func upgrade_permanent_stat(upgrade_id: String, max_level: int = -1) -> bool:
 	return true
 
 
+func get_selected_class() -> String:
+	return player_data.selected_class
+
+
+func set_selected_class(p_class_name: String) -> void:
+	if is_class_unlocked(p_class_name):
+		player_data.selected_class = p_class_name
+		save_data()
+
+
+func is_cosmetic_unlocked(cosmetic_name: String) -> bool:
+	return cosmetic_name in player_data.unlocked_cosmetics
+
+
+func unlock_cosmetic(cosmetic_name: String) -> void:
+	if not is_cosmetic_unlocked(cosmetic_name):
+		player_data.unlocked_cosmetics.append(cosmetic_name)
+		print("[SaveSystem] Unlocked cosmetic: %s" % cosmetic_name)
+		save_data()
+
+
+func get_boss_kills() -> int:
+	return player_data.boss_kills
+
+
+func add_boss_kill() -> void:
+	player_data.boss_kills += 1
+	save_data()
+
+
+func get_deaths() -> int:
+	return player_data.deaths
+
+
+func add_death() -> void:
+	player_data.deaths += 1
+	save_data()
+
+
+func get_damage_dealt() -> int:
+	return player_data.damage_dealt
+
+
+func add_damage_dealt(damage: int) -> void:
+	player_data.damage_dealt += damage
+	save_data()
+
+
 # === UTILITY FUNCTIONS ===
 
 # Reset all save data (useful for testing or implementing a "reset progress" feature)
@@ -306,6 +360,10 @@ func reset_save_data() -> void:
 		"unlocked_cosmetics": [],
 		"permanent_upgrades": {},
 		"achievements": [],
+		"selected_class": "Archer",
+		"boss_kills": 0,
+		"deaths": 0,
+		"damage_dealt": 0,
 		"last_loadout": {
 			"class": "Archer",
 			"weapon": "bow"

@@ -307,6 +307,11 @@ func _process(_delta):
 	if Input.is_action_just_pressed("ui_accept"):  # E or Enter key
 		_try_interact()
 
+	# Handle UI closing
+	if Input.is_action_just_pressed("ui_cancel"):  # ESC key
+		if active_ui != "":
+			close_active_ui()
+
 
 func _try_interact():
 	if not local_player:
@@ -334,16 +339,75 @@ func _try_interact():
 func _open_zone_ui(zone_type: String):
 	print("[Hub] Opening %s UI" % zone_type)
 
-	if has_node("HubUI"):
-		var hub_ui = get_node("HubUI")
-		if hub_ui.has_method("open_ui"):
-			hub_ui.open_ui(zone_type)
-			active_ui = zone_type
+	# Use the new meta progression UI for meta-related zones
+	if zone_type in ["character", "shop", "stats"]:
+		_open_meta_progression_ui(zone_type)
+	else:
+		# Use the existing hub UI for other zones (mission, teleporter)
+		if has_node("HubUI"):
+			var hub_ui = get_node("HubUI")
+			if hub_ui.has_method("open_ui"):
+				hub_ui.open_ui(zone_type)
+				active_ui = zone_type
+
+
+func _open_meta_progression_ui(tab: String):
+	# Check if meta progression UI instance exists
+	var meta_ui = get_node_or_null("MetaProgressionUI")
+
+	if not meta_ui:
+		# Load and instantiate the meta progression UI
+		var meta_ui_scene = preload("res://coop/scenes/ui/meta_progression/meta_progression_ui.tscn")
+		meta_ui = meta_ui_scene.instantiate()
+		meta_ui.name = "MetaProgressionUI"
+		add_child(meta_ui)
+
+		# Connect signals
+		meta_ui.closed.connect(_on_meta_ui_closed)
+		meta_ui.class_selected.connect(_on_class_selected)
+		meta_ui.item_purchased.connect(_on_item_purchased)
+
+	# Open the UI with the requested tab
+	meta_ui.open(tab)
+	active_ui = "meta_progression"
 
 
 func close_active_ui():
-	if has_node("HubUI"):
+	if active_ui == "meta_progression":
+		var meta_ui = get_node_or_null("MetaProgressionUI")
+		if meta_ui:
+			meta_ui.close()
+	elif has_node("HubUI"):
 		var hub_ui = get_node("HubUI")
 		if hub_ui.has_method("close_ui"):
 			hub_ui.close_ui()
-			active_ui = ""
+	active_ui = ""
+
+
+func _on_meta_ui_closed():
+	active_ui = ""
+	print("[Hub] Meta progression UI closed")
+
+
+func _on_class_selected(selected_class: String):
+	print("[Hub] Class selected: %s" % selected_class)
+
+	# Update player loadout in LobbyManager
+	var peer_id = multiplayer.get_unique_id()
+	if peer_id in LobbyManager.players:
+		LobbyManager.players[peer_id]["class"] = selected_class
+		SaveSystem.save_loadout(selected_class, LobbyManager.players[peer_id]["weapon"])
+
+	# Update visual representation if needed
+	if local_player and local_player.has_method("set_class"):
+		local_player.set_class(selected_class)
+
+
+func _on_item_purchased(item_data: Dictionary):
+	print("[Hub] Item purchased: %s" % item_data.name)
+
+	# Play purchase sound effect if available
+	# AudioManager.play_sfx("purchase")
+
+	# Show purchase notification if available
+	# NotificationManager.show_notification("Purchased: " + item_data.name)

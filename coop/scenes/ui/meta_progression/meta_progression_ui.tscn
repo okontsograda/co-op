@@ -1,0 +1,241 @@
+[gd_scene load_steps=2 format=3 uid="uid://dymu16rrml1aw"]
+
+[ext_resource type="Script" path="res://coop/scripts/ui/meta_progression/meta_progression_ui.gd" id="1_meta_ui"]
+
+[node name="MetaProgressionUI" type="CanvasLayer"]
+script = ExtResource("1_meta_ui")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Background" type="ColorRect" parent="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.8)
+
+[node name="MainContainer" type="MarginContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Header" type="HBoxContainer" parent="Control/MainContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Control/MainContainer/VBoxContainer/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Meta Progression"
+theme_type_variation = &"HeaderLarge"
+
+[node name="MetaCoinsDisplay" type="PanelContainer" parent="Control/MainContainer/VBoxContainer/Header"]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Control/MainContainer/VBoxContainer/Header/MetaCoinsDisplay"]
+layout_mode = 2
+
+[node name="CoinIcon" type="Label" parent="Control/MainContainer/VBoxContainer/Header/MetaCoinsDisplay/HBoxContainer"]
+layout_mode = 2
+text = "💰"
+
+[node name="CoinsLabel" type="Label" parent="Control/MainContainer/VBoxContainer/Header/MetaCoinsDisplay/HBoxContainer"]
+layout_mode = 2
+text = "0 MC"
+theme_type_variation = &"HeaderSmall"
+
+[node name="CloseButton" type="Button" parent="Control/MainContainer/VBoxContainer/Header"]
+layout_mode = 2
+text = "X"
+
+[node name="TabContainer" type="TabContainer" parent="Control/MainContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Character" type="MarginContainer" parent="Control/MainContainer/VBoxContainer/TabContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer"]
+layout_mode = 2
+text = "Select Your Class"
+theme_type_variation = &"HeaderMedium"
+horizontal_alignment = 1
+
+[node name="ClassGrid" type="GridContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 20
+columns = 4
+
+[node name="SelectedClassInfo" type="PanelContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo"]
+layout_mode = 2
+
+[node name="ClassName" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo/VBoxContainer"]
+layout_mode = 2
+text = "Archer"
+theme_type_variation = &"HeaderMedium"
+
+[node name="ClassDescription" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo/VBoxContainer"]
+layout_mode = 2
+text = "A ranged damage dealer with high mobility."
+autowrap_mode = 2
+
+[node name="Shop" type="MarginContainer" parent="Control/MainContainer/VBoxContainer/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop"]
+layout_mode = 2
+
+[node name="ShopHeader" type="HBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Meta Shop"
+theme_type_variation = &"HeaderMedium"
+
+[node name="FilterButtons" type="HBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader"]
+layout_mode = 2
+
+[node name="AllButton" type="Button" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons"]
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+text = "All"
+
+[node name="ClassButton" type="Button" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons"]
+layout_mode = 2
+toggle_mode = true
+text = "Classes"
+
+[node name="WeaponButton" type="Button" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons"]
+layout_mode = 2
+toggle_mode = true
+text = "Weapons"
+
+[node name="CosmeticButton" type="Button" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons"]
+layout_mode = 2
+toggle_mode = true
+text = "Cosmetics"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ShopItemList" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Stats" type="MarginContainer" parent="Control/MainContainer/VBoxContainer/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer"]
+layout_mode = 2
+text = "Career Statistics"
+theme_type_variation = &"HeaderMedium"
+horizontal_alignment = 1
+
+[node name="StatsGrid" type="GridContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer"]
+layout_mode = 2
+columns = 2
+
+[node name="GeneralStats" type="PanelContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid/GeneralStats"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid/GeneralStats/VBoxContainer"]
+layout_mode = 2
+text = "General"
+theme_type_variation = &"HeaderSmall"
+
+[node name="StatsList" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid/GeneralStats/VBoxContainer"]
+layout_mode = 2
+
+[node name="CombatStats" type="PanelContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid/CombatStats"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid/CombatStats/VBoxContainer"]
+layout_mode = 2
+text = "Combat"
+theme_type_variation = &"HeaderSmall"
+
+[node name="StatsList" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Stats/VBoxContainer/StatsGrid/CombatStats/VBoxContainer"]
+layout_mode = 2
+
+[node name="Achievements" type="MarginContainer" parent="Control/MainContainer/VBoxContainer/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Achievements"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Achievements/VBoxContainer"]
+layout_mode = 2
+text = "Achievements"
+theme_type_variation = &"HeaderMedium"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Achievements/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AchievementsList" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Achievements/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[connection signal="pressed" from="Control/MainContainer/VBoxContainer/Header/CloseButton" to="." method="_on_close_button_pressed"]
+[connection signal="pressed" from="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons/AllButton" to="." method="_on_filter_button_pressed" binds= ["all"]]
+[connection signal="pressed" from="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons/ClassButton" to="." method="_on_filter_button_pressed" binds= ["class"]]
+[connection signal="pressed" from="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons/WeaponButton" to="." method="_on_filter_button_pressed" binds= ["weapon"]]
+[connection signal="pressed" from="Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ShopHeader/FilterButtons/CosmeticButton" to="." method="_on_filter_button_pressed" binds= ["cosmetic"]]

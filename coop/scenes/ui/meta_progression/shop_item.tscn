@@ -1,0 +1,56 @@
+[gd_scene load_steps=2 format=3 uid="uid://bxqwv7kj8m5ne"]
+
+[ext_resource type="Script" path="res://coop/scripts/ui/meta_progression/shop_item.gd" id="1_shop_item"]
+
+[node name="ShopItem" type="PanelContainer"]
+custom_minimum_size = Vector2(400, 80)
+script = ExtResource("1_shop_item")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 10
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="IconRect" type="TextureRect" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(48, 48)
+expand_mode = 1
+stretch_mode = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ItemName" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+text = "Item Name"
+theme_type_variation = &"HeaderMedium"
+
+[node name="ItemDescription" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+text = "Item description goes here"
+theme_type_variation = &"SubText"
+autowrap_mode = 2
+
+[node name="PriceContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="PriceLabel" type="Label" parent="MarginContainer/HBoxContainer/PriceContainer"]
+layout_mode = 2
+text = "500 MC"
+theme_type_variation = &"HeaderSmall"
+horizontal_alignment = 1
+
+[node name="BuyButton" type="Button" parent="MarginContainer/HBoxContainer/PriceContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = "Buy"
+
+[connection signal="pressed" from="MarginContainer/HBoxContainer/PriceContainer/BuyButton" to="." method="_on_buy_button_pressed"]

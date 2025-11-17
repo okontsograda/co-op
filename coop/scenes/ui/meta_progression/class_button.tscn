@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://bfa7ge78kyam5"]
+
+[ext_resource type="Script" path="res://coop/scripts/ui/meta_progression/class_button.gd" id="1_class_button"]
+
+[node name="ClassButton" type="PanelContainer"]
+custom_minimum_size = Vector2(120, 150)
+script = ExtResource("1_class_button")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+alignment = 1
+
+[node name="IconRect" type="TextureRect" parent="VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 80)
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ClassName" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Archer"
+theme_type_variation = &"HeaderSmall"
+horizontal_alignment = 1
+
+[node name="SelectButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Select"
+
+[node name="LockedOverlay" type="ColorRect" parent="."]
+visible = false
+layout_mode = 2
+color = Color(0, 0, 0, 0.7)
+mouse_filter = 2
+
+[node name="LockIcon" type="Label" parent="LockedOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+text = "🔒"
+theme_type_variation = &"HeaderLarge"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[connection signal="pressed" from="VBoxContainer/SelectButton" to="." method="_on_select_button_pressed"]
