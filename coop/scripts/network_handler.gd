@@ -337,6 +337,11 @@ func start_server(go_to_lobby: bool = true) -> void:
 
 
 func _on_peer_connected_sync(peer_id: int) -> void:
+	# When a new peer connects, ensure they're registered in LobbyManager
+	# (They will send their data via LobbyManager sync)
+	if LobbyManager and not LobbyManager.players.has(peer_id):
+		LobbyManager.register_player(peer_id, false)
+	
 	# When a new peer connects, send them all existing enemies
 	print("New peer ", peer_id, " connected, syncing existing enemies")
 

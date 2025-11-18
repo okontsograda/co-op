@@ -44,6 +44,12 @@ func enter_lobby(host_online_id: String = ""):
 	register_player(local_id, is_host)
 	print("After register_player, players dict: ", players)
 
+	# If we're a client, send our local data to the host
+	if not is_host:
+		# Wait a moment for connection to stabilize
+		await get_tree().create_timer(0.2).timeout
+		sync_local_player_data_to_host()
+
 	# If we're the server, set up multiplayer signals
 	if multiplayer.is_server():
 		_setup_multiplayer_signals()
@@ -58,6 +64,7 @@ func leave_lobby():
 func _on_peer_connected(peer_id: int):
 	if is_in_lobby and multiplayer.is_server():
 		if not players.has(peer_id):
+			# Register with defaults first - peer will send their actual data via RPC
 			register_player(peer_id, false)
 		# Send current lobby state to new player
 		_send_lobby_state_to_peer.rpc_id(peer_id, players)
@@ -127,6 +134,11 @@ func _send_lobby_state_to_peer(lobby_state: Dictionary):
 		if not players.has(peer_id):
 			players[peer_id] = lobby_state[peer_id]
 			player_joined.emit(peer_id, lobby_state[peer_id])
+	
+	# After receiving lobby state, send our local data to host if we're a client
+	if not multiplayer.is_server():
+		await get_tree().create_timer(0.1).timeout
+		sync_local_player_data_to_host()
 
 
 # Set player's selected class
@@ -277,6 +289,60 @@ func _broadcast_player_kicked(peer_id: int):
 	if players.has(peer_id):
 		players.erase(peer_id)
 		player_left.emit(peer_id)
+
+
+# Client sends their local player data to host
+func sync_local_player_data_to_host() -> void:
+	if multiplayer.is_server():
+		return  # Host doesn't need to sync to itself
+	
+	# Wait for SaveSystem to load if needed
+	if not SaveSystem.is_loaded:
+		await SaveSystem.data_loaded
+	
+	# Get local player data from SaveSystem
+	var local_id = multiplayer.get_unique_id()
+	var player_class = "archer"
+	var player_weapon = "bow"
+	var player_name = "Player " + str(local_id)
+	
+	var saved_class = SaveSystem.get_selected_class()
+	if saved_class != "":
+		player_class = saved_class.to_lower()
+	
+	var loadout = SaveSystem.get_last_loadout()
+	if loadout.has("weapon") and loadout["weapon"] != "":
+		player_weapon = loadout["weapon"].to_lower()
+	
+	var saved_name = SaveSystem.get_player_name()
+	if saved_name != "":
+		player_name = saved_name
+	
+	print("[LobbyManager] Client syncing local data to host: class=", player_class, ", weapon=", player_weapon, ", name=", player_name)
+	
+	# Send to host
+	_receive_player_data_from_client.rpc_id(1, local_id, player_class, player_weapon, player_name)
+
+
+# Host receives player data from client
+@rpc("any_peer", "reliable")
+func _receive_player_data_from_client(peer_id: int, player_class: String, player_weapon: String, player_name: String) -> void:
+	if not multiplayer.is_server():
+		return
+	
+	print("[LobbyManager] Host received player data from peer ", peer_id, ": class=", player_class, ", weapon=", player_weapon, ", name=", player_name)
+	
+	# Update the player's data in LobbyManager
+	if players.has(peer_id):
+		players[peer_id]["class"] = player_class
+		players[peer_id]["weapon"] = player_weapon
+		players[peer_id]["player_name"] = player_name
+		
+		# Broadcast updated data to all clients
+		_broadcast_player_joined.rpc(peer_id, players[peer_id])
+		print("[LobbyManager] Updated and broadcasted player ", peer_id, " data")
+	else:
+		print("[LobbyManager] Warning: Received data for peer ", peer_id, " but they're not registered yet")
 
 
 # Start the game (host only)

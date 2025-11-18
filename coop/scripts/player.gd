@@ -272,6 +272,10 @@ func _ready() -> void:
 		await get_tree().process_frame
 		var player_peer_id = name.to_int()
 		GameDirector.update_player_health(player_peer_id, current_health, max_health)
+		
+		# Sync initial health to all clients when player spawns
+		# This ensures peers see the correct health when a player first appears
+		sync_player_health.rpc(current_health)
 
 
 ## Enable or disable combat (used in hub/safe zones)
@@ -912,7 +916,8 @@ func request_dash_strike(target_pos: Vector2, strike_range: float) -> void:
 		process_dash_strike_on_server(global_position, target_pos, strike_range)
 	else:
 		# Send dash strike request to server
-		rpc_id(1, "process_dash_strike_on_server", global_position, target_pos, strike_range)
+		# Use rpc() instead of rpc_id(1) for better reliability - server will filter it
+		process_dash_strike_on_server.rpc(global_position, target_pos, strike_range)
 
 ## Server processes dash strike (authoritative)
 @rpc("any_peer", "reliable")
@@ -920,11 +925,16 @@ func process_dash_strike_on_server(attacker_pos: Vector2, target_pos: Vector2, s
 	if not multiplayer.is_server():
 		return
 
-	# Get attacker
+	# Get attacker peer ID
 	var attacker_peer_id = multiplayer.get_remote_sender_id()
-	# If called directly (not via RPC), use the caller's unique ID
+	# If called directly (not via RPC, e.g., from server itself), use the caller's unique ID
 	if attacker_peer_id == 0:
 		attacker_peer_id = multiplayer.get_unique_id()
+	
+	# Validate we got a valid peer ID
+	if attacker_peer_id == 0:
+		push_warning("Failed to get attacker peer ID for dash strike")
+		return
 
 	# SECURITY: Rate limiting - prevent dash strike spam
 	if not validate_rpc_rate_limit(attacker_peer_id, "process_dash_strike_on_server", ATTACK_RPC_MIN_INTERVAL):
@@ -1102,7 +1112,8 @@ func request_melee_attack(target_pos: Vector2) -> void:
 		process_melee_attack_on_server(global_position, target_pos)
 	else:
 		# Send attack request to server with attacker's position and target
-		rpc_id(1, "process_melee_attack_on_server", global_position, target_pos)
+		# Use rpc() instead of rpc_id(1) for better reliability - server will filter it
+		process_melee_attack_on_server.rpc(global_position, target_pos)
 
 ## Server processes melee attack (authoritative hit detection)
 @rpc("any_peer", "reliable")
@@ -1112,9 +1123,15 @@ func process_melee_attack_on_server(attacker_pos: Vector2, target_pos: Vector2) 
 
 	# Get attacker peer ID and find their player
 	var attacker_peer_id = multiplayer.get_remote_sender_id()
-	# If called directly (not via RPC), use the caller's unique ID
+	# If called directly (not via RPC, e.g., from server itself), use the caller's unique ID
 	if attacker_peer_id == 0:
+		# This happens when server calls it directly (not via RPC)
 		attacker_peer_id = multiplayer.get_unique_id()
+	
+	# Validate we got a valid peer ID
+	if attacker_peer_id == 0:
+		push_warning("Failed to get attacker peer ID for melee attack")
+		return
 
 	# SECURITY: Rate limiting - prevent attack spam
 	if not validate_rpc_rate_limit(attacker_peer_id, "process_melee_attack_on_server", ATTACK_RPC_MIN_INTERVAL):
@@ -1390,7 +1407,7 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 	# Server checks dodge status
 	if dodge_invincible:
 		# Notify all clients damage was evaded (for VFX)
-		rpc("on_damage_evaded")
+		on_damage_evaded.rpc()
 		print("Player ", name, " evaded attack!")
 		return
 
@@ -1409,7 +1426,8 @@ func take_damage(amount: int, attacker: Node2D) -> void:
 
 	# Broadcast damage to all clients (including victim)
 	var attacker_name = str(attacker.name) if attacker else "unknown"
-	rpc("apply_damage_from_server", amount, current_health, attacker_name)
+	# Use rpc() to broadcast to all clients - the RPC will only execute on clients due to @rpc("authority") mode
+	apply_damage_from_server.rpc(amount, current_health, attacker_name)
 
 	# Check for death on server
 	if current_health <= 0:
@@ -1421,11 +1439,11 @@ func handle_death_on_server(attacker_name: String) -> void:
 		return
 
 	# Broadcast death to all clients
-	rpc("handle_death_rpc")
-	rpc("on_player_died", attacker_name)
+	handle_death_rpc.rpc()
+	on_player_died.rpc(attacker_name)
 
 ## Client receives damage from server (authoritative)
-@rpc("authority", "reliable", "call_local")
+@rpc("any_peer", "reliable", "call_local")
 func apply_damage_from_server(amount: int, new_health: int, attacker_name: String) -> void:
 	# SECURITY: Verify this RPC came from server
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -1442,7 +1460,7 @@ func apply_damage_from_server(amount: int, new_health: int, attacker_name: Strin
 	# (damage feedback code would go here)
 
 ## Client receives evade notification
-@rpc("authority", "reliable", "call_local")
+@rpc("any_peer", "reliable", "call_local")
 func on_damage_evaded() -> void:
 	# SECURITY: Verify this RPC came from server
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -1555,10 +1573,14 @@ func spawn_evade_text() -> void:
 
 ## DEPRECATED: Use apply_damage_from_server or apply_healing_from_server instead
 ## This RPC is now server-authoritative only
-@rpc("authority", "reliable", "call_local")
+@rpc("any_peer", "reliable", "call_local")
 func sync_player_health(health: int) -> void:
-	# Only server can broadcast health changes
-	# Clients receive this RPC from server, not send it
+	# SECURITY: Verify this RPC came from server
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not validate_rpc_authority(sender_id, "sync_player_health"):
+		return
+	
+	# Update health to match server
 	current_health = health
 
 	# Update GameDirector with health change (server only)
@@ -1586,10 +1608,10 @@ func heal(amount: int) -> void:
 	GameDirector.update_player_health(peer_id, current_health, max_health)
 
 	# Broadcast healing to all clients
-	rpc("apply_healing_from_server", amount, current_health)
+	apply_healing_from_server.rpc(amount, current_health)
 
 ## Client receives healing from server (authoritative)
-@rpc("authority", "reliable", "call_local")
+@rpc("any_peer", "reliable", "call_local")
 func apply_healing_from_server(amount: int, new_health: int) -> void:
 	# SECURITY: Verify this RPC came from server
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -2201,7 +2223,7 @@ func complete_revive() -> void:
 		GameDirector.update_player_health(peer_id, current_health, max_health)
 
 	# Broadcast revive completion
-	rpc("sync_revive_complete", name.to_int(), current_health)
+	sync_revive_complete.rpc(name.to_int(), current_health)
 
 	# Remove revive indicator
 	remove_revive_indicator()

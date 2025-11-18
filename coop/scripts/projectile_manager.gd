@@ -85,8 +85,13 @@ func spawn_projectile(
 
 	# Get actual sender (handle direct calls vs RPC)
 	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:  # Called directly, not via RPC
+	if sender_id == 0:  # Called directly, not via RPC (e.g., from server itself)
 		sender_id = shooter_peer_id
+	
+	# Validate we got a valid sender ID
+	if sender_id == 0:
+		push_warning("Failed to get sender ID for projectile spawn")
+		return
 
 	# SECURITY: Rate limiting
 	if not _validate_rpc_rate_limit(sender_id, "spawn_projectile"):
