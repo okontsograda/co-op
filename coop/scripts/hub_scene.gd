@@ -482,6 +482,11 @@ func _on_character_selection_confirmed(selected_class: String, selected_weapon: 
 			LobbyManager.players[peer_id]["class"] = selected_class
 			LobbyManager.players[peer_id]["weapon"] = selected_weapon
 		
+		# Update player metadata to keep it in sync (for stats screen and other systems)
+		local_player.set_meta("selected_class", selected_class)
+		local_player.set_meta("selected_weapon", selected_weapon)
+		print("[Hub] Updated player metadata: class=%s, weapon=%s" % [selected_class, selected_weapon])
+		
 		# Apply class modifiers to update sprite, stats, and appearance
 		if local_player.has_method("apply_class_modifiers"):
 			local_player.apply_class_modifiers(selected_class)

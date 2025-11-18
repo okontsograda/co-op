@@ -1,9 +1,17 @@
 extends CharacterBody2D
 
 
+# Base Stats (exported for easy editing in Inspector)
+@export_group("Base Stats")
+@export var base_max_health: int = 100  # Base maximum health before class modifiers
+@export var base_attack_damage: int = 15  # Base attack damage before class modifiers
+@export var base_walk_speed: float = 100.0  # Base walking speed before class modifiers
+@export var base_run_speed: float = 135.0  # Base running speed before class modifiers
+@export var base_fire_cooldown: float = 1.0  # Base fire cooldown (seconds) before class modifiers
+
 # Movement speeds
-const walk_speed: float = 100.0  # Default walking speed
-const run_speed: float = 135.0  # Running speed (when holding Shift)
+var walk_speed: float = 100.0  # Current walking speed (base * class modifier)
+var run_speed: float = 135.0  # Current running speed (base * class modifier)
 var current_speed: float = walk_speed
 var class_speed_modifier: float = 1.0  # Modifier from class selection
 
@@ -14,9 +22,9 @@ const stamina_drain_rate: float = 40.0  # Stamina drained per second when runnin
 const stamina_regen_rate: float = 25.0  # Stamina regenerated per second when not running
 var is_running: bool = false
 
-var max_health: int = 100
+var max_health: int = 100  # Current max health (base * class modifier)
 var current_health: int = max_health
-@export var attack_damage: int  # Base arrow damage (editable in Inspector)
+var attack_damage: int = 15  # Current attack damage (base * class modifier)
 
 # Player state
 var is_alive: bool = true  # Track if player is alive for enemy targeting
@@ -51,7 +59,7 @@ var is_firing: bool = false
 var can_fire: bool = true
 var is_fire_button_held: bool = false  # Track if fire button is held
 var fire_timer: float = 0.0  # Timer for automatic fire when holding
-const fire_cooldown: float = 1.0  # Cooldown time between shots (1 shot per second max)
+var fire_cooldown: float = 1.0  # Current fire cooldown (base * class modifier)
 
 # Dodge/Evade System
 var is_dodging: bool = false  # Currently performing a dodge roll
@@ -91,7 +99,7 @@ const ROCKET_SCENE = preload("res://coop/scenes/rocket.tscn")
 var weapon_stats = {
 	"damage": 0.0,  # Additional flat damage (base is attack_damage)
 	"damage_multiplier": 1.0,  # Multiplicative damage bonus
-	"fire_cooldown": fire_cooldown,  # Cooldown between shots
+	"fire_cooldown": 1.0,  # Cooldown between shots (will be set from fire_cooldown)
 	"pierce_count": 0,  # Number of enemies arrow can pierce
 	"multishot_count": 1,  # Number of arrows fired per shot
 	"arrow_speed": 500.0,  # Base arrow speed
@@ -159,6 +167,15 @@ func _ready() -> void:
 	# Enable Y-sort for proper depth sorting
 	# Characters with higher Y position (lower on screen) will render in front
 	y_sort_enabled = true
+
+	# Initialize base stats from exported variables
+	max_health = base_max_health
+	attack_damage = base_attack_damage
+	walk_speed = base_walk_speed
+	run_speed = base_run_speed
+	fire_cooldown = base_fire_cooldown
+	current_health = max_health
+	weapon_stats["fire_cooldown"] = fire_cooldown
 
 	# Apply weapon selection if coming from lobby (do this BEFORE class modifiers)
 	if has_meta("selected_weapon"):
@@ -435,14 +452,14 @@ func _physics_process(_delta: float) -> void:
 	# Determine if player can run (has stamina and is trying to run)
 	if wants_to_run and direction != Vector2.ZERO and current_stamina > 0:
 		is_running = true
-		current_speed = run_speed * class_speed_modifier
+		current_speed = run_speed
 		# Drain stamina while running
 		current_stamina -= stamina_drain_rate * _delta
 		if current_stamina < 0:
 			current_stamina = 0
 	else:
 		is_running = false
-		current_speed = walk_speed * class_speed_modifier
+		current_speed = walk_speed
 		# Regenerate stamina when not running
 		if current_stamina < max_stamina:
 			current_stamina += stamina_regen_rate * _delta
@@ -3144,18 +3161,21 @@ func apply_class_modifiers(selected_class: String) -> void:
 
 	print("Applying class modifiers for ", class_data["name"])
 
-	# Apply health modifier
-	max_health = int(max_health * class_data["health_modifier"])
+	# Apply health modifier (use base value)
+	max_health = int(base_max_health * class_data["health_modifier"])
 	current_health = max_health
 
-	# Apply damage modifier
-	attack_damage = int(attack_damage * class_data["damage_modifier"])
+	# Apply damage modifier (use base value)
+	attack_damage = int(base_attack_damage * class_data["damage_modifier"])
 
 	# Apply speed modifiers
 	class_speed_modifier = class_data["speed_modifier"]
+	walk_speed = base_walk_speed * class_speed_modifier
+	run_speed = base_run_speed * class_speed_modifier
 
-	# Apply attack speed modifier to fire cooldown
-	weapon_stats.fire_cooldown = fire_cooldown * (1.0 / class_data["attack_speed_modifier"])
+	# Apply attack speed modifier to fire cooldown (use base value)
+	fire_cooldown = base_fire_cooldown * (1.0 / class_data["attack_speed_modifier"])
+	weapon_stats["fire_cooldown"] = fire_cooldown
 
 	# Apply combat type and melee range
 	if class_data.has("combat_type"):

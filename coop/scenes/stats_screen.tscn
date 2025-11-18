@@ -69,6 +69,122 @@ layout_mode = 2
 layout_mode = 2
 columns = 2
 
+[node name="BaseStats" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/Content"]
+layout_mode = 2
+
+[node name="SectionTitle" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats"]
+layout_mode = 2
+text = "BASE STATS"
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats"]
+layout_mode = 2
+
+[node name="StatsGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats"]
+layout_mode = 2
+columns = 2
+
+[node name="BaseHealthLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "Base Health:"
+
+[node name="BaseHealthValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "100"
+
+[node name="BaseDamageLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "Base Damage:"
+
+[node name="BaseDamageValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "15"
+
+[node name="BaseWalkSpeedLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "Base Walk Speed:"
+
+[node name="BaseWalkSpeedValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "100.0"
+
+[node name="BaseRunSpeedLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "Base Run Speed:"
+
+[node name="BaseRunSpeedValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "135.0"
+
+[node name="BaseFireCooldownLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "Base Fire Cooldown:"
+
+[node name="BaseFireCooldownValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/BaseStats/StatsGrid"]
+layout_mode = 2
+text = "1.0s"
+
+[node name="ClassModifiedStats" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/Content"]
+layout_mode = 2
+
+[node name="SectionTitle" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats"]
+layout_mode = 2
+text = "CLASS-MODIFIED STATS"
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats"]
+layout_mode = 2
+
+[node name="StatsGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats"]
+layout_mode = 2
+columns = 2
+
+[node name="ModifiedHealthLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "Health:"
+
+[node name="ModifiedHealthValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "100 / 100"
+
+[node name="ModifiedDamageLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "Damage:"
+
+[node name="ModifiedDamageValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "15"
+
+[node name="ModifiedWalkSpeedLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "Walk Speed:"
+
+[node name="ModifiedWalkSpeedValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "100.0"
+
+[node name="ModifiedRunSpeedLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "Run Speed:"
+
+[node name="ModifiedRunSpeedValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "135.0"
+
+[node name="ModifiedFireCooldownLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "Fire Cooldown:"
+
+[node name="ModifiedFireCooldownValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/ClassModifiedStats/StatsGrid"]
+layout_mode = 2
+text = "1.0s"
+
+[node name="ClassLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/PlayerStats/StatsGrid"]
+layout_mode = 2
+text = "Class:"
+
+[node name="ClassValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/PlayerStats/StatsGrid"]
+layout_mode = 2
+text = "Archer"
+
 [node name="LevelLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/PlayerStats/StatsGrid"]
 layout_mode = 2
 text = "Level:"
@@ -178,6 +294,16 @@ text = "Homing:"
 [node name="HomingValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/WeaponStats/StatsGrid"]
 layout_mode = 2
 text = "None"
+
+[node name="ComboLabel" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/WeaponStats/StatsGrid"]
+layout_mode = 2
+text = "Combo Attack:"
+visible = false
+
+[node name="ComboValue" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/Content/WeaponStats/StatsGrid"]
+layout_mode = 2
+text = "Ready"
+visible = false
 
 [node name="ActiveUpgrades" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/Content"]
 layout_mode = 2
