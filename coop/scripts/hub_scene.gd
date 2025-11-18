@@ -90,7 +90,7 @@ func initialize_solo_mode():
 
 func _prepare_hub_state(is_multiplayer: bool, peer_id: int, is_host: bool) -> void:
 	HubManager.initialize_hub(is_multiplayer)
-	HubManager.register_player(peer_id)
+	HubManager.sync_connected_players(peer_id)
 
 	if peer_id not in LobbyManager.players:
 		var loadout = SaveSystem.get_last_loadout()

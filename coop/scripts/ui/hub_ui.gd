@@ -67,6 +67,7 @@ func _ready():
 		ready_status.visible = true
 		_update_ready_status()
 		HubManager.player_ready_changed.connect(_on_player_ready_changed)
+		HubManager.player_list_changed.connect(_on_player_list_changed)
 
 		# Show host ID display if server/host
 		if multiplayer.is_server():
@@ -310,6 +311,12 @@ func _update_ready_status():
 
 
 func _on_player_ready_changed(_peer_id: int, _is_ready: bool):
+	_update_ready_status()
+	if mission_ui.visible:
+		_update_mission_ui()
+
+
+func _on_player_list_changed():
 	_update_ready_status()
 	if mission_ui.visible:
 		_update_mission_ui()
