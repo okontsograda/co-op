@@ -8,7 +8,6 @@ extends Node2D
 @onready var character_station: Area2D = $Buildings/CharacterHouse/Area2D
 @onready var meta_shop: Area2D = $Buildings/MetaShop/Area2D
 @onready var stats_display: Area2D = $Buildings/StatsHouse/Area2D
-@onready var mission_board: Area2D = $Buildings/MissionHall/Area2D
 @onready var skill_tree: Area2D = null  # SkillTree building doesn't exist yet
 @onready var teleporter_pad: Area2D = $Buildings/Teleporter/Area2D
 
@@ -180,15 +179,12 @@ func _connect_interaction_zones():
 	stats_display.body_entered.connect(_on_zone_entered.bind("stats"))
 	stats_display.body_exited.connect(_on_zone_exited.bind("stats"))
 
-	mission_board.body_entered.connect(_on_zone_entered.bind("mission"))
-	mission_board.body_exited.connect(_on_zone_exited.bind("mission"))
-
 	if skill_tree:
 		skill_tree.body_entered.connect(_on_zone_entered.bind("skill"))
 		skill_tree.body_exited.connect(_on_zone_exited.bind("skill"))
-	if teleporter_pad:
-		teleporter_pad.body_entered.connect(_on_zone_entered.bind("teleporter"))
-		teleporter_pad.body_exited.connect(_on_zone_exited.bind("teleporter"))
+
+	teleporter_pad.body_entered.connect(_on_zone_entered.bind("teleporter"))
+	teleporter_pad.body_exited.connect(_on_zone_exited.bind("teleporter"))
 
 
 func _spawn_solo_player():
@@ -322,7 +318,6 @@ func _try_interact():
 		"character": character_station,
 		"shop": meta_shop,
 		"stats": stats_display,
-		"mission": mission_board,
 		"skill": skill_tree,
 		"teleporter": teleporter_pad
 	}
@@ -339,16 +334,38 @@ func _try_interact():
 func _open_zone_ui(zone_type: String):
 	print("[Hub] Opening %s UI" % zone_type)
 
-	# Use the new meta progression UI for meta-related zones
-	if zone_type in ["character", "shop", "stats"]:
-		_open_meta_progression_ui(zone_type)
-	else:
-		# Use the existing hub UI for other zones (mission, teleporter)
-		if has_node("HubUI"):
-			var hub_ui = get_node("HubUI")
-			if hub_ui.has_method("open_ui"):
-				hub_ui.open_ui(zone_type)
-				active_ui = zone_type
+	match zone_type:
+		"character":
+			_open_character_selection_ui()
+		"shop", "stats":
+			_open_meta_progression_ui(zone_type)
+		_:
+			# Use the existing hub UI for other zones (teleporter handles missions)
+			if has_node("HubUI"):
+				var hub_ui = get_node("HubUI")
+				if hub_ui.has_method("open_ui"):
+					hub_ui.open_ui(zone_type)
+					active_ui = zone_type
+
+
+func _open_character_selection_ui():
+	# Check if character selection UI exists
+	var char_ui = get_node_or_null("CharacterSelectionUI")
+
+	if not char_ui:
+		# Load and instantiate the character selection UI
+		var char_ui_scene = preload("res://coop/scenes/ui/character_selection_ui.tscn")
+		char_ui = char_ui_scene.instantiate()
+		char_ui.name = "CharacterSelectionUI"
+		add_child(char_ui)
+
+		# Connect signals
+		char_ui.closed.connect(_on_character_ui_closed)
+		char_ui.selection_confirmed.connect(_on_character_selection_confirmed)
+
+	# Open the UI
+	char_ui.open()
+	active_ui = "character_selection"
 
 
 func _open_meta_progression_ui(tab: String):
@@ -364,7 +381,6 @@ func _open_meta_progression_ui(tab: String):
 
 		# Connect signals
 		meta_ui.closed.connect(_on_meta_ui_closed)
-		meta_ui.class_selected.connect(_on_class_selected)
 		meta_ui.item_purchased.connect(_on_item_purchased)
 
 	# Open the UI with the requested tab
@@ -373,34 +389,26 @@ func _open_meta_progression_ui(tab: String):
 
 
 func close_active_ui():
-	if active_ui == "meta_progression":
-		var meta_ui = get_node_or_null("MetaProgressionUI")
-		if meta_ui:
-			meta_ui.close()
-	elif has_node("HubUI"):
-		var hub_ui = get_node("HubUI")
-		if hub_ui.has_method("close_ui"):
-			hub_ui.close_ui()
+	match active_ui:
+		"character_selection":
+			var char_ui = get_node_or_null("CharacterSelectionUI")
+			if char_ui:
+				char_ui.close()
+		"meta_progression":
+			var meta_ui = get_node_or_null("MetaProgressionUI")
+			if meta_ui:
+				meta_ui.close()
+		_:
+			if has_node("HubUI"):
+				var hub_ui = get_node("HubUI")
+				if hub_ui.has_method("close_ui"):
+					hub_ui.close_ui()
 	active_ui = ""
 
 
 func _on_meta_ui_closed():
 	active_ui = ""
 	print("[Hub] Meta progression UI closed")
-
-
-func _on_class_selected(selected_class: String):
-	print("[Hub] Class selected: %s" % selected_class)
-
-	# Update player loadout in LobbyManager
-	var peer_id = multiplayer.get_unique_id()
-	if peer_id in LobbyManager.players:
-		LobbyManager.players[peer_id]["class"] = selected_class
-		SaveSystem.save_loadout(selected_class, LobbyManager.players[peer_id]["weapon"])
-
-	# Update visual representation if needed
-	if local_player and local_player.has_method("set_class"):
-		local_player.set_class(selected_class)
 
 
 func _on_item_purchased(item_data: Dictionary):
@@ -411,3 +419,18 @@ func _on_item_purchased(item_data: Dictionary):
 
 	# Show purchase notification if available
 	# NotificationManager.show_notification("Purchased: " + item_data.name)
+
+
+func _on_character_ui_closed():
+	active_ui = ""
+	print("[Hub] Character selection UI closed")
+
+
+func _on_character_selection_confirmed(selected_class: String, selected_weapon: String):
+	print("[Hub] Character selection confirmed: %s with %s" % [selected_class, selected_weapon])
+
+	# Update visual representation if needed
+	if local_player and local_player.has_method("set_class"):
+		local_player.set_class(selected_class)
+	if local_player and local_player.has_method("set_weapon"):
+		local_player.set_weapon(selected_weapon)

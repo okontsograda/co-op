@@ -1,17 +1,11 @@
 extends CanvasLayer
 
 signal closed
-signal class_selected(selected_class: String)
 signal item_purchased(item_data: Dictionary)
 
 # UI References
 @onready var coins_label: Label = $Control/MainContainer/VBoxContainer/Header/MetaCoinsDisplay/HBoxContainer/CoinsLabel
 @onready var tab_container: TabContainer = $Control/MainContainer/VBoxContainer/TabContainer
-
-# Character Tab
-@onready var class_grid: GridContainer = $Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/ClassGrid
-@onready var selected_class_name: Label = $Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo/VBoxContainer/ClassName
-@onready var selected_class_desc: Label = $Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo/VBoxContainer/ClassDescription
 
 # Shop Tab
 @onready var shop_item_list: VBoxContainer = $Control/MainContainer/VBoxContainer/TabContainer/Shop/VBoxContainer/ScrollContainer/ShopItemList
@@ -27,11 +21,9 @@ signal item_purchased(item_data: Dictionary)
 # Preload prefabs
 var shop_item_scene = preload("res://coop/scenes/ui/meta_progression/shop_item.tscn")
 var stat_display_scene = preload("res://coop/scenes/ui/meta_progression/stat_display.tscn")
-var class_button_scene = preload("res://coop/scenes/ui/meta_progression/class_button.tscn")
 
 # Current state
 var current_filter: String = "all"
-var selected_class: String = ""
 
 # Shop data (this would normally come from a data file or database)
 var shop_items = [
@@ -45,13 +37,6 @@ var shop_items = [
 	{"name": "Shadow Cloak", "description": "Dark mysterious cloak cosmetic", "cost": 250, "type": "cosmetic", "unlock": "shadow_cloak", "icon": "🌑"},
 ]
 
-# Class data
-var class_data = {
-	"Archer": {"description": "A ranged damage dealer with high mobility and precision.", "icon": "🏹"},
-	"Knight": {"description": "A tanky melee fighter with high defense and sword mastery.", "icon": "⚔️"},
-	"Mage": {"description": "A powerful spellcaster with elemental abilities and area damage.", "icon": "🔮"},
-	"Tank": {"description": "The ultimate defender with crowd control and damage mitigation.", "icon": "🛡️"}
-}
 
 func _ready():
 	visible = false
@@ -67,27 +52,23 @@ func open(tab: String = ""):
 	visible = true
 	_update_meta_coins()
 
-	# Switch to requested tab
+	# Switch to requested tab (Character tab removed - has its own UI now)
 	match tab:
-		"character":
-			tab_container.current_tab = 0
-			_populate_classes()
 		"shop":
-			tab_container.current_tab = 1
+			tab_container.current_tab = 0  # Shop is now first tab
 			_populate_shop()
 		"stats":
-			tab_container.current_tab = 2
+			tab_container.current_tab = 1  # Stats is now second tab
 			_populate_stats()
 		"achievements":
-			tab_container.current_tab = 3
+			tab_container.current_tab = 2  # Achievements is now third tab
 			_populate_achievements()
 		_:
-			# Default to character tab
+			# Default to shop tab
 			tab_container.current_tab = 0
-			_populate_classes()
+			_populate_shop()
 
 	# Populate all tabs
-	_populate_classes()
 	_populate_shop()
 	_populate_stats()
 	_populate_achievements()
@@ -99,30 +80,6 @@ func close():
 func _update_meta_coins():
 	var coins = SaveSystem.get_meta_coins()
 	coins_label.text = str(coins) + " MC"
-
-func _populate_classes():
-	# Clear existing buttons
-	for child in class_grid.get_children():
-		child.queue_free()
-
-	var unlocked_classes = SaveSystem.get_unlocked_classes()
-	var current_class = SaveSystem.get_selected_class()
-
-	for p_class_name in class_data.keys():
-		var class_button = class_button_scene.instantiate()
-
-		# Add to scene tree FIRST
-		class_grid.add_child(class_button)
-
-		# THEN setup and configure
-		class_button.setup(p_class_name, class_data[p_class_name], p_class_name in unlocked_classes)
-		class_button.class_selected.connect(_on_class_selected)
-
-		# Highlight if currently selected
-		if p_class_name == current_class:
-			class_button.set_selected(true)
-			selected_class = p_class_name
-			_update_selected_class_info(p_class_name)
 
 func _populate_shop():
 	# Clear existing items
@@ -184,22 +141,6 @@ func _populate_achievements():
 	placeholder_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	achievements_list.add_child(placeholder_label)
 
-func _on_class_selected(p_class_name: String):
-	selected_class = p_class_name
-	SaveSystem.set_selected_class(p_class_name)
-	_update_selected_class_info(p_class_name)
-
-	# Update all class buttons to reflect selection
-	for button in class_grid.get_children():
-		button.set_selected(button.player_class == p_class_name)
-
-	class_selected.emit(p_class_name)
-
-func _update_selected_class_info(p_class_name: String):
-	if p_class_name in class_data:
-		selected_class_name.text = p_class_name
-		selected_class_desc.text = class_data[p_class_name].description
-
 func _on_purchase_requested(item_data: Dictionary):
 	var cost = item_data.cost
 
@@ -211,7 +152,6 @@ func _on_purchase_requested(item_data: Dictionary):
 		match item_data.type:
 			"class":
 				SaveSystem.unlock_class(item_data.unlock)
-				_populate_classes()  # Refresh class buttons
 			"weapon":
 				SaveSystem.unlock_weapon(item_data.unlock)
 			"cosmetic":

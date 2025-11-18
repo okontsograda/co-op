@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://dymu16rrml1aw"]
+[gd_scene load_steps=2 format=3 uid="uid://c3i8buimgf0ye"]
 
 [ext_resource type="Script" path="res://coop/scripts/ui/meta_progression/meta_progression_ui.gd" id="1_meta_ui"]
 
@@ -65,7 +65,48 @@ text = "X"
 layout_mode = 2
 size_flags_vertical = 3
 
+[node name="Character" type="MarginContainer" parent="Control/MainContainer/VBoxContainer/TabContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer"]
+layout_mode = 2
+text = "Select Your Class"
+theme_type_variation = &"HeaderMedium"
+horizontal_alignment = 1
+
+[node name="ClassGrid" type="GridContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 20
+columns = 4
+
+[node name="SelectedClassInfo" type="PanelContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo"]
+layout_mode = 2
+
+[node name="ClassName" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo/VBoxContainer"]
+layout_mode = 2
+text = "Archer"
+theme_type_variation = &"HeaderMedium"
+
+[node name="ClassDescription" type="Label" parent="Control/MainContainer/VBoxContainer/TabContainer/Character/VBoxContainer/SelectedClassInfo/VBoxContainer"]
+layout_mode = 2
+text = "A ranged damage dealer with high mobility."
+autowrap_mode = 2
+
 [node name="Shop" type="MarginContainer" parent="Control/MainContainer/VBoxContainer/TabContainer"]
+visible = false
 layout_mode = 2
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10

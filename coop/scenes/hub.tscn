@@ -1124,9 +1124,6 @@ position = Vector2(807, 226)
 [node name="StatsHouse" parent="Buildings" instance=ExtResource("8_shop")]
 position = Vector2(300, 600)
 
-[node name="MissionHall" parent="Buildings" instance=ExtResource("8_shop")]
-position = Vector2(800, 600)
-
 [node name="Teleporter" parent="Buildings" instance=ExtResource("9_teleporter")]
 position = Vector2(375, 313)
 
