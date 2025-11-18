@@ -73,12 +73,33 @@ func _on_peer_disconnected(peer_id: int):
 func register_player(peer_id: int, is_host: bool = false):
 	print("register_player called: peer_id=", peer_id, " is_host=", is_host)
 	if not players.has(peer_id):
+		# Try to load saved class from SaveSystem (for local player)
+		var default_class = "archer"
+		var default_weapon = "bow"
+		var default_name = "Player " + str(peer_id)
+		
+		if peer_id == multiplayer.get_unique_id():
+			# This is the local player - load from SaveSystem
+			if SaveSystem.is_loaded:
+				var saved_class = SaveSystem.get_selected_class()
+				if saved_class != "":
+					default_class = saved_class.to_lower()
+					print("[LobbyManager] Loaded saved class for local player: ", default_class)
+				
+				var loadout = SaveSystem.get_last_loadout()
+				if loadout.has("weapon") and loadout["weapon"] != "":
+					default_weapon = loadout["weapon"].to_lower()
+				
+				var saved_name = SaveSystem.get_player_name()
+				if saved_name != "":
+					default_name = saved_name
+		
 		players[peer_id] = {
-			"class": "archer", 
-			"weapon": "bow", 
+			"class": default_class, 
+			"weapon": default_weapon, 
 			"ready": false, 
 			"is_host": is_host,
-			"player_name": "Player " + str(peer_id)  # Default name
+			"player_name": default_name
 		}
 		print("Added player ", peer_id, " to players dict: ", players[peer_id])
 		print("Emitting player_joined signal for peer ", peer_id)

@@ -17,7 +17,7 @@ var player_data = {
 
 	# Meta progression (persistent hub currency and unlocks)
 	"meta_coins": 0,  # Currency earned from missions, spent in hub
-	"unlocked_classes": ["Archer"],  # Default: Archer unlocked
+	"unlocked_classes": ["Archer", "Knight"],  # Default: Archer and Knight unlocked
 	"unlocked_weapons": ["bow"],  # Default: bow unlocked
 	"unlocked_cosmetics": [],  # Future: cosmetic items
 	"permanent_upgrades": {},  # Future: permanent stat boosts {upgrade_id: level}
@@ -89,8 +89,15 @@ func load_data() -> bool:
 	# Merge loaded data with default structure (in case new fields were added)
 	_merge_data(player_data, loaded_data)
 	
+	# Ensure Knight is unlocked by default (for backwards compatibility with old saves)
+	if "Knight" not in player_data.unlocked_classes:
+		player_data.unlocked_classes.append("Knight")
+		print("[SaveSystem] Added Knight to unlocked classes (backwards compatibility)")
+	
 	print("[SaveSystem] Successfully loaded save data")
 	print("[SaveSystem] Player name: ", player_data.player_name)
+	print("[SaveSystem] Selected class: ", player_data.selected_class)
+	print("[SaveSystem] Unlocked classes: ", player_data.unlocked_classes)
 	is_loaded = true
 	data_loaded.emit()
 	return true
@@ -108,6 +115,7 @@ func save_data() -> bool:
 	file.close()
 	
 	print("[SaveSystem] Successfully saved data")
+	print("[SaveSystem] Selected class in saved data: %s" % player_data.selected_class)
 	data_saved.emit()
 	return true
 
@@ -118,6 +126,16 @@ func _merge_data(default_dict: Dictionary, loaded_dict: Dictionary) -> void:
 		if key in default_dict:
 			if typeof(default_dict[key]) == TYPE_DICTIONARY and typeof(loaded_dict[key]) == TYPE_DICTIONARY:
 				_merge_data(default_dict[key], loaded_dict[key])
+			elif typeof(default_dict[key]) == TYPE_ARRAY and typeof(loaded_dict[key]) == TYPE_ARRAY:
+				# For arrays, merge unique values (preserve defaults that might be missing in old saves)
+				var default_array = default_dict[key] as Array
+				var loaded_array = loaded_dict[key] as Array
+				# Combine arrays and remove duplicates
+				var merged_array = default_array.duplicate()
+				for item in loaded_array:
+					if item not in merged_array:
+						merged_array.append(item)
+				default_dict[key] = merged_array
 			else:
 				default_dict[key] = loaded_dict[key]
 
@@ -231,13 +249,17 @@ func spend_meta_currency(amount: int) -> bool:
 
 
 func is_class_unlocked(p_class_name: String) -> bool:
-	return p_class_name in player_data.unlocked_classes
+	# Case-insensitive check - convert to capitalized format for comparison
+	var capitalized_name = p_class_name.capitalize()
+	return capitalized_name in player_data.unlocked_classes
 
 
 func unlock_class(p_class_name: String) -> void:
-	if not is_class_unlocked(p_class_name):
-		player_data.unlocked_classes.append(p_class_name)
-		print("[SaveSystem] Unlocked class: %s" % p_class_name)
+	# Convert to capitalized format for consistency
+	var capitalized_name = p_class_name.capitalize()
+	if not is_class_unlocked(capitalized_name):
+		player_data.unlocked_classes.append(capitalized_name)
+		print("[SaveSystem] Unlocked class: %s" % capitalized_name)
 		save_data()
 
 
@@ -263,6 +285,7 @@ func get_unlocked_weapons() -> Array:
 func save_loadout(p_class_name: String, p_weapon_name: String) -> void:
 	player_data.last_loadout.class = p_class_name
 	player_data.last_loadout.weapon = p_weapon_name
+	print("[SaveSystem] Saving loadout: class=%s, weapon=%s" % [p_class_name, p_weapon_name])
 	save_data()
 
 
@@ -300,9 +323,19 @@ func get_selected_class() -> String:
 
 
 func set_selected_class(p_class_name: String) -> void:
-	if is_class_unlocked(p_class_name):
-		player_data.selected_class = p_class_name
-		save_data()
+	# Convert to capitalized format for consistency
+	var capitalized_name = p_class_name.capitalize()
+	
+	# Always save the selected class, but warn if it's not unlocked
+	if not is_class_unlocked(capitalized_name):
+		print("[SaveSystem] WARNING: Setting selected class to %s which is not unlocked!" % capitalized_name)
+		# Unlock it automatically to prevent issues
+		unlock_class(capitalized_name)
+	
+	player_data.selected_class = capitalized_name
+	print("[SaveSystem] Setting selected class to: %s" % capitalized_name)
+	save_data()
+	print("[SaveSystem] Selected class saved successfully")
 
 
 func is_cosmetic_unlocked(cosmetic_name: String) -> bool:
@@ -355,7 +388,7 @@ func reset_save_data() -> void:
 		"highest_wave": 0,
 		"total_coins_earned": 0,
 		"meta_coins": 0,
-		"unlocked_classes": ["Archer"],
+		"unlocked_classes": ["Archer", "Knight"],
 		"unlocked_weapons": ["bow"],
 		"unlocked_cosmetics": [],
 		"permanent_upgrades": {},

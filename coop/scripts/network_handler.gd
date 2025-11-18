@@ -315,14 +315,14 @@ func start_server(go_to_lobby: bool = true) -> void:
 	# Connect to peer_disconnected signal to remove disconnected players
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
-	# If go_to_lobby is true, enter lobby instead of starting game immediately
+	# If go_to_lobby is true, enter hub instead of starting game immediately
 	if go_to_lobby:
-		# Store online ID and transition to lobby
+		# Store online ID and transition to hub
 		print("NetworkHandler: Calling LobbyManager.enter_lobby with online_id: ", peer.online_id)
 		LobbyManager.enter_lobby(peer.online_id)
 		print("NetworkHandler: LobbyManager.players after enter_lobby: ", LobbyManager.players)
-		print("NetworkHandler: Changing scene to lobby.tscn")
-		get_tree().change_scene_to_file("res://coop/scenes/lobby.tscn")
+		print("NetworkHandler: Changing scene to hub.tscn")
+		get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
 	else:
 		# Old behavior: spawn player and start game immediately
 		await get_tree().create_timer(0.1).timeout
@@ -979,13 +979,13 @@ func start_client(host_id: String = "", go_to_lobby: bool = true) -> void:
 
 	print("Client successfully connected to ", host_id)
 
-	# If go_to_lobby is true, enter lobby
+	# If go_to_lobby is true, enter hub
 	if go_to_lobby:
 		print("NetworkHandler: Calling LobbyManager.enter_lobby with host_id: ", host_id)
 		LobbyManager.enter_lobby(host_id)
 		print("NetworkHandler: LobbyManager.players after enter_lobby: ", LobbyManager.players)
-		print("NetworkHandler: Changing scene to lobby.tscn")
-		get_tree().change_scene_to_file("res://coop/scenes/lobby.tscn")
+		print("NetworkHandler: Changing scene to hub.tscn")
+		get_tree().change_scene_to_file("res://coop/scenes/hub.tscn")
 
 
 # Chat system functions

@@ -216,13 +216,58 @@ func _spawn_player_internal(peer_id: int):
 		print("[Hub] No spawn points found, using default position")
 
 	# Add metadata for class/weapon
+	# PRIORITY: SaveSystem > LobbyManager (SaveSystem has the persistent saved class)
+	var selected_class = ""
+	var selected_weapon = "bow"
+	
+	# Wait for SaveSystem to load if needed
+	if not SaveSystem.is_loaded:
+		await SaveSystem.data_loaded
+	
+	# First, try to load from SaveSystem (this is the persistent saved class)
+	var saved_class = SaveSystem.get_selected_class()
+	if saved_class != "":
+		# Convert capitalized SaveSystem format to lowercase for PlayerClass
+		selected_class = saved_class.to_lower()
+		print("[Hub] Loaded saved class from SaveSystem: %s" % selected_class)
+		
+		# Get saved weapon from loadout
+		var loadout = SaveSystem.get_last_loadout()
+		if loadout.has("weapon") and loadout["weapon"] != "":
+			selected_weapon = loadout["weapon"].to_lower()
+			print("[Hub] Loaded saved weapon from loadout: %s" % selected_weapon)
+	
+	# Fallback to LobbyManager if SaveSystem doesn't have a class
+	if selected_class == "" and peer_id in LobbyManager.players:
+		selected_class = LobbyManager.players[peer_id].get("class", "")
+		selected_weapon = LobbyManager.players[peer_id].get("weapon", "bow")
+		print("[Hub] Loaded class from LobbyManager: %s" % selected_class)
+	
+	# Set metadata for player BEFORE adding to scene (so _ready() can access it)
+	if selected_class != "":
+		player.set_meta("selected_class", selected_class)
+		player.set_meta("selected_weapon", selected_weapon)
+		print("[Hub] Set metadata for player %d: class=%s, weapon=%s" % [peer_id, selected_class, selected_weapon])
+	else:
+		print("[Hub] WARNING: No class found for player %d, will default to archer" % peer_id)
+	
+	# Ensure LobbyManager has this data for consistency
 	if peer_id in LobbyManager.players:
-		player.set_meta("selected_class", LobbyManager.players[peer_id]["class"])
-		player.set_meta("selected_weapon", LobbyManager.players[peer_id]["weapon"])
+		if selected_class != "":
+			LobbyManager.players[peer_id]["class"] = selected_class
+		if selected_weapon != "":
+			LobbyManager.players[peer_id]["weapon"] = selected_weapon
+	else:
+		# If player not in LobbyManager yet, add them
+		LobbyManager.register_player(peer_id, peer_id == multiplayer.get_unique_id() and multiplayer.is_server())
+		if selected_class != "":
+			LobbyManager.players[peer_id]["class"] = selected_class
+		if selected_weapon != "":
+			LobbyManager.players[peer_id]["weapon"] = selected_weapon
 
-	# Add player to scene
+	# Add player to scene (this triggers _ready() which will read the metadata)
 	add_child(player)
-	print("[Hub] Player spawned: %d" % peer_id)
+	print("[Hub] Player %d added to scene tree" % peer_id)
 
 
 func _find_local_player():
@@ -429,8 +474,20 @@ func _on_character_ui_closed():
 func _on_character_selection_confirmed(selected_class: String, selected_weapon: String):
 	print("[Hub] Character selection confirmed: %s with %s" % [selected_class, selected_weapon])
 
-	# Update visual representation if needed
-	if local_player and local_player.has_method("set_class"):
-		local_player.set_class(selected_class)
-	if local_player and local_player.has_method("set_weapon"):
-		local_player.set_weapon(selected_weapon)
+	# Update player model immediately with new class
+	if local_player:
+		# Update LobbyManager data for this player
+		var peer_id = multiplayer.get_unique_id()
+		if peer_id in LobbyManager.players:
+			LobbyManager.players[peer_id]["class"] = selected_class
+			LobbyManager.players[peer_id]["weapon"] = selected_weapon
+		
+		# Apply class modifiers to update sprite, stats, and appearance
+		if local_player.has_method("apply_class_modifiers"):
+			local_player.apply_class_modifiers(selected_class)
+			print("[Hub] Applied class modifiers to player model")
+		
+		# Update weapon if player has the method
+		if local_player.has_method("initialize_weapon"):
+			local_player.initialize_weapon()
+			print("[Hub] Reinitialized weapon for player")

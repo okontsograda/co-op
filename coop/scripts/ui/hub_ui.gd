@@ -130,16 +130,23 @@ func _build_class_buttons():
 	for child in class_buttons_container.get_children():
 		child.queue_free()
 
-	# Get unlocked classes
+	# Get unlocked classes (convert to lowercase for comparison)
 	var unlocked_classes = SaveSystem.get_unlocked_classes()
-	var all_classes = ["Archer", "Knight", "Mage", "Tank"]
+	var unlocked_classes_lower = []
+	for cls in unlocked_classes:
+		unlocked_classes_lower.append(cls.to_lower())
+	
+	# Use lowercase class IDs to match PlayerClass system
+	var all_classes = ["archer", "knight", "mage", "tank"]
 
 	for p_class in all_classes:
 		var btn = Button.new()
-		btn.text = p_class
-		btn.disabled = not (p_class in unlocked_classes)
+		# Display capitalized name from PlayerClass
+		var class_info = PlayerClass.get_class_by_name(p_class)
+		btn.text = class_info["name"]
+		btn.disabled = not (p_class in unlocked_classes_lower)
 
-		if p_class in unlocked_classes:
+		if p_class in unlocked_classes_lower:
 			btn.pressed.connect(_on_class_selected.bind(p_class))
 		else:
 			btn.tooltip_text = "Locked - Purchase in Meta Shop"
@@ -150,20 +157,23 @@ func _build_class_buttons():
 func _on_class_selected(p_class_name: String):
 	print("[HubUI] Class selected: %s" % p_class_name)
 
-	# Update local player data
+	# Update local player data (p_class_name is lowercase ID)
 	var peer_id = multiplayer.get_unique_id()
 	if peer_id in LobbyManager.players:
 		LobbyManager.players[peer_id]["class"] = p_class_name
 
 		# Determine weapon based on class
+		var class_data = PlayerClass.get_class_by_name(p_class_name)
 		var weapon = "bow"
-		if p_class_name == "Knight":
+		if class_data.has("combat_type") and class_data["combat_type"] == "melee":
 			weapon = "sword"
 
 		LobbyManager.players[peer_id]["weapon"] = weapon
 
-		# Save loadout
-		SaveSystem.save_loadout(p_class_name, weapon)
+		# Save loadout (convert to capitalized for SaveSystem)
+		var capitalized_class = p_class_name.capitalize()
+		SaveSystem.set_selected_class(capitalized_class)
+		SaveSystem.save_loadout(capitalized_class, weapon)
 
 		print("[HubUI] Loadout saved: %s with %s" % [p_class_name, weapon])
 

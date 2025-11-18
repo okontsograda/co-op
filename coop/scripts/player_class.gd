@@ -4,8 +4,10 @@ class_name PlayerClass
 # Static class definitions for different player types
 static func get_class_by_name(class_id: String) -> Dictionary:
 	var classes = get_all_classes()
-	if classes.has(class_id):
-		return classes[class_id]
+	# Convert to lowercase for case-insensitive lookup
+	var lower_class_id = class_id.to_lower()
+	if classes.has(lower_class_id):
+		return classes[lower_class_id]
 	return classes["archer"]  # Default to archer
 
 

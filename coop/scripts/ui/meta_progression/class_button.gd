@@ -31,9 +31,10 @@ func _apply_setup(p_class_name: String, class_data: Dictionary, p_is_unlocked: b
 	player_class = p_class_name
 	is_unlocked = p_is_unlocked
 
-	# Set class info
+	# Set class info (display capitalized name from PlayerClass)
 	if class_name_label:
-		class_name_label.text = p_class_name
+		var class_info = PlayerClass.get_class_by_name(p_class_name)
+		class_name_label.text = class_info["name"]
 
 	# Set icon (using emoji for now)
 	if class_data.has("icon") and icon_rect:

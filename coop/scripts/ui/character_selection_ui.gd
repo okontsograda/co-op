@@ -19,9 +19,9 @@ var class_button_scene = preload("res://coop/scenes/ui/meta_progression/class_bu
 var selected_class: String = ""
 var selected_weapon: String = ""
 
-# Class data with stats
+# Class data with stats (using lowercase IDs to match PlayerClass system)
 var class_data = {
-	"Archer": {
+	"archer": {
 		"description": "A ranged damage dealer with high mobility and precision.",
 		"icon": "🏹",
 		"stats": {
@@ -33,7 +33,7 @@ var class_data = {
 		},
 		"weapons": ["Bow", "Crossbow", "Throwing Knives"]
 	},
-	"Knight": {
+	"knight": {
 		"description": "A tanky melee fighter with high defense and sword mastery.",
 		"icon": "⚔️",
 		"stats": {
@@ -45,7 +45,7 @@ var class_data = {
 		},
 		"weapons": ["Sword", "Mace", "Axe"]
 	},
-	"Mage": {
+	"mage": {
 		"description": "A powerful spellcaster with elemental abilities and area damage.",
 		"icon": "🔮",
 		"stats": {
@@ -57,7 +57,7 @@ var class_data = {
 		},
 		"weapons": ["Staff", "Wand", "Orb"]
 	},
-	"Tank": {
+	"tank": {
 		"description": "The ultimate defender with crowd control and damage mitigation.",
 		"icon": "🛡️",
 		"stats": {
@@ -81,7 +81,8 @@ func open():
 	# Pre-select current class if any
 	var current_class = SaveSystem.get_selected_class()
 	if current_class != "":
-		_select_class(current_class)
+		# Convert capitalized name to lowercase ID
+		_select_class(current_class.to_lower())
 
 func close():
 	visible = false
@@ -93,6 +94,10 @@ func _populate_classes():
 		child.queue_free()
 
 	var unlocked_classes = SaveSystem.get_unlocked_classes()
+	# Convert unlocked classes to lowercase for comparison
+	var unlocked_classes_lower = []
+	for cls in unlocked_classes:
+		unlocked_classes_lower.append(cls.to_lower())
 
 	for p_class_name in class_data.keys():
 		var class_button = class_button_scene.instantiate()
@@ -100,8 +105,8 @@ func _populate_classes():
 		# Add to tree first
 		class_grid.add_child(class_button)
 
-		# Then setup
-		class_button.setup(p_class_name, class_data[p_class_name], p_class_name in unlocked_classes)
+		# Then setup (check if lowercase version is unlocked)
+		class_button.setup(p_class_name, class_data[p_class_name], p_class_name in unlocked_classes_lower)
 		class_button.class_selected.connect(_on_class_button_pressed)
 
 		# Highlight current selection
@@ -138,9 +143,10 @@ func _update_class_info(p_class_name: String):
 		return
 
 	var data = class_data[p_class_name]
+	var class_info = PlayerClass.get_class_by_name(p_class_name)
 
-	# Update name and description
-	class_name_label.text = p_class_name
+	# Update name and description (use capitalized name from PlayerClass for display)
+	class_name_label.text = class_info["name"]
 	class_description.text = data.description
 
 	# Update icon (using emoji for now)
@@ -246,16 +252,19 @@ func _on_confirm_button_pressed():
 	if selected_class == "" or selected_weapon == "":
 		return
 
-	# Save selection
-	SaveSystem.set_selected_class(selected_class)
-	SaveSystem.save_loadout(selected_class, selected_weapon)
+	# Convert to capitalized format for SaveSystem (selected_class is lowercase ID)
+	var capitalized_class = selected_class.capitalize()
+	
+	# Save selection to SaveSystem (uses capitalized format)
+	SaveSystem.set_selected_class(capitalized_class)
+	SaveSystem.save_loadout(capitalized_class, selected_weapon)
 
-	# Update LobbyManager if in multiplayer
+	# Update LobbyManager if in multiplayer (uses lowercase IDs)
 	var peer_id = multiplayer.get_unique_id()
 	if peer_id in LobbyManager.players:
 		LobbyManager.players[peer_id]["class"] = selected_class
 		LobbyManager.players[peer_id]["weapon"] = selected_weapon
 
-	# Emit signal and close
+	# Emit signal with lowercase class ID (for hub scene to use)
 	selection_confirmed.emit(selected_class, selected_weapon)
 	close()

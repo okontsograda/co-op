@@ -170,9 +170,30 @@ func _ready() -> void:
 	var selected_class := ""
 	if has_meta("selected_class"):
 		selected_class = str(get_meta("selected_class"))
+		print("[Player] Found selected_class in metadata: ", selected_class)
 	elif LobbyManager and LobbyManager.players.has(peer_id):
 		selected_class = LobbyManager.players[peer_id].get("class", "archer")
+		print("[Player] Found selected_class in LobbyManager: ", selected_class)
+	
+	# If still no class, try loading from SaveSystem (for hub spawns)
+	if selected_class == "" and is_multiplayer_authority():
+		# Wait for SaveSystem to load if needed
+		if not SaveSystem.is_loaded:
+			await SaveSystem.data_loaded
+		
+		var saved_class = SaveSystem.get_selected_class()
+		if saved_class != "":
+			# Convert capitalized SaveSystem format to lowercase for PlayerClass
+			selected_class = saved_class.to_lower()
+			print("[Player] Loaded selected_class from SaveSystem: ", selected_class)
+	
+	# Default to archer if still no class found
+	if selected_class == "":
+		selected_class = "archer"
+		print("[Player] No class found, defaulting to archer")
+	
 	if selected_class != "":
+		print("[Player] Applying class modifiers for: ", selected_class)
 		apply_class_modifiers(selected_class)
 
 	# Initialize weapon configuration
@@ -3157,17 +3178,27 @@ func apply_class_modifiers(selected_class: String) -> void:
 
 	# Load and apply character sprite frames
 	var animated_sprite = get_node_or_null("AnimatedSprite2D")
-	if animated_sprite and class_data.has("sprite_frames_path"):
-		var sprite_frames = load(class_data["sprite_frames_path"])
-		if sprite_frames:
-			animated_sprite.sprite_frames = sprite_frames
-			print("  Loaded sprite frames from: ", class_data["sprite_frames_path"])
-			# Restart current animation with new sprite frames
-			if animated_sprite.is_playing():
-				var current_anim = animated_sprite.animation
-				animated_sprite.play(current_anim)
+	if animated_sprite:
+		if class_data.has("sprite_frames_path"):
+			var sprite_frames_path = class_data["sprite_frames_path"]
+			print("  Attempting to load sprite frames from: ", sprite_frames_path)
+			var sprite_frames = load(sprite_frames_path)
+			if sprite_frames:
+				animated_sprite.sprite_frames = sprite_frames
+				print("  ✓ Successfully loaded sprite frames from: ", sprite_frames_path)
+				# Force play idle animation to make sprite visible
+				if animated_sprite.sprite_frames.has_animation("idle"):
+					animated_sprite.play("idle")
+				elif animated_sprite.is_playing():
+					var current_anim = animated_sprite.animation
+					animated_sprite.play(current_anim)
+			else:
+				print("  ✗ ERROR: Failed to load sprite frames from: ", sprite_frames_path)
+				print("  ✗ File may not exist or path is incorrect")
 		else:
-			print("  ERROR: Failed to load sprite frames from: ", class_data["sprite_frames_path"])
+			print("  ✗ WARNING: Class data missing sprite_frames_path!")
+	else:
+		print("  ✗ ERROR: AnimatedSprite2D node not found!")
 
 	# Apply color tint to sprite (if you want to tint on top of the sprite)
 	if animated_sprite:
