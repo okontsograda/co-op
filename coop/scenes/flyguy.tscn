@@ -491,6 +491,7 @@ position = Vector2(-2, -29)
 shape = SubResource("CapsuleShape2D_enemy")
 
 [node name="AttackRangeArea" type="Area2D" parent="."]
+visible = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackRangeArea"]
 position = Vector2(-2, -25)
