@@ -33,6 +33,7 @@ var is_in_attack_range: bool = false
 var is_area_attack: bool = false
 var area_attack_radius: float = 100.0  # Radius for area attacks
 var attack_warning_indicator: Node2D = null  # Visual warning circle
+var attack_collision_area: Area2D = null  # Collision area for attack range (visible)
 var warning_tween: Tween = null  # Tween for warning animation
 var area_attack_position: Vector2 = Vector2.ZERO  # Store position when attack starts
 var last_attacker: String = ""  # Track who dealt the killing blow
@@ -829,7 +830,7 @@ func show_area_attack_warning() -> void:
 	if attack_warning_indicator:
 		hide_area_attack_warning()
 	
-	# Create a circle indicator using Line2D
+	# Create a circle indicator using Line2D (outline)
 	var circle = Line2D.new()
 	circle.z_index = 10  # Render above ground but below enemies
 	circle.width = 3.0
@@ -848,6 +849,58 @@ func show_area_attack_warning() -> void:
 	add_child(circle)
 	attack_warning_indicator = circle
 	
+	# Use existing AttackRangeArea from scene if it exists, otherwise create dynamically
+	var area = get_node_or_null("AttackRangeArea")
+	if not area:
+		# Create collision area for visual debugging (fallback if not in scene)
+		area = Area2D.new()
+		area.name = "AttackRangeArea"
+		area.position = Vector2.ZERO  # Center on enemy
+		
+		# Create collision shape
+		var collision_shape = CollisionShape2D.new()
+		var circle_shape = CircleShape2D.new()
+		circle_shape.radius = area_attack_radius
+		collision_shape.shape = circle_shape
+		area.add_child(collision_shape)
+		
+		# Create visual representation of collision (filled circle)
+		var polygon = Polygon2D.new()
+		polygon.z_index = 9  # Just below the outline
+		polygon.color = Color(1.0, 0.2, 0.2, 0.3)  # Semi-transparent red fill
+		
+		# Generate filled circle polygon
+		var polygon_points = PackedVector2Array()
+		for i in range(segments):
+			var angle = (i / float(segments)) * TAU
+			var point = Vector2(cos(angle), sin(angle)) * area_attack_radius
+			polygon_points.append(point)
+		polygon.polygon = polygon_points
+		area.add_child(polygon)
+		
+		add_child(area)
+	else:
+		# Update existing collision shape radius to match current attack radius
+		var collision_shape = area.get_node_or_null("CollisionShape2D")
+		if collision_shape and collision_shape.shape:
+			if collision_shape.shape is CircleShape2D:
+				collision_shape.shape.radius = area_attack_radius
+		
+		# Update polygon if it exists
+		var polygon = area.get_node_or_null("Polygon2D")
+		if polygon:
+			# Regenerate polygon points for new radius
+			var polygon_points = PackedVector2Array()
+			for i in range(segments):
+				var angle = (i / float(segments)) * TAU
+				var point = Vector2(cos(angle), sin(angle)) * area_attack_radius
+				polygon_points.append(point)
+			polygon.polygon = polygon_points
+	
+	# Make the area visible
+	area.visible = true
+	attack_collision_area = area
+	
 	# Animate the warning (pulse effect)
 	if warning_tween:
 		warning_tween.kill()
@@ -855,6 +908,14 @@ func show_area_attack_warning() -> void:
 	warning_tween.set_loops()
 	warning_tween.tween_property(circle, "modulate:a", 0.4, 0.3)
 	warning_tween.tween_property(circle, "modulate:a", 0.8, 0.3)
+	
+	# Also animate the fill if polygon exists
+	var polygon = area.get_node_or_null("Polygon2D")
+	if polygon:
+		var fill_tween = create_tween()
+		fill_tween.set_loops()
+		fill_tween.tween_property(polygon, "color:a", 0.2, 0.3)
+		fill_tween.tween_property(polygon, "color:a", 0.3, 0.3)
 	
 	# Broadcast to all clients (only if server)
 	if multiplayer.is_server():
@@ -878,6 +939,14 @@ func hide_area_attack_warning() -> void:
 	if attack_warning_indicator:
 		attack_warning_indicator.queue_free()
 		attack_warning_indicator = null
+	
+	if attack_collision_area:
+		# Hide the area instead of freeing it (so it stays in scene for editor visibility)
+		attack_collision_area.visible = false
+		# Only free if it was created dynamically (not from scene)
+		if attack_collision_area.name == "AttackCollisionArea":
+			attack_collision_area.queue_free()
+		attack_collision_area = null
 	
 	# Broadcast to all clients (only if server)
 	if multiplayer.is_server():

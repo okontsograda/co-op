@@ -1,4 +1,4 @@
-[gd_scene load_steps=70 format=3 uid="uid://ccnkn1l7sfeai"]
+[gd_scene load_steps=71 format=3 uid="uid://ccnkn1l7sfeai"]
 
 [ext_resource type="Script" uid="uid://bye8ye18ljmnl" path="res://coop/scripts/enemy.gd" id="1_i20k8"]
 [ext_resource type="Texture2D" uid="uid://dipeyk3tyqjiv" path="res://assets/Sprites/FlyGuy/smash_start.png" id="2_t4lp7"]
@@ -462,6 +462,9 @@ properties/4/path = NodePath("AnimatedSprite2D:flip_h")
 properties/4/spawn = true
 properties/4/replication_mode = 1
 
+[sub_resource type="CircleShape2D" id="CircleShape2D_attack"]
+radius = 100.0
+
 [node name="Enemy" type="CharacterBody2D"]
 script = ExtResource("1_i20k8")
 
@@ -486,6 +489,16 @@ replication_config = SubResource("SceneReplicationConfig_anim")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
 position = Vector2(-2, -29)
 shape = SubResource("CapsuleShape2D_enemy")
+
+[node name="AttackRangeArea" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackRangeArea"]
+position = Vector2(-2, -25)
+shape = SubResource("CircleShape2D_attack")
+
+[node name="Polygon2D" type="Polygon2D" parent="AttackRangeArea"]
+z_index = 9
+color = Color(1, 0.2, 0.2, 0.3)
 
 [node name="HealthBar" parent="." instance=ExtResource("7_v5xb8")]
 layout_mode = 3
