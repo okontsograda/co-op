@@ -182,7 +182,7 @@ properties/4/replication_mode = 1
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_epkag")
-attack_damage = 150
+base_attack_damage = 50
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -35)

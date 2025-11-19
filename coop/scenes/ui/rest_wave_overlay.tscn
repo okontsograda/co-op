@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=6 format=3 uid="uid://bnoec3t5anu3s"]
 
-[ext_resource type="Script" path="res://coop/scripts/rest_wave_overlay.gd" id="1"]
+[ext_resource type="Script" uid="uid://bsm56qqp8yryp" path="res://coop/scripts/rest_wave_overlay.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://ce1ym2wr7lrk5" path="res://assets/UI/Banner_Horizontal.png" id="2_u2v4b"]
+[ext_resource type="Texture2D" uid="uid://b8obh2om4k5x0" path="res://assets/UI/Buttons/Button_Blue_3Slides.png" id="3_ls5we"]
+[ext_resource type="Texture2D" uid="uid://bl5icrxapdt7s" path="res://assets/UI/Buttons/Button_Blue_3Slides_Pressed.png" id="4_p35s5"]
+[ext_resource type="Texture2D" uid="uid://dreo0trrdarnb" path="res://assets/UI/Buttons/Button_Hover_3Slides.png" id="5_axfux"]
 
 [node name="RestWaveOverlay" type="CanvasLayer"]
 layer = 100
@@ -19,16 +23,15 @@ theme_override_constants/margin_right = 20
 layout_mode = 2
 theme_override_constants/separation = 5
 
+[node name="BannerHorizontal" type="Sprite2D" parent="TopCenterMessage/VBoxContainer"]
+position = Vector2(558, 22.500006)
+scale = Vector2(2.6770833, 0.73437506)
+texture = ExtResource("2_u2v4b")
+
 [node name="TitleLabel" type="Label" parent="TopCenterMessage/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 text = "REST WAVE"
-horizontal_alignment = 1
-
-[node name="SubtitleLabel" type="Label" parent="TopCenterMessage/VBoxContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Visit the shop or apply level-ups - Press Ready when done"
 horizontal_alignment = 1
 
 [node name="ReadyStatusLabel" type="Label" parent="TopCenterMessage/VBoxContainer"]
@@ -40,7 +43,8 @@ horizontal_alignment = 1
 [node name="LeftSidePanel" type="MarginContainer" parent="."]
 anchors_preset = 9
 anchor_bottom = 1.0
-offset_right = 250.0
+offset_top = 198.0
+offset_right = 220.0
 grow_vertical = 2
 theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 150
@@ -50,18 +54,40 @@ theme_override_constants/margin_bottom = 20
 layout_mode = 2
 theme_override_constants/separation = 15
 
-[node name="LevelUpButton" type="Button" parent="LeftSidePanel/VBoxContainer"]
-custom_minimum_size = Vector2(200, 60)
+[node name="LevelUpButton" type="TextureButton" parent="LeftSidePanel/VBoxContainer"]
 layout_mode = 2
+texture_normal = ExtResource("3_ls5we")
+texture_pressed = ExtResource("4_p35s5")
+texture_hover = ExtResource("5_axfux")
+
+[node name="Label" type="Label" parent="LeftSidePanel/VBoxContainer/LevelUpButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_font_sizes/font_size = 20
 text = "LEVEL UP (0)"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="VSpacer" type="Control" parent="LeftSidePanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 20)
+[node name="ReadyButton2" type="TextureButton" parent="LeftSidePanel/VBoxContainer"]
 layout_mode = 2
+texture_normal = ExtResource("3_ls5we")
+texture_pressed = ExtResource("4_p35s5")
+texture_hover = ExtResource("5_axfux")
 
-[node name="ReadyButton" type="Button" parent="LeftSidePanel/VBoxContainer"]
-custom_minimum_size = Vector2(200, 60)
-layout_mode = 2
+[node name="Label" type="Label" parent="LeftSidePanel/VBoxContainer/ReadyButton2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_font_sizes/font_size = 20
 text = "READY UP"
+horizontal_alignment = 1
+vertical_alignment = 1

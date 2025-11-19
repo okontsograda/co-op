@@ -7,7 +7,9 @@ extends CanvasLayer
 @onready var subtitle_label = $TopCenterMessage/VBoxContainer/SubtitleLabel
 @onready var ready_status_label = $TopCenterMessage/VBoxContainer/ReadyStatusLabel
 @onready var level_up_button = $LeftSidePanel/VBoxContainer/LevelUpButton
-@onready var ready_button = $LeftSidePanel/VBoxContainer/ReadyButton
+@onready var level_up_label = $LeftSidePanel/VBoxContainer/LevelUpButton/Label
+@onready var ready_button = $LeftSidePanel/VBoxContainer/ReadyButton2
+@onready var ready_label = $LeftSidePanel/VBoxContainer/ReadyButton2/Label
 
 # State
 var is_local_player_ready: bool = false
@@ -41,11 +43,11 @@ func _ready():
 
 func _process(_delta):
 	# Update level up button text with pending count
-	if visible and level_up_button:
+	if visible and level_up_button and level_up_label:
 		var team_xp = get_node_or_null("/root/TeamXP")
 		if team_xp:
 			var pending = team_xp.get_pending_level_ups()
-			level_up_button.text = "LEVEL UP (%d)" % pending
+			level_up_label.text = "LEVEL UP (%d)" % pending
 			level_up_button.disabled = pending <= 0
 
 
@@ -62,11 +64,11 @@ func show_overlay() -> void:
 	print("  - ready_button: ", ready_button != null)
 
 	# Reset ready button
-	if ready_button:
+	if ready_button and ready_label:
 		ready_button.disabled = false
-		ready_button.text = "READY UP"
+		ready_label.text = "READY UP"
 	else:
-		print("[RestWaveOverlay] ERROR: ready_button is null!")
+		print("[RestWaveOverlay] ERROR: ready_button or ready_label is null!")
 
 	# Show the overlay
 	show()
@@ -88,9 +90,9 @@ func _on_ready_button_pressed() -> void:
 	is_local_player_ready = true
 
 	# Disable button
-	if ready_button:
+	if ready_button and ready_label:
 		ready_button.disabled = true
-		ready_button.text = "WAITING..."
+		ready_label.text = "WAITING..."
 
 	# Send ready request to server
 	print("[RestWaveOverlay] Getting NetworkHandler...")

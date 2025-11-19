@@ -11,18 +11,53 @@ const enemy_types = {
 		"base_health": 50,
 		"base_damage": 15,
 		"base_speed": 80.0
+	},
+	"flyguy": {
+		"scene": "res://coop/scenes/flyguy.tscn",
+		"base_health": 50,
+		"base_damage": 15,
+		"base_speed": 80.0
 	}
 	# Future enemy types can be added here:
 	# "goblin": { ... },
 	# "skeleton": { ... },
 }
 
+## Export: Select which enemy types can spawn
+## Add/remove enemy type names from this array to control spawning
+@export var enabled_enemy_types: Array[String] = []
+
 # Enemy tracking
 var enemy_id_counter: int = 0
 
 
 func _ready() -> void:
-	print("EnemyManager initialized")
+	# Initialize enabled enemy types with all available types if empty
+	if enabled_enemy_types.is_empty():
+		var all_types: Array[String] = []
+		for key in enemy_types.keys():
+			all_types.append(key)
+		enabled_enemy_types = all_types
+		print("EnemyManager: No enabled enemies specified, enabling all: ", enabled_enemy_types)
+	
+	# Validate enabled enemy types (remove invalid ones)
+	var valid_types: Array[String] = []
+	for enemy_type in enabled_enemy_types:
+		if enemy_types.has(enemy_type):
+			valid_types.append(enemy_type)
+		else:
+			push_warning("EnemyManager: Invalid enemy type '%s' in enabled_enemy_types, removing it" % enemy_type)
+	
+	enabled_enemy_types = valid_types
+	
+	if enabled_enemy_types.is_empty():
+		push_error("EnemyManager: No valid enemy types enabled! Defaulting to all enemies.")
+		var all_types: Array[String] = []
+		for key in enemy_types.keys():
+			all_types.append(key)
+		enabled_enemy_types = all_types
+	
+	print("EnemyManager initialized with enabled enemies: ", enabled_enemy_types)
 
 
 ## ============================================================================
@@ -102,6 +137,19 @@ func _get_wave_damage_multiplier(wave: int) -> float:
 ## ============================================================================
 ## HELPER FUNCTIONS
 ## ============================================================================
+
+## Get a random enemy type from enabled types
+func get_random_enemy_type() -> String:
+	if enabled_enemy_types.is_empty():
+		push_error("EnemyManager: No enabled enemy types! Returning first available type.")
+		return enemy_types.keys()[0]
+	return enabled_enemy_types[randi() % enabled_enemy_types.size()]
+
+
+## Get list of all available enemy type names
+func get_available_enemy_types() -> Array[String]:
+	return enemy_types.keys()
+
 
 ## Get next available enemy ID
 func get_next_enemy_id() -> String:

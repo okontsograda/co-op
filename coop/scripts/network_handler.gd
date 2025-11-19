@@ -859,10 +859,13 @@ func spawn_single_enemy() -> void:
 	# Get enemy size from GameDirector (handles special events and wave scaling)
 	var enemy_size = get_random_enemy_size()
 
+	# Get random enemy type
+	var enemy_type = EnemyManager.get_random_enemy_type()
+
 	# Use EnemyManager for clean API
 	EnemyManager.spawn_enemy.rpc(
 		spawn_position,
-		"mushroom",  # Enemy type
+		enemy_type,
 		enemy_size,
 		current_wave,
 		false,  # is_boss
@@ -887,10 +890,13 @@ func spawn_boss() -> void:
 	var boss_health = GameDirector.get_boss_health()
 	var boss_name = GameDirector.get_random_boss_name()
 
+	# Get random enemy type for boss
+	var enemy_type = EnemyManager.get_random_enemy_type()
+
 	# Use EnemyManager for clean API
 	EnemyManager.spawn_enemy.rpc(
 		spawn_position,
-		"mushroom",  # Enemy type (bosses use same base type)
+		enemy_type,
 		boss_size,
 		current_wave,
 		true,  # is_boss

@@ -1,22 +1,27 @@
-[gd_scene load_steps=3 format=4 uid="uid://bwae3g5tqqwsg"]
+[gd_scene load_steps=3 format=3 uid="uid://bwae3g5tqqwsg"]
 
 [ext_resource type="Script" path="res://coop/scripts/ui/loading_screen.gd" id="1_load"]
+[ext_resource type="Texture2D" uid="uid://ce1ym2wr7lrk5" path="res://assets/UI/Banner_Horizontal.png" id="2_6if5c"]
+
 [node name="LoadingScreen" type="CanvasLayer"]
 layer = 500
 script = ExtResource("1_load")
 
 [node name="ColorRect" type="ColorRect" parent="."]
-color = Color(0, 0, 0, 0.74)
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 0.0
-offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.26666668)
+
+[node name="BannerHorizontal" type="Sprite2D" parent="ColorRect"]
+position = Vector2(566, 292)
+scale = Vector2(3.1041667, 1)
+texture = ExtResource("2_6if5c")
 
 [node name="VBox" type="VBoxContainer" parent="ColorRect"]
-anchors_preset = 8
+layout_mode = 0
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
@@ -31,13 +36,15 @@ theme_override_constants/separation = 12
 
 [node name="StatusLabel" type="Label" parent="ColorRect/VBox"]
 unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
 text = "Loading..."
 horizontal_alignment = 1
 vertical_alignment = 1
-theme_override_font_sizes/font_size = 32
 
 [node name="SubstatusLabel" type="Label" parent="ColorRect/VBox"]
 unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "Please wait"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 18

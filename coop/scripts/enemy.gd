@@ -28,6 +28,13 @@ var current_health: int = max_health
 var target_player: Node2D = null
 var can_attack: bool = true
 var is_in_attack_range: bool = false
+
+# Area attack properties (for flyguy)
+var is_area_attack: bool = false
+var area_attack_radius: float = 100.0  # Radius for area attacks
+var attack_warning_indicator: Node2D = null  # Visual warning circle
+var warning_tween: Tween = null  # Tween for warning animation
+var area_attack_position: Vector2 = Vector2.ZERO  # Store position when attack starts
 var last_attacker: String = ""  # Track who dealt the killing blow
 
 # Animation states
@@ -66,6 +73,16 @@ const RPC_MIN_INTERVAL: float = 0.05  # Minimum 50ms between same RPC
 func _ready() -> void:
 	# Add to enemies group
 	add_to_group("enemies")
+	
+	# Check if this is a flyguy enemy (area attack)
+	var scene_file = get_scene_file_path()
+	if scene_file and "flyguy" in scene_file.to_lower():
+		is_area_attack = true
+		area_attack_radius = 100.0  # Set area attack radius for flyguy
+		attack_range = area_attack_radius  # Use area radius as attack range
+		# Set flyguy-specific attack sound (if not already set in scene)
+		if attack_hit_sound_path == "res://assets/Sounds/SFX/mushroom_hit.mp3":
+			attack_hit_sound_path = "res://assets/Sounds/SFX/ground_impact.mp3"  # Change to flyguy sound
 	
 	# Make enemy not pushable by other CharacterBody2D (players)
 	# Set motion mode to MOTION_MODE_FLOATING to prevent being pushed
@@ -415,15 +432,21 @@ func _physics_process(_delta: float) -> void:
 				attack_target(target_player)
 
 			# Move towards target if not in attack range and not attacking
-			if not is_in_attack_range and not is_attacking:
+			# For area attacks, also stop moving when attacking (even if not "in range" by single-target logic)
+			if not is_in_attack_range and not is_attacking and not (is_area_attack and is_attacking):
 				velocity = direction_to_target * speed
 			else:
 				# Stop moving when in attack range or attacking
+				# For area attacks, always stop when attacking
 				velocity = Vector2.ZERO
 		else:
 			# No target, stop moving
 			velocity = Vector2.ZERO
 			is_in_attack_range = false
+		
+		# For area attacks, always stop moving when attacking (extra safety check)
+		if is_area_attack and is_attacking:
+			velocity = Vector2.ZERO
 			
 	# Always call move_and_slide for proper physics handling
 	move_and_slide()
@@ -703,13 +726,35 @@ func attack_target(target: Node2D) -> void:
 	is_attacking = true
 	can_attack = false  # Prevent multiple attacks
 
-	# Play attack animation immediately (telegraph)
-	rpc("play_attack_animation")
+	# Get sprite reference
 	var sprite = get_node_or_null("AnimatedSprite2D")
+	
+	# Calculate attack animation duration dynamically
+	var attack_animation_duration: float = 0.7  # Default fallback
 	if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("attack"):
-		# Ensure attack animation doesn't loop
-		sprite.sprite_frames.set_animation_loop("attack", false)
-		sprite.play("attack")
+		var frame_count = sprite.sprite_frames.get_frame_count("attack")
+		var anim_speed = sprite.sprite_frames.get_animation_speed("attack")
+		if frame_count > 0 and anim_speed > 0:
+			# Calculate duration: frame_count / anim_speed
+			attack_animation_duration = frame_count / anim_speed
+	
+	# Play attack animation - immediate for single target, delayed for area attacks
+	if not is_area_attack:
+		# For single target attacks, play animation immediately (telegraph)
+		rpc("play_attack_animation")
+		if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("attack"):
+			# Ensure attack animation doesn't loop
+			sprite.sprite_frames.set_animation_loop("attack", false)
+			# Stop current animation and reset to ensure it plays from start
+			sprite.stop()
+			sprite.play("attack")
+	
+	# Show area attack warning indicator for flyguy
+	if is_area_attack:
+		# Store the attack position NOW - this is where the damage will be calculated from
+		# Even if the flyguy moves during the attack, damage is based on where the warning was shown
+		area_attack_position = global_position
+		show_area_attack_warning()
 	
 	# Visual telegraph - flash red to warn player
 	if sprite:
@@ -723,23 +768,53 @@ func attack_target(target: Node2D) -> void:
 	const ATTACK_TELEGRAPH_DURATION = 0.3  # 0.3 seconds to react
 	await get_tree().create_timer(ATTACK_TELEGRAPH_DURATION).timeout
 	
-	# Check if target is STILL in range and valid before dealing damage
-	if target and is_instance_valid(target) and target.has_method("take_damage"):
-		var distance_to_target = global_position.distance_to(target.global_position)
+	# Play attack animation for area attacks - delayed to sync with damage
+	if is_area_attack:
+		# For area attacks (flyguy), start animation now
+		rpc("play_attack_animation")
+		if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("attack"):
+			# Ensure attack animation doesn't loop
+			sprite.sprite_frames.set_animation_loop("attack", false)
+			# Stop current animation and reset to ensure it plays from start
+			sprite.stop()
+			sprite.play("attack")
 		
-		if distance_to_target <= attack_range:
-			# Player is still in range - hit them!
-			target.take_damage(attack_damage, self)
+		# Wait a bit for animation to reach the impact frame before dealing damage
+		# This syncs the damage with the visual impact of the attack
+		const AREA_ATTACK_DAMAGE_DELAY = 1.5  # Delay damage slightly after animation starts
+		await get_tree().create_timer(AREA_ATTACK_DAMAGE_DELAY).timeout
+		
+		# Area attack - damage all players in radius
+		perform_area_attack()
+	else:
+		# Single target attack - damage happens immediately after telegraph
+		if target and is_instance_valid(target) and target.has_method("take_damage"):
+			var distance_to_target = global_position.distance_to(target.global_position)
 			
-			# Play mushroom hit sound when damage is dealt
-			play_mushroom_hit_sound()
-		else:
-			# Player moved out of range - attack missed!
-			print("Enemy ", name, " attack MISSED! Target moved out of range (", distance_to_target, " > ", attack_range, ")")
-			spawn_miss_text()
+			if distance_to_target <= attack_range:
+				# Player is still in range - hit them!
+				target.take_damage(attack_damage, self)
+				
+				# Play mushroom hit sound when damage is dealt
+				play_mushroom_hit_sound()
+			else:
+				# Player moved out of range - attack missed!
+				print("Enemy ", name, " attack MISSED! Target moved out of range (", distance_to_target, " > ", attack_range, ")")
+				spawn_miss_text()
+	
+	# Hide area attack warning after attack
+	if is_area_attack:
+		hide_area_attack_warning()
 
-	# Wait for remaining attack animation to finish
-	await get_tree().create_timer(0.4).timeout  # Wait for remaining animation
+	# Wait for attack animation to finish
+	if is_area_attack:
+		# For area attacks, animation started after telegraph, so wait for full duration
+		await get_tree().create_timer(attack_animation_duration).timeout
+	else:
+		# For single target attacks, animation started before telegraph
+		# Wait for remaining animation duration minus telegraph time (0.3s) and flash time (0.1s)
+		var remaining_duration = max(0.1, attack_animation_duration - ATTACK_TELEGRAPH_DURATION - 0.1)
+		await get_tree().create_timer(remaining_duration).timeout
 
 	# Reset attacking state
 	is_attacking = false
@@ -747,6 +822,132 @@ func attack_target(target: Node2D) -> void:
 	# Start attack cooldown
 	await get_tree().create_timer(attack_cooldown).timeout
 	can_attack = true
+
+
+func show_area_attack_warning() -> void:
+	# Create visual warning indicator for area attack
+	if attack_warning_indicator:
+		hide_area_attack_warning()
+	
+	# Create a circle indicator using Line2D
+	var circle = Line2D.new()
+	circle.z_index = 10  # Render above ground but below enemies
+	circle.width = 3.0
+	circle.default_color = Color(1.0, 0.2, 0.2, 0.8)  # Red with transparency
+	
+	# Generate circle points
+	var points = PackedVector2Array()
+	var segments = 64  # Smooth circle
+	for i in range(segments + 1):
+		var angle = (i / float(segments)) * TAU
+		var point = Vector2(cos(angle), sin(angle)) * area_attack_radius
+		points.append(point)
+	
+	circle.points = points
+	circle.position = Vector2.ZERO  # Center on enemy
+	add_child(circle)
+	attack_warning_indicator = circle
+	
+	# Animate the warning (pulse effect)
+	if warning_tween:
+		warning_tween.kill()
+	warning_tween = create_tween()
+	warning_tween.set_loops()
+	warning_tween.tween_property(circle, "modulate:a", 0.4, 0.3)
+	warning_tween.tween_property(circle, "modulate:a", 0.8, 0.3)
+	
+	# Broadcast to all clients (only if server)
+	if multiplayer.is_server():
+		rpc("show_area_attack_warning_rpc")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func show_area_attack_warning_rpc() -> void:
+	# Only show on clients (server already showed it)
+	if multiplayer.is_server():
+		return
+	
+	show_area_attack_warning()
+
+
+func hide_area_attack_warning() -> void:
+	if warning_tween:
+		warning_tween.kill()
+		warning_tween = null
+	
+	if attack_warning_indicator:
+		attack_warning_indicator.queue_free()
+		attack_warning_indicator = null
+	
+	# Broadcast to all clients (only if server)
+	if multiplayer.is_server():
+		rpc("hide_area_attack_warning_rpc")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func hide_area_attack_warning_rpc() -> void:
+	# Only hide on clients (server already hid it)
+	if multiplayer.is_server():
+		return
+	
+	hide_area_attack_warning()
+
+
+func perform_area_attack() -> void:
+	# Only server processes area attacks
+	if not multiplayer.is_server():
+		return
+	
+	# IMPORTANT: Use the stored attack position (where warning was shown), not current position
+	# This ensures damage matches the warning circle, even if flyguy moved during the attack
+	var attack_pos = area_attack_position
+	if attack_pos == Vector2.ZERO:
+		# Fallback to current position if somehow not set
+		attack_pos = global_position
+	
+	var players = get_tree().get_nodes_in_group("players")
+	var players_hit = 0
+	
+	# Debug: Log attack position and radius
+	print("Flyguy ", name, " performing area attack at stored position ", attack_pos, " (current: ", global_position, ") with radius ", area_attack_radius)
+	
+	for player in players:
+		if not is_instance_valid(player):
+			continue
+		
+		# Skip dead players
+		if "is_alive" in player and not player.is_alive:
+			continue
+		
+		# Check distance from the stored attack position (where warning was shown)
+		# Use the exact same calculation as the warning circle
+		var distance_to_player = attack_pos.distance_to(player.global_position)
+		
+		# Debug: Log all player distances
+		print("Flyguy ", name, " checking player ", player.name, " at ", player.global_position, " distance from attack pos: ", distance_to_player, " (radius: ", area_attack_radius, ")")
+		
+		# Use <= for inclusive check (same as warning circle boundary)
+		if distance_to_player <= area_attack_radius:
+			# Player is in range - hit them!
+			if player.has_method("take_damage"):
+				player.take_damage(attack_damage, self)
+				players_hit += 1
+				print("Flyguy ", name, " HIT player ", player.name, " at distance ", distance_to_player, " (within radius ", area_attack_radius, ")")
+		else:
+			# Player moved out of range during delay - they dodged!
+			print("Flyguy ", name, " MISSED player ", player.name, " (distance: ", distance_to_player, " > radius: ", area_attack_radius, ")")
+	
+	if players_hit > 0:
+		# Play hit sound when damage is dealt
+		play_mushroom_hit_sound()
+		print("Flyguy ", name, " area attack hit ", players_hit, " player(s)")
+	else:
+		# No players hit - attack missed!
+		print("Flyguy ", name, " area attack MISSED! No players in range")
+		spawn_miss_text()
+	
+	# Reset attack position
+	area_attack_position = Vector2.ZERO
 
 
 func spawn_miss_text() -> void:
@@ -786,6 +987,8 @@ func play_attack_animation() -> void:
 	if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation("attack"):
 		# Ensure attack animation doesn't loop
 		sprite.sprite_frames.set_animation_loop("attack", false)
+		# Stop current animation and reset to ensure it plays from start
+		sprite.stop()
 		sprite.play("attack")
 
 
