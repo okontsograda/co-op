@@ -79,8 +79,7 @@ func _ready() -> void:
 	var scene_file = get_scene_file_path()
 	if scene_file and "flyguy" in scene_file.to_lower():
 		is_area_attack = true
-		area_attack_radius = 100.0  # Set area attack radius for flyguy
-		attack_range = area_attack_radius  # Use area radius as attack range
+		# Area attack radius will be set in apply_size_stats() based on enemy size
 		# Set flyguy-specific attack sound (if not already set in scene)
 		if attack_hit_sound_path == "res://assets/Sounds/SFX/mushroom_hit.mp3":
 			attack_hit_sound_path = "res://assets/Sounds/SFX/ground_impact.mp3"  # Change to flyguy sound
@@ -223,6 +222,7 @@ func apply_size_stats() -> void:
 	var base_range = 40.0
 	var base_cooldown = 1.5
 	var base_scale = 1.0
+	var base_area_radius = 100.0  # Base area attack radius for flyguy
 	
 	match enemy_size:
 		EnemySize.SMALL:
@@ -233,6 +233,9 @@ func apply_size_stats() -> void:
 			attack_range = base_range * 0.8  # 32
 			attack_cooldown = base_cooldown * 0.8  # 1.2
 			scale = Vector2.ONE * 0.7  # Smaller sprite
+			# Scale area attack radius with sprite scale for flyguy
+			if is_area_attack:
+				area_attack_radius = base_area_radius * 0.7  # 70
 			
 		EnemySize.MEDIUM:
 			# Medium enemies: Balanced
@@ -242,6 +245,9 @@ func apply_size_stats() -> void:
 			attack_range = base_range  # 40
 			attack_cooldown = base_cooldown  # 1.5
 			scale = Vector2.ONE * base_scale  # Normal sprite
+			# Base area attack radius for flyguy
+			if is_area_attack:
+				area_attack_radius = base_area_radius  # 100
 			
 		EnemySize.LARGE:
 			# Large enemies: Slow, high health, high damage
@@ -251,6 +257,9 @@ func apply_size_stats() -> void:
 			attack_range = base_range * 1.2  # 48
 			attack_cooldown = base_cooldown * 1.3  # 1.95
 			scale = Vector2.ONE * 1.5  # Larger sprite
+			# Scale area attack radius with sprite scale for flyguy
+			if is_area_attack:
+				area_attack_radius = base_area_radius * 1.5  # 150
 			
 		EnemySize.HUGE:
 			# Huge enemies: Very slow, very high health, very high damage (boss-like)
@@ -260,9 +269,18 @@ func apply_size_stats() -> void:
 			attack_range = base_range * 1.5  # 60
 			attack_cooldown = base_cooldown * 1.5  # 2.25
 			scale = Vector2.ONE * 2.0  # Much larger sprite
+			# Scale area attack radius with sprite scale for flyguy
+			if is_area_attack:
+				area_attack_radius = base_area_radius * 2.0  # 200
 	
 	# Set current health to max health
 	current_health = max_health
+	
+	# Update attack range for area attacks
+	if is_area_attack:
+		attack_range = area_attack_radius
+		# Update collision shape and polygon if they exist (for flyguy)
+		update_area_attack_visuals()
 
 
 func get_size_name() -> String:
@@ -276,6 +294,33 @@ func get_size_name() -> String:
 		EnemySize.HUGE:
 			return "HUGE"
 	return "UNKNOWN"
+
+
+func update_area_attack_visuals() -> void:
+	"""Update the area attack collision shape and polygon to match current radius"""
+	if not is_area_attack:
+		return
+	
+	var area = get_node_or_null("AttackRangeArea")
+	if not area:
+		return
+	
+	# Update collision shape radius
+	var collision_shape = area.get_node_or_null("CollisionShape2D")
+	if collision_shape and collision_shape.shape:
+		if collision_shape.shape is CircleShape2D:
+			collision_shape.shape.radius = area_attack_radius
+	
+	# Update polygon points
+	var polygon = area.get_node_or_null("Polygon2D")
+	if polygon:
+		var segments = 64  # Smooth circle
+		var polygon_points = PackedVector2Array()
+		for i in range(segments):
+			var angle = (i / float(segments)) * TAU
+			var point = Vector2(cos(angle), sin(angle)) * area_attack_radius
+			polygon_points.append(point)
+		polygon.polygon = polygon_points
 
 
 func apply_wave_scaling(health_multiplier: float, damage_multiplier: float) -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3 uid="uid://ewcge3xong6o"]
+[gd_scene load_steps=33 format=3 uid="uid://ewcge3xong6o"]
 
 [ext_resource type="Script" uid="uid://w23twj8bucmt" path="res://coop/scripts/player.gd" id="1_epkag"]
 [ext_resource type="Texture2D" uid="uid://bkmrhxpq8yuwi" path="res://assets/Characters/Archer/Archer_Shoot.png" id="2_v5c7p"]
@@ -180,6 +180,9 @@ properties/4/path = NodePath("AnimatedSprite2D:flip_h")
 properties/4/spawn = true
 properties/4/replication_mode = 1
 
+[sub_resource type="Theme" id="Theme_g5pi5"]
+default_font_size = 12
+
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_epkag")
 base_attack_damage = 50
@@ -236,10 +239,11 @@ offset_right = 58.0
 offset_bottom = -10.0
 
 [node name="LevelLabel" type="Label" parent="."]
-offset_left = -101.0
+offset_left = -106.0
 offset_top = -85.0
-offset_right = -1.0
+offset_right = -6.0
 offset_bottom = -62.0
+theme = SubResource("Theme_g5pi5")
 text = "Lv.1"
 horizontal_alignment = 1
 vertical_alignment = 1
